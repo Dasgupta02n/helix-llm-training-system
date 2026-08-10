@@ -586,11 +586,34 @@ def _bootstrap_once(db: Session, settings) -> None:  # type: ignore[no-untyped-d
             db.add(admin)
             db.flush()
     else:
-        # Keep bootstrap admin usable after auth upgrades
-        if not admin.email_verified:
-            admin.email_verified = True
-        if not admin.password_set:
+        # Sync superadmin credentials from BOOTSTRAP_ADMIN_* env (ops rotation).
+        target_email = (settings.bootstrap_admin_email or "").lower().strip()
+        if target_email and admin.email != target_email:
+            other = (
+                db.query(m.User)
+                .filter(m.User.email == target_email)
+                .first()
+            )
+            if other and other.id != admin.id:
+                # Move superadmin role to the configured account
+                admin.is_superadmin = False
+                other.is_superadmin = True
+                other.is_active = True
+                other.email_verified = True
+                other.password_set = True
+                if settings.bootstrap_admin_password:
+                    other.hashed_password = hash_password(
+                        settings.bootstrap_admin_password
+                    )
+                admin = other
+            else:
+                admin.email = target_email
+        if settings.bootstrap_admin_password:
+            admin.hashed_password = hash_password(settings.bootstrap_admin_password)
             admin.password_set = True
+        admin.email_verified = True
+        admin.is_active = True
+        admin.is_superadmin = True
 
     demo = db.query(m.Tenant).filter(m.Tenant.slug == "demo").first()
     if not demo:
