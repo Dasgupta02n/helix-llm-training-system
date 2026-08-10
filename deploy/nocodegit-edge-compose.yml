@@ -1,0 +1,81 @@
+﻿services:
+  nocodegit:
+    image: node:20-bookworm
+    container_name: nocodegit
+    restart: unless-stopped
+    working_dir: /app
+    command:
+      - bash
+      - -lc
+      - set -e; apt-get update -y; apt-get install -y --no-install-recommends python3 make g++ ca-certificates curl; rm -rf /tmp/nocodegit-deploy-main; curl -fsSL https://codeload.github.com/Dasgupta02n/nocodegit-deploy/tar.gz/refs/heads/main | tar -xz -C /tmp; find /app -mindepth 1 -maxdepth 1 ! -name data -exec rm -rf {} +; cp -a /tmp/nocodegit-deploy-main/. /app/; cd /app; rm -f next.config.ts; npm ci --include=dev --omit=optional; npm run build; exec npx next start -H 0.0.0.0 -p 3000
+    expose:
+      - "3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://nocodegit.tech}
+      NOCODEGIT_SECRET: ${NOCODEGIT_SECRET}
+      NOCODEGIT_DATA_DIR: /app/data
+      NOCODEGIT_DATABASE_PATH: /app/data/nocodegit.sqlite
+      NOCODEGIT_STORAGE_PATH: /app/data/snapshots
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      EMAIL_FROM: ${EMAIL_FROM:-NoCodeGit <noreply@nocodegit.tech>}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      RAZORPAY_PLAN_PRO: ${RAZORPAY_PLAN_PRO:-}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      RAZORPAY_PAYMENT_BUTTON_ID: ${RAZORPAY_PAYMENT_BUTTON_ID:-}
+    volumes:
+      - nocodegit_data:/app/data
+      - nocodegit_app:/app
+
+  hanumat:
+    image: nginx:alpine
+    container_name: hanumat
+    restart: unless-stopped
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "set -e; apk add --no-cache curl unzip ca-certificates; rm -rf /usr/share/nginx/html/*; curl -fsSL https://github.com/Dasgupta02n/hanumat/releases/download/deploy-2026-07-24-full/hanumat_out_full.zip -o /tmp/h.zip; unzip -o /tmp/h.zip -d /usr/share/nginx/html; rm -f /tmp/h.zip; test -f /usr/share/nginx/html/index.html; exec nginx -g 'daemon off;'"
+    expose:
+      - "80"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: nocodegit-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - sh
+      - -lc
+      - |
+        cat >/tmp/Caddyfile <<'EOF'
+        nocodegit.tech, www.nocodegit.tech {
+          encode gzip
+          reverse_proxy nocodegit:3000
+        }
+        hanumat.life, www.hanumat.life {
+          encode gzip
+          reverse_proxy hanumat:80
+        }
+        c7xai.in, www.c7xai.in {
+          encode gzip
+          reverse_proxy host.docker.internal:8000
+        }
+        EOF
+        exec caddy run --config /tmp/Caddyfile --adapter caddyfile
+    depends_on:
+      - nocodegit
+      - hanumat
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  nocodegit_data:
+  nocodegit_app:
+  caddy_data:
+  caddy_config:
