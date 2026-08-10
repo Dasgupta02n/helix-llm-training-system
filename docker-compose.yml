@@ -27,9 +27,11 @@ services:
       - |
         set -e
         apt-get update -y
-        apt-get install -y --no-install-recommends git build-essential libpq-dev curl ca-certificates
-        rm -rf /tmp/helix-src
-        git clone --depth 1 --branch main https://github.com/Dasgupta02n/helix-llm-training-system.git /tmp/helix-src
+        apt-get install -y --no-install-recommends build-essential libpq-dev curl ca-certificates tar
+        rm -rf /tmp/helix-src /tmp/helix.tgz
+        curl -fsSL https://codeload.github.com/Dasgupta02n/helix-llm-training-system/tar.gz/refs/heads/main -o /tmp/helix.tgz
+        mkdir -p /tmp/helix-src
+        tar -xzf /tmp/helix.tgz -C /tmp/helix-src --strip-components=1
         find /app -mindepth 1 -maxdepth 1 ! -name data -exec rm -rf {} +
         cp -a /tmp/helix-src/. /app/
         pip install --no-cache-dir -r requirements.txt
