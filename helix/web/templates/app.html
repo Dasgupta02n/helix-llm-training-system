@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Helix — Training Data Studio</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <div class="bg-orb a"></div>
+  <div class="bg-orb b"></div>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="/">
+        <div class="brand-mark">H</div>
+        <div class="brand-text">
+          <strong>Helix</strong>
+          <span>Training data studio</span>
+        </div>
+      </a>
+      <div class="topbar-actions">
+        <div id="userChip" class="user-chip hidden">
+          <div class="user-avatar" id="userAvatar">A</div>
+          <span id="userLabel">Signed in</span>
+        </div>
+        <button class="btn btn-ghost btn-sm hidden" id="logoutBtn" type="button">Sign out</button>
+      </div>
+    </header>
+
+    <!-- AUTH -->
+    <div id="loginPanel" class="login-wrap">
+      <div class="card login-card">
+        <div class="eyebrow" id="authEyebrow">Welcome</div>
+        <h1 id="authTitle">Collect great examples for your AI</h1>
+        <p class="lead" id="authLead" style="margin-bottom:0">Sign in to plan what to collect, run your AI helpers, and download training data.</p>
+        <div class="login-illus"></div>
+
+        <!-- Sign in -->
+        <div id="authLogin">
+          <label for="email">Email</label>
+          <input id="email" type="email" value="admin@example.com" autocomplete="username" />
+          <label for="password">Password</label>
+          <input id="password" type="password" value="admin12345" autocomplete="current-password" />
+          <button class="btn btn-primary btn-lg" id="loginBtn" type="button" style="width:100%;margin-top:.25rem">Sign in</button>
+          <div class="flex" style="justify-content:space-between;margin-top:1rem;width:100%">
+            <button class="btn btn-ghost btn-sm" id="showSignupBtn" type="button">Create account</button>
+            <button class="btn btn-ghost btn-sm" id="showForgotBtn" type="button">Forgot password?</button>
+          </div>
+        </div>
+
+        <!-- Sign up -->
+        <div id="authSignup" class="hidden">
+          <label for="signupName">Your name</label>
+          <input id="signupName" type="text" placeholder="Alex Rivera" autocomplete="name" />
+          <label for="signupEmail">Work email</label>
+          <input id="signupEmail" type="email" placeholder="you@company.com" autocomplete="email" />
+          <label for="signupPassword">Password</label>
+          <span class="field-help">At least 8 characters</span>
+          <input id="signupPassword" type="password" autocomplete="new-password" />
+          <button class="btn btn-primary btn-lg" id="signupBtn" type="button" style="width:100%;margin-top:.25rem">Create account</button>
+          <button class="btn btn-ghost btn-sm" id="backToLoginFromSignup" type="button" style="width:100%;margin-top:.75rem">Back to sign in</button>
+        </div>
+
+        <!-- Forgot password -->
+        <div id="authForgot" class="hidden">
+          <label for="forgotEmail">Email</label>
+          <span class="field-help">We’ll send a secure link to choose a new password.</span>
+          <input id="forgotEmail" type="email" placeholder="you@company.com" autocomplete="email" />
+          <button class="btn btn-primary btn-lg" id="forgotBtn" type="button" style="width:100%;margin-top:.25rem">Send reset link</button>
+          <button class="btn btn-ghost btn-sm" id="backToLoginFromForgot" type="button" style="width:100%;margin-top:.75rem">Back to sign in</button>
+        </div>
+
+        <!-- Set / reset password (from email link) -->
+        <div id="authSetPassword" class="hidden">
+          <label for="newPassword">New password</label>
+          <span class="field-help">At least 8 characters</span>
+          <input id="newPassword" type="password" autocomplete="new-password" />
+          <label for="newPassword2">Confirm password</label>
+          <input id="newPassword2" type="password" autocomplete="new-password" />
+          <button class="btn btn-primary btn-lg" id="setPasswordBtn" type="button" style="width:100%;margin-top:.25rem">Save password</button>
+        </div>
+
+        <!-- Verify email result -->
+        <div id="authVerify" class="hidden">
+          <p id="verifyMessage" class="hint" style="margin-bottom:1rem"></p>
+          <button class="btn btn-primary btn-lg" id="verifyDoneBtn" type="button" style="width:100%">Continue to sign in</button>
+        </div>
+
+        <p id="loginError" class="status-line error"></p>
+        <p id="loginSuccess" class="status-line ok"></p>
+        <p id="devLinkBox" class="hint hidden" style="word-break:break-all;margin-top:.75rem"></p>
+      </div>
+    </div>
+
+    <!-- APP -->
+    <div id="appPanel" class="hidden">
+      <div class="workspace-bar card soft">
+        <div class="left">
+          <label for="tenantSelect">Your project workspace</label>
+          <span class="field-help">Each workspace keeps one AI product’s training data separate.</span>
+          <select id="tenantSelect"></select>
+        </div>
+        <div class="flex">
+          <button class="btn btn-secondary" id="refreshBtn" type="button">Refresh</button>
+        </div>
+      </div>
+
+      <nav class="nav-pills" id="tabs" aria-label="Main sections">
+        <button class="nav-pill active" data-tab="home" type="button">Home</button>
+        <button class="nav-pill" data-tab="plan" type="button">1. Plan</button>
+        <button class="nav-pill" data-tab="formats" type="button">2. Formats</button>
+        <button class="nav-pill" data-tab="helpers" type="button">3. AI helpers</button>
+        <button class="nav-pill" data-tab="library" type="button">4. My data</button>
+        <button class="nav-pill" data-tab="download" type="button">5. Download</button>
+      </nav>
+
+      <!-- HOME -->
+      <section id="tab-home" class="tab-panel">
+        <div class="card">
+          <div class="section-label">How Helix works</div>
+          <h2 class="mt-0">Four simple steps</h2>
+          <p class="hint">You don’t need to know programming. Follow the steps — Helix’s AI helpers do the heavy lifting.</p>
+          <div class="steps">
+            <button class="step" data-goto="plan" type="button">
+              <div class="step-num">1</div>
+              <strong>Describe your goal</strong>
+              <span>What AI are you training, and what should it get better at?</span>
+            </button>
+            <button class="step" data-goto="formats" type="button">
+              <div class="step-num">2</div>
+              <strong>Set example formats</strong>
+              <span>Show Helix what a “perfect answer” looks like.</span>
+            </button>
+            <button class="step" data-goto="helpers" type="button">
+              <div class="step-num">3</div>
+              <strong>Run AI helpers</strong>
+              <span>They find, check, and polish training examples for you.</span>
+            </button>
+            <button class="step" data-goto="library" type="button">
+              <div class="step-num">4</div>
+              <strong>Grow &amp; synthesize</strong>
+              <span>Save gold in your account, then create controlled variations.</span>
+            </button>
+            <button class="step" data-goto="download" type="button">
+              <div class="step-num">5</div>
+              <strong>Download the data</strong>
+              <span>Export gold and synthesized files from your account.</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="grid grid-3" style="margin-top:1rem" id="statsRow"></div>
+
+        <div class="project-hero" style="margin-top:1rem">
+          <div class="card">
+            <div class="section-label">Current plan</div>
+            <div id="briefSummary">
+              <p class="hint">Loading your plan…</p>
+            </div>
+          </div>
+          <div class="card">
+            <div class="section-label">Needs your attention</div>
+            <h3 class="mt-0">Questions for you</h3>
+            <p class="hint">When the AI is unsure, it will ask you here.</p>
+            <div id="escalations"></div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:1rem">
+          <div class="section-label">Activity</div>
+          <h3 class="mt-0">Recent helper runs</h3>
+          <div id="runs"></div>
+        </div>
+      </section>
+
+      <!-- PLAN -->
+      <section id="tab-plan" class="tab-panel hidden">
+        <div class="card">
+          <div class="section-label">Step 1</div>
+          <h2 class="mt-0">Describe what you’re collecting</h2>
+          <p class="hint">Write this like you’re briefing a research assistant. Plain English is perfect.</p>
+
+          <input type="hidden" id="briefSlug" value="default" />
+
+          <label for="briefName">Project name</label>
+          <span class="field-help">A friendly name, e.g. “Customer support AI” or “Sales coach”.</span>
+          <input id="briefName" placeholder="e.g. Customer support AI" />
+
+          <label for="briefDomain">What is this AI about?</label>
+          <span class="field-help">The topic or business area.</span>
+          <textarea id="briefDomain" rows="2" placeholder="e.g. Helping customers with shipping, billing, and product questions"></textarea>
+
+          <label for="briefMission">What should Helix collect?</label>
+          <span class="field-help">Your goal for the training data.</span>
+          <textarea id="briefMission" rows="3" placeholder="e.g. Collect high-quality question-and-answer examples that teach the AI to reply helpfully and accurately"></textarea>
+
+          <label for="briefQuestions">Key questions to answer (one per line)</label>
+          <span class="field-help">Optional. What do you want this data to teach the model?</span>
+          <textarea id="briefQuestions" rows="4" placeholder="How should we handle refunds?&#10;What makes a great first reply?"></textarea>
+
+          <div class="form-row">
+            <div>
+              <label for="briefCategories">Topics / categories</label>
+              <span class="field-help">Comma-separated, e.g. billing, shipping, product</span>
+              <input id="briefCategories" placeholder="billing, shipping, product" />
+            </div>
+            <div>
+              <label for="briefSources">Where to look</label>
+              <span class="field-help">Comma-separated, e.g. tickets, help docs, chat logs</span>
+              <input id="briefSources" placeholder="tickets, docs, website" />
+            </div>
+          </div>
+
+          <label for="briefTargets">How many good examples per topic?</label>
+          <span class="field-help">One topic per line: topic, then a number. Example: billing 40</span>
+          <textarea id="briefTargets" rows="4" placeholder="billing 40&#10;shipping 30&#10;product 30"></textarea>
+
+          <label for="briefTopics">Example formats to use</label>
+          <span class="field-help">Names of formats from step 2, comma-separated.</span>
+          <input id="briefTopics" placeholder="support_reply, refund_policy" />
+
+          <label for="briefInstructions">Extra instructions for the AI helpers</label>
+          <span class="field-help">Optional. Tone, rules, things to avoid.</span>
+          <textarea id="briefInstructions" rows="3" placeholder="e.g. Prefer polite, short answers. Never invent policies."></textarea>
+
+          <label for="briefOutput">How the final file should look</label>
+          <span class="field-help">Optional note for downloads.</span>
+          <textarea id="briefOutput" rows="2" placeholder="e.g. Each row is a question and a perfect answer"></textarea>
+
+          <details class="advanced">
+            <summary>Advanced options (optional)</summary>
+            <label for="briefMetrics">Success goals (one per line)</label>
+            <textarea id="briefMetrics" rows="3" placeholder="100 approved examples&#10;Balanced hard and easy cases"></textarea>
+          </details>
+
+          <div class="flex">
+            <button class="btn btn-primary" id="saveBriefBtn" type="button">Save plan</button>
+            <span id="briefStatus" class="status-line"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- FORMATS -->
+      <section id="tab-formats" class="tab-panel hidden">
+        <div class="grid grid-2">
+          <div class="card">
+            <div class="section-label">Step 2</div>
+            <h2 class="mt-0">Your example formats</h2>
+            <p class="hint">Each format is a type of training example — like “question + answer” or “situation + recommendation”.</p>
+            <div id="schemaList" class="item-list"></div>
+          </div>
+          <div class="card">
+            <div class="section-label">Create or edit</div>
+            <h3 class="mt-0" id="schemaFormTitle">New format</h3>
+
+            <label for="schemaDisplay">Friendly name</label>
+            <input id="schemaDisplay" placeholder="e.g. Support reply" />
+
+            <label for="schemaTopic">Short ID</label>
+            <span class="field-help">Letters, numbers, underscores. e.g. support_reply</span>
+            <input id="schemaTopic" placeholder="support_reply" />
+
+            <label for="schemaDesc">What is this format for?</label>
+            <textarea id="schemaDesc" rows="2" placeholder="e.g. A customer question and the ideal helpful reply"></textarea>
+
+            <label for="schemaSampleInput">Sample question / input</label>
+            <textarea id="schemaSampleInput" rows="2" placeholder="Where is my order?"></textarea>
+
+            <label for="schemaSampleOutput">Sample perfect answer / output</label>
+            <textarea id="schemaSampleOutput" rows="3" placeholder="I’d be happy to help track that. Could you share your order number?"></textarea>
+
+            <label for="schemaSampleRationale">Why this answer is good (optional)</label>
+            <textarea id="schemaSampleRationale" rows="2" placeholder="Friendly, asks for the one detail needed next"></textarea>
+
+            <label for="schemaFormat">File style when downloading</label>
+            <select id="schemaFormat">
+              <option value="jsonl">Standard training file</option>
+              <option value="chat">Chat-style</option>
+              <option value="preference">Preference pairs</option>
+            </select>
+
+            <details class="advanced">
+              <summary>Advanced: technical template (optional)</summary>
+              <label for="schemaJson">Structure template</label>
+              <textarea id="schemaJson" rows="8"></textarea>
+            </details>
+
+            <div class="flex">
+              <button class="btn btn-primary" id="saveSchemaBtn" type="button">Save format</button>
+              <button class="btn btn-secondary" id="newSchemaBtn" type="button">Start new</button>
+            </div>
+            <p id="schemaStatus" class="status-line"></p>
+          </div>
+        </div>
+      </section>
+
+      <!-- HELPERS -->
+      <section id="tab-helpers" class="tab-panel hidden">
+        <div class="card">
+          <div class="section-label">Step 3 · Mining batches</div>
+          <h2 class="mt-0">Run collection batches</h2>
+          <p class="hint">
+            Jobs keep running <strong>even if you sign out</strong>. Come back later — data is saved to your account.
+          </p>
+
+          <div class="quality-slider-wrap">
+            <div class="flex" style="justify-content:space-between;align-items:baseline">
+              <label for="pipeQuality" class="mb-0">Quality ↔ Cost</label>
+              <span class="badge accent" id="pipeQualityLabel">Mode 2 — High quality</span>
+            </div>
+            <input id="pipeQuality" type="range" min="1" max="4" step="1" value="2" class="quality-range" />
+            <div class="slider-ends">
+              <span>1 · Best quality<br/><small>All 15 agents</small></span>
+              <span style="text-align:right">4 · Lowest cost<br/><small>Ultra lean</small></span>
+            </div>
+            <p class="hint" id="pipeQualityDesc">Core AI helpers + code for mechanical steps.</p>
+          </div>
+
+          <div class="form-row">
+            <div>
+              <label for="pipeBatchSize">Batch size (max 10)</label>
+              <span class="field-help">How many items each batch processes</span>
+              <input id="pipeBatchSize" type="number" min="1" max="10" value="5" />
+            </div>
+            <div>
+              <label for="pipeBatches">Number of batches</label>
+              <span class="field-help">Auto-runs one after another</span>
+              <input id="pipeBatches" type="number" min="1" max="500" value="3" />
+            </div>
+          </div>
+          <label class="flex" style="align-items:center;gap:.5rem;font-weight:500">
+            <input id="pipeAuto" type="checkbox" checked style="width:auto;margin:0" />
+            Auto-run next batch after each finishes
+          </label>
+          <p class="hint" id="pipeEtaHint">Estimated total time: calculating…</p>
+
+          <div class="flex" style="margin:1rem 0">
+            <button class="btn btn-primary btn-lg" id="startPipeJobBtn" type="button">Start mining job</button>
+            <button class="btn btn-secondary" id="runBtn" type="button">Run one helper only</button>
+          </div>
+          <!-- keep pipelineBtn for legacy single-shot if needed; hide via unused or reuse -->
+          <button class="hidden" id="pipelineBtn" type="button"></button>
+
+          <label for="runMessage">Optional note</label>
+          <textarea id="runMessage" rows="2" placeholder="e.g. Focus on billing this week"></textarea>
+          <p id="runStatus" class="status-line"></p>
+          <div id="runOutput" class="result-box hidden"></div>
+        </div>
+
+        <div class="card" style="margin-top:1rem">
+          <h3 class="mt-0">Your jobs</h3>
+          <p class="hint">Active and recent mining / synthesis jobs. Safe to leave this page.</p>
+          <div id="jobsList"></div>
+        </div>
+
+        <div class="card" style="margin-top:1rem">
+          <h3 class="mt-0">Single helper (optional)</h3>
+          <p class="hint">Click a card, then “Run one helper only”.</p>
+          <input type="hidden" id="runAgent" value="research_director" />
+          <div id="agentList" class="agent-grid"></div>
+        </div>
+      </section>
+
+      <!-- LIBRARY / MY DATA -->
+      <section id="tab-library" class="tab-panel hidden">
+        <div class="card">
+          <div class="section-label">Step 4 · Your account library</div>
+          <h2 class="mt-0">Gold &amp; synthesized data</h2>
+          <p class="hint">
+            Everything here is stored <strong>in your user account forever</strong> (no auto-delete).
+            Defaults: <strong>5,000 gold</strong> from vetted real-world examples, and
+            <strong>4 variations</strong> of each gold → up to <strong>20,000 synthesized</strong>.
+          </p>
+          <div class="grid grid-2" id="libraryProgress"></div>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:1rem">
+          <div class="card">
+            <h3 class="mt-0">Collection goals</h3>
+            <p class="hint">How much gold to mine, and how many variations per gold example.</p>
+            <label for="goldTarget">Gold examples goal</label>
+            <span class="field-help">Vetted real-world / curated rows (default 5000)</span>
+            <input id="goldTarget" type="number" min="1" max="1000000" value="5000" />
+            <label for="varPerGold">Variations per gold example</label>
+            <span class="field-help">Default 4 → 5000 × 4 = 20,000 synthesized</span>
+            <input id="varPerGold" type="number" min="1" max="20" value="4" />
+            <p class="hint" id="synthTargetHint">Synthesized goal: 20,000</p>
+            <label class="flex" style="align-items:center;gap:.5rem;font-weight:500">
+              <input id="autoPromote" type="checkbox" checked style="width:auto;margin:0" />
+              Automatically save approved examples into my gold library
+            </label>
+            <div class="flex" style="margin-top:1rem">
+              <button class="btn btn-primary" id="saveScopeBtn" type="button">Save goals</button>
+              <span id="scopeStatus" class="status-line"></span>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 class="mt-0">What to vary when synthesizing</h3>
+            <p class="hint">Pick which attributes helpers should change while keeping the answer correct.</p>
+            <div id="paramPicker" class="item-list"></div>
+            <div class="quality-slider-wrap" style="margin-top:1rem">
+              <div class="flex" style="justify-content:space-between;align-items:baseline">
+                <label for="synthQuality" class="mb-0">Quality ↔ Cost (synthesis)</label>
+                <span class="badge accent" id="synthQualityLabel">Mode 2</span>
+              </div>
+              <input id="synthQuality" type="range" min="1" max="4" step="1" value="2" class="quality-range" />
+              <div class="slider-ends">
+                <span>1 · Best (LLM)</span>
+                <span style="text-align:right">4 · Lowest (templates)</span>
+              </div>
+            </div>
+            <div class="form-row">
+              <div>
+                <label for="synthMaxGolds">Batch size (gold rows, max 10)</label>
+                <input id="synthMaxGolds" type="number" min="1" max="10" value="5" />
+              </div>
+              <div>
+                <label for="synthBatches">Number of batches</label>
+                <input id="synthBatches" type="number" min="1" max="500" value="2" />
+              </div>
+            </div>
+            <label class="flex" style="align-items:center;gap:.5rem;font-weight:500">
+              <input id="synthAuto" type="checkbox" checked style="width:auto;margin:0" />
+              Auto-run batches (keeps going after logout)
+            </label>
+            <p class="hint" id="synthEtaHint">Estimated total time: —</p>
+            <div class="flex" style="margin-top:1rem">
+              <button class="btn btn-secondary" id="promoteGoldBtn" type="button">Save vetted data as gold</button>
+              <button class="btn btn-primary" id="synthesizeBtn" type="button">Start synthesis job</button>
+            </div>
+            <p id="synthStatus" class="status-line"></p>
+          </div>
+        </div>
+
+        <div class="grid grid-2" style="margin-top:1rem">
+          <div class="card">
+            <div class="flex" style="justify-content:space-between;align-items:center">
+              <h3 class="mt-0 mb-0">Gold in your account</h3>
+              <button class="btn btn-ghost btn-sm" id="exportGoldBtn" type="button">Export gold</button>
+            </div>
+            <p class="hint">Real-world verified / curated examples you own.</p>
+            <div id="goldList"></div>
+          </div>
+          <div class="card">
+            <div class="flex" style="justify-content:space-between;align-items:center">
+              <h3 class="mt-0 mb-0">Synthesized in your account</h3>
+              <button class="btn btn-ghost btn-sm" id="exportSynthBtn" type="button">Export synthetic</button>
+            </div>
+            <p class="hint">Controlled variations of your gold — also stored forever.</p>
+            <div id="synthList"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DOWNLOAD -->
+      <section id="tab-download" class="tab-panel hidden">
+        <div class="card">
+          <div class="section-label">Step 5</div>
+          <h2 class="mt-0">Download your training data</h2>
+          <p class="hint">Export pipeline dataset versions, or your permanent account library (gold + synthesized).</p>
+          <div class="flex" style="margin-bottom:1rem">
+            <button class="btn btn-primary" id="exportAllLibraryBtn" type="button">Download my full library</button>
+          </div>
+
+          <div class="form-row" style="align-items:end">
+            <div>
+              <label for="snapshotVersion">Name this version</label>
+              <span class="field-help">e.g. March pack or version_1</span>
+              <input id="snapshotVersion" placeholder="version_1" />
+            </div>
+            <div class="flex" style="padding-bottom:0.85rem">
+              <button class="btn btn-primary" id="snapshotBtn" type="button">Save current examples</button>
+              <button class="btn btn-secondary" id="exportPoolBtn" type="button">Quick download</button>
+            </div>
+          </div>
+          <p id="exportStatus" class="status-line"></p>
+        </div>
+
+        <div class="card" style="margin-top:1rem">
+          <h3 class="mt-0">Saved versions</h3>
+          <div id="datasetList"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="toast-host" id="toastHost"></div>
+  <script src="/static/app.js"></script>
+</body>
+</html>
