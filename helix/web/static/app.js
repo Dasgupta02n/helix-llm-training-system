@@ -261,6 +261,9 @@ function goTab(name) {
   document.querySelectorAll(".tab-panel").forEach((p) => p.classList.add("hidden"));
   const panel = $(`tab-${name}`);
   if (panel) panel.classList.remove("hidden");
+  if (name === "riu") {
+    loadRiuSession().catch((e) => toast(e.message, "err"));
+  }
 }
 
 // ── Auth screens ────────────────────────────────────────────────────
@@ -1407,6 +1410,145 @@ async function snapshotPool() {
   }
 }
 
+// ── Riu conversational helper ───────────────────────────────────────
+
+function renderMarkdownLite(text) {
+  // minimal **bold** + newlines for Riu replies
+  return escapeHtml(text || "")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\n/g, "<br>");
+}
+
+function renderRiuState(state) {
+  const el = $("riuStateCard");
+  if (!el) return;
+  const s = state || {};
+  const rows = [
+    ["Project", s.project_name],
+    ["Domain", s.domain],
+    ["Mission", s.mission],
+    ["Topics", (s.categories || []).join(", ")],
+    ["Format", s.format_name || s.topic_key],
+    ["Gold goal", s.gold_target],
+    ["Variations", s.variations_per_gold],
+    ["Quality mode", s.quality_mode],
+  ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
+  if (!rows.length) {
+    el.innerHTML = `<p class="hint mb-0">Nothing yet — start the chat.</p>`;
+    return;
+  }
+  el.innerHTML = `<dl>${rows
+    .map(
+      ([k, v]) =>
+        `<div><dt>${escapeHtml(String(k))}</dt><dd>${escapeHtml(String(v))}</dd></div>`
+    )
+    .join("")}</dl>`;
+}
+
+function renderRiuMessages(messages) {
+  const box = $("riuMessages");
+  if (!box) return;
+  box.innerHTML = "";
+  (messages || []).forEach((m) => {
+    const div = document.createElement("div");
+    const role = m.role === "user" ? "user" : "assistant";
+    div.className = `riu-msg ${role}`;
+    const who =
+      role === "user" ? "You" : m.name || "Riu";
+    div.innerHTML = `<span class="who">${escapeHtml(who)}</span><div class="body">${renderMarkdownLite(
+      m.content || ""
+    )}</div>`;
+    if (m.progress != null && role === "assistant") {
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      meta.textContent = `Setup ~${m.progress}% · phase ${m.phase || "—"}`;
+      div.appendChild(meta);
+    }
+    box.appendChild(div);
+  });
+  box.scrollTop = box.scrollHeight;
+}
+
+async function loadRiuSession() {
+  if (!state.tenantSlug || !$("riuMessages")) return;
+  $("riuStatus").textContent = "Loading Riu…";
+  const data = await api(`/api/t/${state.tenantSlug}/riu/session`);
+  renderRiuMessages(data.messages || []);
+  renderRiuState(data.state || {});
+  const last = (data.messages || []).filter((m) => m.role === "assistant").slice(-1)[0];
+  const prog = last?.progress ?? 0;
+  if ($("riuProgressBadge")) $("riuProgressBadge").textContent = `Setup ${prog}%`;
+  $("riuStatus").textContent = data.status === "active" ? "Riu is ready" : `Session ${data.status}`;
+  return data;
+}
+
+async function sendRiuMessage(text) {
+  if (!state.tenantSlug) throw new Error("Pick a workspace first");
+  const msg = (text || "").trim();
+  if (!msg) return;
+  $("riuInput").value = "";
+  $("riuSendBtn").disabled = true;
+  $("riuStatus").textContent = "Riu is thinking…";
+
+  // optimistic user bubble
+  const box = $("riuMessages");
+  if (box) {
+    const div = document.createElement("div");
+    div.className = "riu-msg user";
+    div.innerHTML = `<span class="who">You</span><div class="body">${renderMarkdownLite(msg)}</div>`;
+    box.appendChild(div);
+    const typing = document.createElement("div");
+    typing.className = "riu-typing";
+    typing.id = "riuTyping";
+    typing.textContent = "Riu is typing…";
+    box.appendChild(typing);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  try {
+    const data = await api(`/api/t/${state.tenantSlug}/riu/message`, {
+      method: "POST",
+      body: JSON.stringify({ message: msg }),
+    });
+    $("riuTyping")?.remove();
+    renderRiuMessages(data.messages || []);
+    renderRiuState(data.state || {});
+    if ($("riuProgressBadge")) {
+      $("riuProgressBadge").textContent = `Setup ${data.progress ?? 0}%`;
+    }
+    const jobsStarted = (data.action_results || []).filter(
+      (r) => r.ok && (r.action === "start_pipeline" || r.action === "start_synthesis")
+    );
+    if (jobsStarted.length) {
+      toast("Riu started a job — it keeps running if you leave");
+      pollJobs().catch(() => {});
+      // refresh plan/library views in background
+      refreshAll().catch(() => {});
+    } else if ((data.action_results || []).some((r) => r.ok && r.action === "save_plan")) {
+      loadBrief().catch(() => {});
+    }
+    $("riuStatus").textContent = data.used_llm ? "Riu (AI) replied" : "Riu replied";
+  } catch (e) {
+    $("riuTyping")?.remove();
+    $("riuStatus").textContent = e.message;
+    toast(e.message, "err");
+  } finally {
+    $("riuSendBtn").disabled = false;
+    $("riuInput")?.focus();
+  }
+}
+
+async function restartRiu() {
+  if (!state.tenantSlug) return;
+  $("riuStatus").textContent = "Starting new chat…";
+  const data = await api(`/api/t/${state.tenantSlug}/riu/session`, { method: "POST" });
+  renderRiuMessages(data.messages || []);
+  renderRiuState(data.state || {});
+  if ($("riuProgressBadge")) $("riuProgressBadge").textContent = "Setup 0%";
+  $("riuStatus").textContent = "New chat with Riu";
+  toast("New chat with Riu");
+}
+
 // ── Wire up ─────────────────────────────────────────────────────────
 
 document.querySelectorAll(".nav-pill").forEach((btn) => {
@@ -1467,6 +1609,31 @@ if ($("startPipeJobBtn")) $("startPipeJobBtn").onclick = startPipelineJob;
 if ($("synthQuality")) $("synthQuality").addEventListener("input", updateSynthQualityUI);
 if ($("synthBatches")) $("synthBatches").addEventListener("input", updateSynthEta);
 if ($("synthMaxGolds")) $("synthMaxGolds").addEventListener("input", updateSynthEta);
+if ($("riuForm")) {
+  $("riuForm").addEventListener("submit", (e) => {
+    e.preventDefault();
+    sendRiuMessage($("riuInput")?.value || "").catch((err) => toast(err.message, "err"));
+  });
+}
+if ($("riuInput")) {
+  $("riuInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      sendRiuMessage($("riuInput").value || "").catch((err) => toast(err.message, "err"));
+    }
+  });
+}
+if ($("riuRestartBtn")) {
+  $("riuRestartBtn").onclick = () =>
+    restartRiu().catch((e) => toast(e.message, "err"));
+}
+document.querySelectorAll("[data-riu-quick]").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const q = btn.getAttribute("data-riu-quick") || "";
+    goTab("riu");
+    sendRiuMessage(q).catch((e) => toast(e.message, "err"));
+  });
+});
 updatePipeQualityUI();
 updateSynthQualityUI();
 

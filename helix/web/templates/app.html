@@ -98,6 +98,9 @@
 
       <nav class="sidebar-nav" id="tabs" aria-label="Main sections">
         <button class="nav-pill active" data-tab="home" type="button">Home</button>
+        <button class="nav-pill nav-pill-riu" data-tab="riu" type="button">
+          <span class="nav-num">◆</span>Riu
+        </button>
         <button class="nav-pill" data-tab="plan" type="button"><span class="nav-num">1</span>Plan</button>
         <button class="nav-pill" data-tab="formats" type="button"><span class="nav-num">2</span>Formats</button>
         <button class="nav-pill" data-tab="helpers" type="button"><span class="nav-num">3</span>AI helpers</button>
@@ -118,6 +121,59 @@
     </aside>
 
     <main class="main">
+      <!-- RIU CHAT -->
+      <section id="tab-riu" class="tab-panel hidden">
+        <div class="page-head">
+          <div>
+            <span class="page-kicker">Your guide</span>
+            <h2>Chat with Riu</h2>
+            <p class="hint">Riu asks plain-English questions, sets up Helix for you, then starts collecting training data.</p>
+          </div>
+          <div class="page-actions">
+            <span class="badge accent" id="riuProgressBadge">Setup 0%</span>
+            <button class="btn btn-secondary" id="riuRestartBtn" type="button">New chat</button>
+          </div>
+        </div>
+        <div class="riu-layout">
+          <div class="riu-chat">
+            <div id="riuMessages" class="riu-messages" aria-live="polite"></div>
+            <form id="riuForm" class="riu-composer" autocomplete="off">
+              <label class="sr-only" for="riuInput">Message Riu</label>
+              <textarea id="riuInput" rows="2" placeholder="Type your answer… e.g. a customer support bot for shipping questions"></textarea>
+              <div class="riu-composer-actions">
+                <span class="hint mb-0" id="riuStatus">Riu is ready</span>
+                <button class="btn btn-primary" id="riuSendBtn" type="submit">Send</button>
+              </div>
+            </form>
+          </div>
+          <aside class="riu-rail">
+            <div class="side-rail-block">
+              <div class="side-rail-title">How Riu works</div>
+              <ol class="riu-steps-list">
+                <li>Asks what you’re training</li>
+                <li>Learns topics &amp; quality bar</li>
+                <li>Saves plan, formats &amp; goals</li>
+                <li>Starts mining (survives logout)</li>
+              </ol>
+            </div>
+            <div class="side-rail-block">
+              <div class="side-rail-title">Collected so far</div>
+              <div id="riuStateCard" class="riu-state">
+                <p class="hint mb-0">Nothing yet — start the chat.</p>
+              </div>
+            </div>
+            <div class="side-rail-block">
+              <div class="side-rail-title">Shortcuts</div>
+              <div class="flex" style="flex-direction:column;align-items:stretch;gap:8px">
+                <button class="btn btn-secondary btn-block" type="button" data-riu-quick="Customer support AI for shipping and billing">Support AI</button>
+                <button class="btn btn-secondary btn-block" type="button" data-riu-quick="start">Say “start” to run</button>
+                <button class="btn btn-ghost btn-block" type="button" data-goto="helpers">View jobs</button>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+
       <!-- HOME -->
       <section id="tab-home" class="tab-panel">
         <div class="page-head">
@@ -127,11 +183,17 @@
             <p class="hint">You don’t need to know programming. Follow the steps — Helix’s AI helpers do the heavy lifting.</p>
           </div>
           <div class="page-actions">
+            <button class="btn btn-primary" type="button" data-goto="riu">Talk to Riu</button>
             <button class="btn btn-secondary" id="refreshBtn" type="button">Refresh</button>
           </div>
         </div>
 
         <div class="steps">
+          <button class="step step-riu" data-goto="riu" type="button">
+            <div class="step-num">◆</div>
+            <strong>Chat with Riu</strong>
+            <span>Let Riu interview you and run everything automatically.</span>
+          </button>
           <button class="step" data-goto="plan" type="button">
             <div class="step-num">1</div>
             <strong>Describe your goal</strong>

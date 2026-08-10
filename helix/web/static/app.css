@@ -561,12 +561,31 @@ select {
   .stat-card { border-right: 0; border-bottom: 1px solid var(--line-soft); }
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* Steps on Home */
 .steps {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   border-top: 2px solid var(--line);
   border-bottom: 2px solid var(--line);
+}
+.step-riu .step-num {
+  background: var(--ac);
+  color: var(--paper);
+}
+.nav-pill-riu.active {
+  background: var(--ac);
 }
 .step {
   border: 0;
@@ -1033,6 +1052,123 @@ select {
   }
   .page-head h2 { font-size: 24px; }
   .page-body { padding: 16px; }
+}
+
+/* ── Riu chat ───────────────────────────────────────── */
+.riu-layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  min-height: calc(100vh - 120px);
+  border-bottom: 2px solid var(--line);
+}
+.riu-chat {
+  display: flex;
+  flex-direction: column;
+  min-height: 520px;
+  border-right: 1px solid var(--line-soft);
+}
+.riu-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 22px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--paper);
+  max-height: calc(100vh - 260px);
+  min-height: 360px;
+}
+.riu-msg {
+  max-width: min(640px, 92%);
+  padding: 12px 14px;
+  border: 1px solid var(--line-soft);
+  background: var(--paper-2);
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.riu-msg.user {
+  align-self: flex-end;
+  background: var(--ink);
+  color: var(--paper);
+  border-color: var(--ink);
+}
+.riu-msg.assistant {
+  align-self: flex-start;
+  border-left: 3px solid var(--ac);
+}
+.riu-msg .who {
+  display: block;
+  font: 800 10px Archivo, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+  opacity: 0.7;
+}
+.riu-msg.user .who { color: rgba(243, 242, 242, 0.7); }
+.riu-msg.assistant .who { color: var(--ac); opacity: 1; }
+.riu-msg .meta {
+  margin-top: 8px;
+  font-size: 11px;
+  color: var(--muted-ink);
+}
+.riu-composer {
+  border-top: 2px solid var(--line);
+  padding: 14px 20px 18px;
+  background: var(--paper-2);
+}
+.riu-composer textarea {
+  margin-bottom: 10px;
+  min-height: 64px;
+  background: var(--paper);
+}
+.riu-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.riu-rail {
+  background: var(--paper);
+}
+.riu-steps-list {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  color: var(--muted-ink);
+  line-height: 1.7;
+}
+.riu-state {
+  font-size: 13px;
+  line-height: 1.55;
+}
+.riu-state dl {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.riu-state dt {
+  font: 800 10px Archivo, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-ink);
+  margin: 0;
+}
+.riu-state dd {
+  margin: 2px 0 0;
+  color: var(--color-text);
+}
+.riu-typing {
+  align-self: flex-start;
+  font-size: 12px;
+  color: var(--muted-ink);
+  font-style: italic;
+}
+@media (max-width: 960px) {
+  .riu-layout { grid-template-columns: 1fr; }
+  .riu-chat { border-right: 0; border-bottom: 1px solid var(--line-soft); }
+  .riu-messages { max-height: 50vh; }
 }
 
 /* Legacy unused dark-theme chrome (no orbs) */

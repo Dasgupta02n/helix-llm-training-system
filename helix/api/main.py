@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from helix import __version__
-from helix.api.routes import agents, auth, jobs, library, studio, tenants, users
+from helix.api.routes import agents, auth, jobs, library, riu, studio, tenants, users
 from helix.config import get_settings
 from helix.db.session import init_db
 from helix.worker import start_worker
@@ -34,6 +34,7 @@ app.include_router(agents.router)
 app.include_router(studio.router)
 app.include_router(library.router)
 app.include_router(jobs.router)
+app.include_router(riu.router)
 
 static_dir = WEB_DIR / "static"
 static_dir.mkdir(parents=True, exist_ok=True)

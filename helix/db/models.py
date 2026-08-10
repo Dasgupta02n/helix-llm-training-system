@@ -775,3 +775,23 @@ class AgentRun(Base):
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class RiuSession(Base):
+    """Riu conversational helper sessions — plain-English setup + run orchestration."""
+
+    __tablename__ = "riu_sessions"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id"), index=True)
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    status: Mapped[str] = mapped_column(String(40), default="active", index=True)
+    # active | completed | abandoned
+    phase: Mapped[str] = mapped_column(String(40), default="greet")
+    # greet | discover | plan | formats | goals | confirm | running | done
+    state_json: Mapped[str] = mapped_column(Text, default="{}")
+    messages_json: Mapped[str] = mapped_column(Text, default="[]")
+    last_job_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    last_synth_job_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
