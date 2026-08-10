@@ -24,11 +24,21 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> str:
     settings = get_settings()
-    expire = datetime.now(timezone.utc) + timedelta(
-        minutes=settings.access_token_expire_minutes
-    )
-    payload: dict[str, Any] = {"sub": subject, "exp": expire}
+    now = datetime.now(timezone.utc)
+    expire_minutes = settings.access_token_expire_minutes
+    if settings.is_production and expire_minutes > 60 * 24 * 2:
+        # Cap very long-lived tokens in production unless explicitly short
+        expire_minutes = min(expire_minutes, 60 * 24)  # max 24h default cap
+    expire = now + timedelta(minutes=expire_minutes)
+    payload: dict[str, Any] = {
+        "sub": subject,
+        "exp": expire,
+        "iat": now,
+        "typ": "access",
+    }
     if extra:
+        # never allow callers to override typ/exp accidentally
+        extra = {k: v for k, v in extra.items() if k not in {"exp", "typ", "iat"}}
         payload.update(extra)
     return jwt.encode(payload, settings.helix_secret_key, algorithm=ALGORITHM)
 
@@ -36,6 +46,15 @@ def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> st
 def decode_token(token: str) -> dict[str, Any] | None:
     settings = get_settings()
     try:
-        return jwt.decode(token, settings.helix_secret_key, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            token,
+            settings.helix_secret_key,
+            algorithms=[ALGORITHM],
+            options={"require_exp": True, "require_sub": True},
+        )
+        # Reject non-access tokens if typ is present
+        if payload.get("typ") not in (None, "access"):
+            return None
+        return payload
     except JWTError:
         return None

@@ -65,6 +65,7 @@ class Settings(BaseSettings):
 
     max_tool_rounds: int = 12
     default_tenant_monthly_budget_usd: float = 50.0
+    # Local default 7d; production should set ACCESS_TOKEN_EXPIRE_MINUTES lower (e.g. 1440)
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
 
     # User library defaults (indefinite storage in user account)
@@ -81,9 +82,41 @@ class Settings(BaseSettings):
     match_low: float = 0.4
     promotion_regression_tolerance: float = 0.03
 
+    # ── Security ───────────────────────────────────────────────────
+    rate_limit_enabled: bool = True
+    rate_limit_global_per_min: int = 180
+    rate_limit_auth_per_min: int = 20
+    rate_limit_riu_per_min: int = 30
+    max_request_body_bytes: int = 1_048_576  # 1 MiB
+    trust_proxy_headers: bool = True  # Caddy / reverse proxy sets X-Forwarded-For
+    # Comma-separated hostnames allowed in production (empty = skip TrustedHost)
+    allowed_hosts: str = (
+        "c7xai.in,www.c7xai.in,localhost,127.0.0.1,187.127.156.152"
+    )
+    # Disable /docs and /openapi.json in production unless explicitly enabled
+    enable_api_docs: bool = False
+    # Public CORS origins (comma-separated). Empty = no CORS middleware (same-origin only).
+    cors_origins: str = ""
+    # Expose detailed health (Apify username/plan) only when true
+    health_verbose: bool = False
+
     @property
     def is_production(self) -> bool:
         return self.helix_env.lower() in {"production", "prod", "vps"}
+
+    @property
+    def allowed_hosts_list(self) -> list[str]:
+        return [h.strip() for h in (self.allowed_hosts or "").split(",") if h.strip()]
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in (self.cors_origins or "").split(",") if o.strip()]
+
+    @property
+    def docs_enabled(self) -> bool:
+        if self.enable_api_docs:
+            return True
+        return not self.is_production
 
     @property
     def llm_provider(self) -> str:

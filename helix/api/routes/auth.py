@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from helix.api.deps import get_current_user
 from helix.api.schemas import LoginRequest, TokenResponse
+from helix.api.security_middleware import is_valid_email, password_policy_ok
 from helix.config import get_settings
 from helix.db import models as m
 from helix.db.session import get_db
@@ -90,8 +91,11 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> MessageRes
         raise HTTPException(403, "Public signup is disabled. Ask an admin for an invite.")
 
     email = body.email.lower().strip()
-    if len(body.password) < 8:
-        raise HTTPException(400, "Password must be at least 8 characters")
+    if not is_valid_email(email):
+        raise HTTPException(400, "Enter a valid email address")
+    ok_pw, pw_msg = password_policy_ok(body.password)
+    if not ok_pw:
+        raise HTTPException(400, pw_msg)
 
     try:
         user = create_user(
@@ -126,18 +130,25 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> MessageRes
     return MessageResponse(message="Account created. You can sign in now.")
 
 
+# Dummy bcrypt hash so missing-user logins still do a verify (mitigate timing leaks)
+_DUMMY_HASH = hash_password("not-a-real-password-timing-pad")
+
+
 @router.post("/login", response_model=TokenResponse)
 def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
     settings = get_settings()
-    user = db.query(m.User).filter_by(email=body.email.lower().strip()).first()
-    if not user or not user.is_active:
+    email = body.email.lower().strip()
+    user = db.query(m.User).filter_by(email=email).first()
+    # Always run a password verify to reduce user-enumeration timing differences
+    hashed = (
+        user.hashed_password
+        if user and user.password_set and user.hashed_password
+        else _DUMMY_HASH
+    )
+    valid = verify_password(body.password, hashed)
+    if not user or not user.is_active or not user.password_set or not user.hashed_password:
         raise HTTPException(status_code=401, detail="Invalid email or password")
-    if not user.password_set or not user.hashed_password:
-        raise HTTPException(
-            status_code=401,
-            detail="Please create your password using the link we emailed you.",
-        )
-    if not verify_password(body.password, user.hashed_password):
+    if not valid:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if settings.require_email_verification and not user.email_verified and not user.is_superadmin:
         raise HTTPException(
@@ -195,6 +206,9 @@ def change_password(
 ) -> MessageResponse:
     if not verify_password(body.current_password, user.hashed_password):
         raise HTTPException(400, "Current password is incorrect")
+    ok_pw, pw_msg = password_policy_ok(body.new_password)
+    if not ok_pw:
+        raise HTTPException(400, pw_msg)
     user.hashed_password = hash_password(body.new_password)
     user.password_set = True
     user.updated_at = datetime.now(timezone.utc)
@@ -227,6 +241,9 @@ def forgot_password(
 def reset_password(
     body: TokenPasswordRequest, db: Session = Depends(get_db)
 ) -> MessageResponse:
+    ok_pw, pw_msg = password_policy_ok(body.password)
+    if not ok_pw:
+        raise HTTPException(400, pw_msg)
     token = consume_auth_token(
         db, body.token, purpose=["reset_password", "set_password", "invite"]
     )
@@ -247,6 +264,9 @@ def reset_password(
 def set_password(
     body: TokenPasswordRequest, db: Session = Depends(get_db)
 ) -> MessageResponse:
+    ok_pw, pw_msg = password_policy_ok(body.password)
+    if not ok_pw:
+        raise HTTPException(400, pw_msg)
     token = consume_auth_token(
         db, body.token, purpose=["set_password", "invite", "reset_password"]
     )
