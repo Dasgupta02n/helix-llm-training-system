@@ -1521,11 +1521,14 @@ async function sendRiuMessage(text) {
     );
     if (jobsStarted.length) {
       toast("Riu started a job — it keeps running if you leave");
-      pollJobs().catch(() => {});
+      loadJobs().catch(() => {});
+      startJobPolling();
       // refresh plan/library views in background
       refreshAll().catch(() => {});
     } else if ((data.action_results || []).some((r) => r.ok && r.action === "save_plan")) {
       loadBrief().catch(() => {});
+    } else if ((data.action_results || []).some((r) => r.ok && r.action === "save_goals")) {
+      loadLibrary().catch(() => {});
     }
     $("riuStatus").textContent = data.used_llm ? "Riu (AI) replied" : "Riu replied";
   } catch (e) {

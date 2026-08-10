@@ -265,6 +265,43 @@ def _extract_json_object(text: str) -> dict | None:
         return None
 
 
+def _wants_run(text: str) -> bool:
+    """True only for explicit run commands — not 'restart' / 'start over'."""
+    t = (text or "").strip().lower()
+    if t in {"start", "go", "yes", "y", "run", "launch", "begin"}:
+        return True
+    # word-boundary phrases (avoid matching "restart")
+    patterns = (
+        r"\brun\s+it\b",
+        r"\bgo\s+ahead\b",
+        r"\byes,?\s+run\b",
+        r"\byes,?\s+start\b",
+        r"\bbegin\s+collecting\b",
+        r"\bstart\s+(collecting|mining|now|please)\b",
+        r"\bdo\s+it\b",
+        r"\blaunch\s+(it|now|job)?\b",
+    )
+    return any(re.search(p, t) for p in patterns)
+
+
+def _refuses_run(text: str) -> bool:
+    t = (text or "").strip().lower()
+    return any(
+        p in t
+        for p in (
+            "not yet",
+            "wait",
+            "hold on",
+            "don't run",
+            "do not run",
+            "don't start",
+            "do not start",
+            "not now",
+            "later",
+        )
+    )
+
+
 def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
     """Deterministic fallback when LLM is unavailable."""
     t = (user_text or "").strip()
@@ -275,21 +312,8 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
     next_phase = phase
     progress = 10
 
-    wants_run = any(
-        w in lower
-        for w in (
-            "start",
-            "run it",
-            "go ahead",
-            "yes run",
-            "launch",
-            "begin collecting",
-            "do it",
-            "yes, start",
-            "yes start",
-        )
-    )
-    refuse = any(w in lower for w in ("not yet", "wait", "hold on", "don't run", "do not run"))
+    wants_run = _wants_run(t)
+    refuse = _refuses_run(t)
 
     if phase in {"greet", "discover"}:
         patch["project_name"] = t[:120] if t else "My AI project"
@@ -314,9 +338,6 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         )
         next_phase = "plan"
         progress = 35
-        # keep phase plan until categories
-        if state.get("mission") or patch.get("mission"):
-            next_phase = "plan_topics"
     elif phase in {"plan", "plan_topics"} and not state.get("categories"):
         cats = [c.strip() for c in re.split(r"[,;\n]+", t) if c.strip()]
         patch["categories"] = cats or ["general"]
@@ -357,11 +378,16 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         )
         patch["format_description"] = f"Ideal Q&A style examples for {domain}"
         patch["sample_rationale"] = "Clear, helpful, and matches the product tone."
+        try:
+            g0 = int(state.get("gold_target") or 5000)
+            v0 = int(state.get("variations_per_gold") or 4)
+        except (TypeError, ValueError):
+            g0, v0 = 5000, 4
         reply = (
             "Great sample — I'll use that as the quality bar.\n\n"
-            f"Default goals are **{state.get('gold_target', 5000):,} gold examples** "
-            f"and **{state.get('variations_per_gold', 4)} variations** each "
-            f"(~{(state.get('gold_target', 5000) * state.get('variations_per_gold', 4)):,} synthesized).\n\n"
+            f"Default goals are **{g0:,} gold examples** "
+            f"and **{v0} variations** each "
+            f"(~{g0 * v0:,} synthesized).\n\n"
             "Reply **ok** to keep defaults, or type e.g. `gold 1000, variations 3`. "
             "Also pick quality: **best / high / balanced / cheap** (default high)."
         )
@@ -387,18 +413,27 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             patch["quality_mode"] = 2
         if "synth" in lower or "variation" in lower:
             patch["run_synthesis"] = "no" not in lower and "skip" not in lower
-        q = patch.get("quality_mode", state.get("quality_mode", 2))
-        g = patch.get("gold_target", state.get("gold_target", 5000))
-        v = patch.get("variations_per_gold", state.get("variations_per_gold", 4))
+        try:
+            q = int(patch.get("quality_mode", state.get("quality_mode", 2)))
+            g = int(patch.get("gold_target", state.get("gold_target", 5000)))
+            v = int(patch.get("variations_per_gold", state.get("variations_per_gold", 4)))
+            batches = int(state.get("total_batches") or 2)
+            bsize = int(state.get("batch_size") or 5)
+        except (TypeError, ValueError):
+            q, g, v, batches, bsize = 2, 5000, 4, 2, 5
+        # Prefer newly patched project fields when summarizing
+        pname = patch.get("project_name") or state.get("project_name") or "My project"
+        mission = patch.get("mission") or state.get("mission") or "Collect great training examples"
+        cats = patch.get("categories") or state.get("categories") or ["general"]
         reply = (
             "Here's the setup I'll apply:\n\n"
-            f"• Project: **{state.get('project_name') or 'My project'}**\n"
-            f"• Goal: {state.get('mission') or 'Collect great training examples'}\n"
-            f"• Topics: {', '.join(state.get('categories') or ['general'])}\n"
+            f"• Project: **{pname}**\n"
+            f"• Goal: {mission}\n"
+            f"• Topics: {', '.join(cats)}\n"
             f"• Gold target: **{g:,}** · variations/gold: **{v}**\n"
             f"• Quality mode: **{q}** (1 best … 4 cheapest)\n"
-            f"• First run: **{state.get('total_batches', 2)} batches** × "
-            f"**{state.get('batch_size', 5)}** items (keeps going if you sign out)\n\n"
+            f"• First run: **{batches} batches** × "
+            f"**{bsize}** items (keeps going if you sign out)\n\n"
             "Type **start** to save everything and begin collecting. "
             "Or tell me what to change."
         )
@@ -406,12 +441,27 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         progress = 90
         actions.append({"type": "save_goals"})
         actions.append({"type": "save_plan"})
-    elif phase in {"confirm", "running"}:
+    elif phase == "running":
+        if wants_run:
+            reply = (
+                "A job is already in motion (or was just queued). "
+                "Check **AI helpers → Your jobs** for live progress, "
+                "or say **restart** to set up a new collection."
+            )
+        else:
+            reply = (
+                "I'm still here. Your mining job keeps running even if you leave. "
+                "Open **AI helpers → Your jobs** for status, or say **restart** "
+                "to configure a new project with me."
+            )
+        next_phase = "running"
+        progress = 100
+    elif phase == "confirm":
         if refuse:
             reply = "No problem — I won't start yet. Tell me what to change, or say **start** when ready."
             next_phase = "confirm"
             progress = 90
-        elif wants_run or lower in {"start", "go", "yes", "y", "run"}:
+        elif wants_run:
             actions = [
                 {"type": "save_plan"},
                 {"type": "save_format"},
@@ -429,12 +479,24 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             next_phase = "running"
             progress = 100
         else:
+            # Allow mid-confirm goal tweaks
+            gm = re.search(r"gold\s*[:=]?\s*(\d+)", lower)
+            if gm:
+                patch["gold_target"] = max(1, min(int(gm.group(1)), 1_000_000))
+            if any(w in lower for w in ("cheap", "lowest", "lean", "mode 4")):
+                patch["quality_mode"] = 4
+            elif any(w in lower for w in ("best", "highest", "mode 1")):
+                patch["quality_mode"] = 1
+            elif any(w in lower for w in ("balanced", "mode 3")):
+                patch["quality_mode"] = 3
             reply = (
                 "When you're ready, say **start**. "
                 "Or change goals/quality (e.g. `gold 2000, quality cheap`)."
             )
             next_phase = "confirm"
             progress = 90
+            if patch:
+                actions.append({"type": "save_goals"})
     else:
         reply = (
             "I'm here. Tell me what you want to train, or say **restart** "
@@ -443,7 +505,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         next_phase = "discover"
         progress = 10
 
-    if lower.strip() == "restart":
+    if lower.strip() in {"restart", "start over", "reset"}:
         return {
             "reply": "Starting fresh. **What AI or product are you training?**",
             "phase": "greet",
@@ -453,9 +515,13 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             "reset": True,
         }
 
+    # Normalize internal plan_topics → plan for storage
+    if next_phase == "plan_topics":
+        next_phase = "plan"
+
     return {
         "reply": reply,
-        "phase": next_phase if next_phase != "plan_topics" else "plan",
+        "phase": next_phase,
         "state_patch": patch,
         "actions": actions,
         "progress": progress,
@@ -485,24 +551,61 @@ def _llm_turn(
         else:
             hist.append({"role": "user", "content": content})
 
+    # Put state snapshot as the first user turn, then dialogue.
+    # Drop trailing assistant-only incomplete turns.
     context = (
         f"Current phase: {phase}\n"
         f"Collected state JSON:\n{json.dumps(state, ensure_ascii=False)[:4000]}\n"
-        "Respond with the required JSON object only."
+        "Respond with the required JSON object only. "
+        "Only emit start_pipeline after the user clearly confirms."
     )
-    hist = [{"role": "user", "content": context}, *hist]
+    chat_messages: list[dict[str, Any]] = [{"role": "user", "content": context}]
+    for h in hist:
+        # avoid duplicating the context-only first message
+        chat_messages.append(h)
 
-    resp = client.chat(system=SYSTEM_PROMPT, messages=hist, tools=None, tool_choice=None)
+    resp = client.chat(
+        system=SYSTEM_PROMPT, messages=chat_messages, tools=None, tool_choice=None
+    )
     content = (resp.choices[0].message.content or "").strip()
     data = _extract_json_object(content)
     if not data or "reply" not in data:
         raise RuntimeError("Riu LLM returned unparseable JSON")
+    # Sanitize phase
+    phase_raw = str(data.get("phase") or phase).strip().lower()
+    allowed = {
+        "greet",
+        "discover",
+        "plan",
+        "formats",
+        "goals",
+        "confirm",
+        "running",
+        "done",
+    }
+    if phase_raw not in allowed:
+        phase_raw = phase if phase in allowed else "discover"
+    # Normalize actions
+    actions_in = data.get("actions") if isinstance(data.get("actions"), list) else []
+    actions_clean: list[dict] = []
+    for a in actions_in:
+        if isinstance(a, dict) and a.get("type"):
+            actions_clean.append({"type": str(a["type"]).strip()})
+        elif isinstance(a, str) and a.strip():
+            actions_clean.append({"type": a.strip()})
+    try:
+        progress = int(data.get("progress") or 0)
+    except (TypeError, ValueError):
+        progress = 0
+    progress = max(0, min(100, progress))
     return {
         "reply": str(data.get("reply") or "").strip() or "Could you say a bit more?",
-        "phase": str(data.get("phase") or phase),
-        "state_patch": data.get("state_patch") if isinstance(data.get("state_patch"), dict) else {},
-        "actions": data.get("actions") if isinstance(data.get("actions"), list) else [],
-        "progress": int(data.get("progress") or 0),
+        "phase": phase_raw,
+        "state_patch": data.get("state_patch")
+        if isinstance(data.get("state_patch"), dict)
+        else {},
+        "actions": actions_clean,
+        "progress": progress,
     }
 
 
@@ -517,11 +620,14 @@ def _apply_save_plan(
     if isinstance(questions, str):
         questions = [q.strip() for q in questions.splitlines() if q.strip()]
     categories = state.get("categories") or ["general"]
+    if not isinstance(categories, list):
+        categories = [str(categories)]
     sources = state.get("sources") or ["docs", "web"]
+    if not isinstance(sources, list):
+        sources = [str(sources)]
     targets = state.get("phase_targets") or {c: 40 for c in categories}
-    topic_keys = []
-    if state.get("topic_key"):
-        topic_keys = [state["topic_key"]]
+    if not isinstance(targets, dict):
+        targets = {c: 40 for c in categories}
     instructions = state.get("notes") or (
         "Prefer quality over volume. Do not invent scrape data. Escalate when unsure."
     )
@@ -531,6 +637,18 @@ def _apply_save_plan(
         .filter_by(tenant_id=tenant.id, slug=slug)
         .first()
     )
+    # Merge topic keys — never wipe prior formats when topic_key not in state yet
+    prev_keys: list[str] = []
+    if existing:
+        prev_keys = _load_json(existing.topic_keys_json, [])
+        if not isinstance(prev_keys, list):
+            prev_keys = []
+    topic_keys = list(prev_keys)
+    if state.get("topic_key"):
+        tk = _topic_key(str(state["topic_key"]))
+        if tk and tk not in topic_keys:
+            topic_keys.append(tk)
+
     if existing:
         existing.name = name
         existing.domain = domain
@@ -696,6 +814,12 @@ def _apply_start_synthesis(
     return {"ok": True, "action": "start_synthesis", "job": job_to_dict(job)}
 
 
+def _ready_for_pipeline(state: dict) -> tuple[bool, str]:
+    if not (state.get("project_name") or state.get("domain") or state.get("mission")):
+        return False, "Need a project name or mission before starting."
+    return True, ""
+
+
 def execute_actions(
     db: Session,
     *,
@@ -706,9 +830,19 @@ def execute_actions(
     actions: list[dict],
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
+    # Deduplicate while preserving order
+    seen: set[str] = set()
+    ordered: list[dict] = []
     for raw in actions or []:
         if not isinstance(raw, dict):
             continue
+        atype = str(raw.get("type") or "").strip()
+        if not atype or atype in seen:
+            continue
+        seen.add(atype)
+        ordered.append(raw)
+
+    for raw in ordered:
         atype = str(raw.get("type") or "").strip()
         try:
             if atype == "save_plan":
@@ -722,6 +856,10 @@ def execute_actions(
                     )
                 )
             elif atype == "start_pipeline":
+                ok, reason = _ready_for_pipeline(state)
+                if not ok:
+                    results.append({"ok": False, "action": atype, "error": reason})
+                    continue
                 r = _apply_start_pipeline(
                     db, user_id=user_id, tenant_id=tenant.id, state=state
                 )
@@ -733,9 +871,10 @@ def execute_actions(
                 )
                 session.last_synth_job_id = r["job"]["id"]
                 results.append(r)
-            else:
+            elif atype:
                 results.append({"ok": False, "action": atype, "error": "unknown action"})
         except Exception as exc:  # noqa: BLE001
+            db.rollback()
             results.append({"ok": False, "action": atype, "error": str(exc)})
     return results
 
