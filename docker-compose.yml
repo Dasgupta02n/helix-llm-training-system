@@ -1,10 +1,13 @@
+# Production stack for Hostinger VPS (c7xai.in)
+# Build context pulls app code from GitHub so Hostinger can deploy without a local context.
+
 services:
   db:
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: helix
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-helix}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-helix_change_me}
       POSTGRES_DB: helix
     volumes:
       - helix_pg:/var/lib/postgresql/data
@@ -12,16 +15,38 @@ services:
       test: ["CMD-SHELL", "pg_isready -U helix -d helix"]
       interval: 5s
       timeout: 5s
-      retries: 10
+      retries: 20
 
   app:
-    build: .
+    build:
+      context: https://github.com/Dasgupta02n/helix-llm-training-system.git#main
+      dockerfile: Dockerfile
     restart: unless-stopped
-    env_file:
-      - .env
     environment:
       HELIX_ENV: production
-      DATABASE_URL: postgresql+psycopg2://helix:${POSTGRES_PASSWORD:-helix}@db:5432/helix
+      HELIX_BASE_URL: ${HELIX_BASE_URL:-https://c7xai.in}
+      HELIX_SECRET_KEY: ${HELIX_SECRET_KEY}
+      DATABASE_URL: postgresql+psycopg2://helix:${POSTGRES_PASSWORD:-helix_change_me}@db:5432/helix
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-x-ai/grok-4.5}
+      OPENROUTER_SITE_URL: ${OPENROUTER_SITE_URL:-https://c7xai.in}
+      OPENROUTER_SITE_NAME: ${OPENROUTER_SITE_NAME:-Helix}
+      APIFY_API_KEY: ${APIFY_API_KEY}
+      APIFY_MAX_RESULTS_PER_SEARCH: ${APIFY_MAX_RESULTS_PER_SEARCH:-10}
+      APIFY_DEDUPE_HOURS: ${APIFY_DEDUPE_HOURS:-48}
+      APIFY_CACHE_HOURS: ${APIFY_CACHE_HOURS:-24}
+      APIFY_FAIL_CLOSED: ${APIFY_FAIL_CLOSED:-true}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-Helix <onboarding@resend.dev>}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@c7xai.in}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+      ALLOW_PUBLIC_SIGNUP: ${ALLOW_PUBLIC_SIGNUP:-true}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
+      AUTO_CREATE_WORKSPACE_ON_SIGNUP: ${AUTO_CREATE_WORKSPACE_ON_SIGNUP:-true}
+      DEFAULT_GOLD_TARGET_COUNT: ${DEFAULT_GOLD_TARGET_COUNT:-5000}
+      DEFAULT_VARIATIONS_PER_GOLD: ${DEFAULT_VARIATIONS_PER_GOLD:-4}
+      MAX_TOOL_ROUNDS: ${MAX_TOOL_ROUNDS:-12}
     depends_on:
       db:
         condition: service_healthy
@@ -30,18 +55,37 @@ services:
     volumes:
       - helix_data:/app/data
 
-  nginx:
-    image: nginx:1.27-alpine
+  caddy:
+    image: caddy:2-alpine
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
-      - ./deploy/certs:/etc/nginx/certs:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    configs:
+      - source: caddyfile
+        target: /etc/caddy/Caddyfile
     depends_on:
       - app
+
+configs:
+  caddyfile:
+    content: |
+      c7xai.in, www.c7xai.in {
+        encode gzip
+        reverse_proxy app:8000
+        header {
+          Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+          X-Content-Type-Options nosniff
+          X-Frame-Options DENY
+          Referrer-Policy strict-origin-when-cross-origin
+        }
+      }
 
 volumes:
   helix_pg:
   helix_data:
+  caddy_data:
+  caddy_config:
