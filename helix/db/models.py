@@ -54,8 +54,11 @@ class User(Base):
     is_superadmin: Mapped[bool] = mapped_column(Boolean, default=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Admin must approve after email verify before login (except superadmin)
+    admin_approved: Mapped[bool] = mapped_column(Boolean, default=True)
     password_set: Mapped[bool] = mapped_column(Boolean, default=True)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -71,7 +74,7 @@ class AuthToken(Base):
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
     token_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True)
     purpose: Mapped[str] = mapped_column(String(40), index=True)
-    # verify_email | reset_password | set_password | invite
+    # verify_email | reset_password | set_password | invite | admin_approve
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

@@ -190,6 +190,89 @@ def send_set_password_email(db: Session, to: str, name: str, link: str) -> dict[
     )
 
 
+def send_admin_approval_request_email(
+    db: Session,
+    *,
+    admin_email: str,
+    user_email: str,
+    user_name: str,
+    user_id: str,
+    created_at: str,
+    approve_link: str,
+) -> dict[str, Any]:
+    """Notify admin that a user verified email and needs approval."""
+    body = f"""
+      <h1 style="font-size:20px;margin:0 0 12px;">New user awaiting approval</h1>
+      <p style="color:#c8c2b6;line-height:1.5;">
+        A user confirmed their email and is waiting for you to activate their Helix account.
+      </p>
+      <table cellpadding="0" cellspacing="0" style="width:100%;margin:18px 0;border-collapse:collapse;">
+        <tr>
+          <td style="padding:8px 0;color:#8f8890;width:120px;">Name</td>
+          <td style="padding:8px 0;color:#f4f1ea;"><strong>{user_name or "—"}</strong></td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:#8f8890;">Email</td>
+          <td style="padding:8px 0;color:#f4f1ea;"><strong>{user_email}</strong></td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:#8f8890;">User ID</td>
+          <td style="padding:8px 0;color:#f4f1ea;font-family:monospace;font-size:12px;">{user_id}</td>
+        </tr>
+        <tr>
+          <td style="padding:8px 0;color:#8f8890;">Signed up</td>
+          <td style="padding:8px 0;color:#f4f1ea;">{created_at}</td>
+        </tr>
+      </table>
+      <p style="margin:28px 0;">
+        <a href="{approve_link}" style="display:inline-block;background:linear-gradient(135deg,#f0b58a,#e8a87c);color:#1a1210;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px;">
+          Approve account
+        </a>
+      </p>
+      <p style="color:#8f8890;font-size:13px;word-break:break-all;">
+        Or paste this secure link (expires in a few days):<br>{approve_link}
+      </p>
+    """
+    return send_email(
+        db,
+        to=admin_email,
+        subject=f"Approve Helix user: {user_email}",
+        html=_base_html("Approve user", body),
+        text=(
+            f"Approve Helix user {user_name} <{user_email}> (id={user_id}).\n"
+            f"Signed up: {created_at}\n"
+            f"Approve: {approve_link}"
+        ),
+        template="admin_approve_request",
+    )
+
+
+def send_account_activated_email(
+    db: Session, *, to: str, name: str, login_url: str
+) -> dict[str, Any]:
+    body = f"""
+      <h1 style="font-size:20px;margin:0 0 12px;">Your account is active</h1>
+      <p style="color:#c8c2b6;line-height:1.5;">Hi {name or "there"},</p>
+      <p style="color:#c8c2b6;line-height:1.5;">
+        An administrator approved your Helix account. You can sign in and start collecting training data.
+      </p>
+      <p style="margin:28px 0;">
+        <a href="{login_url}" style="display:inline-block;background:linear-gradient(135deg,#f0b58a,#e8a87c);color:#1a1210;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px;">
+          Sign in to Helix
+        </a>
+      </p>
+      <p style="color:#8f8890;font-size:13px;word-break:break-all;">Or open:<br>{login_url}</p>
+    """
+    return send_email(
+        db,
+        to=to,
+        subject="Your Helix account is active",
+        html=_base_html("Account activated", body),
+        text=f"Your Helix account is active. Sign in: {login_url}",
+        template="account_activated",
+    )
+
+
 def send_invite_email(
     db: Session, to: str, name: str, inviter: str, workspace: str, link: str
 ) -> dict[str, Any]:

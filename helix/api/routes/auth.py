@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -21,6 +22,8 @@ from helix.services.auth_tokens import (
     invalidate_tokens,
 )
 from helix.services.email import (
+    send_account_activated_email,
+    send_admin_approval_request_email,
     send_password_reset_email,
     send_set_password_email,
     send_verification_email,
@@ -71,6 +74,46 @@ def _app_link(path: str, token: str) -> str:
     return f"{base}/app?mode={path}&token={token}"
 
 
+def _api_link(path: str, token: str) -> str:
+    """Absolute API link used in admin approval emails (one-click)."""
+    settings = get_settings()
+    base = settings.helix_base_url.rstrip("/")
+    return f"{base}{path}?token={token}"
+
+
+def _notify_admin_for_approval(db: Session, user: m.User) -> dict:
+    """Create approve token and email admin user details + approve button."""
+    settings = get_settings()
+    admin_to = (settings.admin_notification_email or settings.bootstrap_admin_email or "").strip()
+    if not admin_to:
+        return {"ok": False, "error": "No admin notification email configured"}
+
+    invalidate_tokens(db, user.id, "admin_approve")
+    raw = create_auth_token(
+        db,
+        user.id,
+        "admin_approve",
+        hours=settings.admin_approve_token_expire_hours,
+    )
+    approve_link = _api_link("/api/auth/admin-approve", raw)
+    created = user.created_at.isoformat() if user.created_at else "—"
+    result = send_admin_approval_request_email(
+        db,
+        admin_email=admin_to,
+        user_email=user.email,
+        user_name=user.full_name or "",
+        user_id=user.id,
+        created_at=created,
+        approve_link=approve_link,
+    )
+    return {
+        "ok": bool(result.get("ok") or result.get("skipped")),
+        "skipped": bool(result.get("skipped")),
+        "approve_link": approve_link if result.get("skipped") else None,
+        "error": result.get("error"),
+    }
+
+
 def _issue_login(user: m.User) -> TokenResponse:
     token = create_access_token(
         user.id,
@@ -97,6 +140,8 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> MessageRes
     if not ok_pw:
         raise HTTPException(400, pw_msg)
 
+    # New public signups need admin approval when enabled (superadmin path not used here)
+    needs_approval = bool(settings.require_admin_approval)
     try:
         user = create_user(
             db,
@@ -104,6 +149,7 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> MessageRes
             full_name=body.full_name,
             password=body.password,
             email_verified=not settings.require_email_verification,
+            admin_approved=not needs_approval,
             password_set=True,
         )
         if settings.auto_create_workspace_on_signup:
@@ -120,11 +166,26 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)) -> MessageRes
         result = send_verification_email(db, user.email, user.full_name, link)
         if result.get("skipped"):
             dev_link = link  # local without Resend
+        msg = (
+            "Account created. Check your email to confirm your address. "
+            "After that, an admin must approve your account before you can sign in."
+            if needs_approval
+            else "Account created. Check your email to confirm your address before signing in."
+        )
+        return MessageResponse(
+            message=msg,
+            dev_link=dev_link if not settings.is_production else None,
+        )
+
+    # Email verification off — still may need admin approval
+    if needs_approval and not user.admin_approved:
+        note = _notify_admin_for_approval(db, user)
         return MessageResponse(
             message=(
-                "Account created. Check your email to confirm your address before signing in."
+                "Account created. An administrator has been notified and must approve "
+                "your account before you can sign in."
             ),
-            dev_link=dev_link if not settings.is_production else None,
+            dev_link=note.get("approve_link") if not settings.is_production else None,
         )
 
     return MessageResponse(message="Account created. You can sign in now.")
@@ -154,6 +215,18 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> TokenResponse:
         raise HTTPException(
             status_code=403,
             detail="Please confirm your email before signing in. Check your inbox.",
+        )
+    if (
+        settings.require_admin_approval
+        and not user.is_superadmin
+        and not bool(getattr(user, "admin_approved", True))
+    ):
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Your email is confirmed, but an administrator has not approved "
+                "your account yet. You’ll get an email when it’s activated."
+            ),
         )
     user.last_login_at = datetime.now(timezone.utc)
     db.commit()
@@ -278,6 +351,10 @@ def set_password(
     user.hashed_password = hash_password(body.password)
     user.password_set = True
     user.email_verified = True
+    # Invited users are pre-approved by an admin
+    user.admin_approved = True
+    if not user.approved_at:
+        user.approved_at = datetime.now(timezone.utc)
     user.is_active = True
     user.updated_at = datetime.now(timezone.utc)
     db.commit()
@@ -289,6 +366,7 @@ def verify_email(
     token: str = Query(...),
     db: Session = Depends(get_db),
 ) -> MessageResponse:
+    settings = get_settings()
     row = consume_auth_token(db, token, purpose="verify_email")
     if not row:
         raise HTTPException(400, "This confirmation link is invalid or has expired.")
@@ -298,7 +376,97 @@ def verify_email(
     user.email_verified = True
     user.updated_at = datetime.now(timezone.utc)
     db.commit()
+
+    # After verify → notify admin to approve (unless already approved / superadmin)
+    if (
+        settings.require_admin_approval
+        and not user.is_superadmin
+        and not bool(getattr(user, "admin_approved", False))
+    ):
+        note = _notify_admin_for_approval(db, user)
+        return MessageResponse(
+            message=(
+                "Email confirmed. An administrator has been notified and will review "
+                "your account. You’ll receive another email when it’s activated."
+            ),
+            dev_link=note.get("approve_link") if not settings.is_production else None,
+        )
+
     return MessageResponse(message="Email confirmed. You can sign in now.")
+
+
+def _approve_result_html(*, title: str, body: str, ok: bool = True) -> str:
+    color = "#2f7a4b" if ok else "#ae1800"
+    return f"""<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{title} — Helix</title>
+<style>
+body{{margin:0;font-family:system-ui,sans-serif;background:#f3f2f2;color:#201e1d}}
+.card{{max-width:520px;margin:48px auto;padding:28px;background:#eae9e9;border:1px solid rgba(32,30,29,.2)}}
+h1{{font-size:22px;margin:0 0 12px;color:{color}}}
+p{{line-height:1.5;color:rgba(32,30,29,.75)}}
+a{{color:#ec3013}}
+</style></head>
+<body><div class="card"><h1>{title}</h1><p>{body}</p>
+<p><a href="/app">Open Helix</a></p></div></body></html>"""
+
+
+@router.get("/admin-approve", response_class=HTMLResponse)
+def admin_approve_user(
+    token: str = Query(...),
+    db: Session = Depends(get_db),
+) -> HTMLResponse:
+    """One-click approve from admin email (token-protected). Returns HTML for email clients."""
+    settings = get_settings()
+    row = consume_auth_token(db, token, purpose="admin_approve")
+    if not row:
+        return HTMLResponse(
+            _approve_result_html(
+                title="Link invalid",
+                body="This approval link is invalid or has expired.",
+                ok=False,
+            ),
+            status_code=400,
+        )
+    user = db.query(m.User).filter_by(id=row.user_id).first()
+    if not user or not user.is_active:
+        return HTMLResponse(
+            _approve_result_html(
+                title="User not found",
+                body="The user account could not be found.",
+                ok=False,
+            ),
+            status_code=400,
+        )
+    if not user.email_verified and settings.require_email_verification:
+        return HTMLResponse(
+            _approve_result_html(
+                title="Not verified",
+                body="This user has not verified their email yet.",
+                ok=False,
+            ),
+            status_code=400,
+        )
+
+    already = bool(getattr(user, "admin_approved", False))
+    user.admin_approved = True
+    user.approved_at = datetime.now(timezone.utc)
+    user.updated_at = datetime.now(timezone.utc)
+    db.commit()
+
+    login_url = f"{settings.helix_base_url.rstrip('/')}/app"
+    if not already:
+        send_account_activated_email(
+            db, to=user.email, name=user.full_name or "", login_url=login_url
+        )
+        body = (
+            f"Approved <strong>{user.email}</strong>. "
+            "They have been emailed that their account is active."
+        )
+    else:
+        body = f"<strong>{user.email}</strong> was already approved."
+
+    return HTMLResponse(_approve_result_html(title="User approved", body=body, ok=True))
 
 
 @router.post("/resend-verification", response_model=MessageResponse)
@@ -328,5 +496,6 @@ def auth_public_config() -> dict:
     return {
         "allow_public_signup": settings.allow_public_signup,
         "require_email_verification": settings.require_email_verification,
+        "require_admin_approval": settings.require_admin_approval,
         "resend_configured": bool(settings.resend_api_key),
     }

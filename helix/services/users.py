@@ -41,6 +41,7 @@ def create_user(
     password: str | None = None,
     is_superadmin: bool = False,
     email_verified: bool = False,
+    admin_approved: bool | None = None,
     password_set: bool | None = None,
     is_active: bool = True,
 ) -> m.User:
@@ -49,6 +50,9 @@ def create_user(
         raise ValueError("An account with this email already exists")
 
     has_pw = bool(password)
+    # Superadmin always approved; public signups wait for admin when required
+    if admin_approved is None:
+        admin_approved = True if is_superadmin else True
     user = m.User(
         id=_uid("usr_"),
         email=email,
@@ -57,6 +61,7 @@ def create_user(
         is_superadmin=is_superadmin,
         is_active=is_active,
         email_verified=email_verified,
+        admin_approved=bool(admin_approved),
         password_set=password_set if password_set is not None else has_pw,
     )
     db.add(user)
@@ -103,7 +108,11 @@ def user_public(user: m.User) -> dict:
         "is_superadmin": user.is_superadmin,
         "is_active": user.is_active,
         "email_verified": bool(user.email_verified),
+        "admin_approved": bool(getattr(user, "admin_approved", True)),
         "password_set": bool(user.password_set),
         "last_login_at": user.last_login_at.isoformat() if user.last_login_at else None,
+        "approved_at": user.approved_at.isoformat()
+        if getattr(user, "approved_at", None)
+        else None,
         "created_at": user.created_at.isoformat() if user.created_at else None,
     }

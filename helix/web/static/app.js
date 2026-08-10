@@ -328,7 +328,7 @@ function setAuthMode(mode) {
     verify: {
       eye: "Email confirmation",
       title: "Confirming your email…",
-      lead: "One moment while we activate your account.",
+      lead: "One moment while we confirm your address.",
       panel: "authVerify",
     },
   };
@@ -456,7 +456,8 @@ async function verifyEmailToken(token) {
     const data = await api(`/api/auth/verify-email?token=${encodeURIComponent(token)}`);
     $("verifyMessage").textContent = data.message || "Email confirmed.";
     $("authTitle").textContent = "Email confirmed";
-    $("authLead").textContent = "Your account is ready.";
+    $("authLead").textContent =
+      "If admin approval is required, wait for the activation email before signing in.";
     toast("Email confirmed");
   } catch (e) {
     $("verifyMessage").textContent = e.message;

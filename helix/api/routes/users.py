@@ -124,6 +124,7 @@ def invite_user(
                 password=None,
                 is_superadmin=body.is_superadmin,
                 email_verified=False,
+                admin_approved=True,  # invited by admin
                 password_set=False,
             )
         except ValueError as e:

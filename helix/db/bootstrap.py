@@ -567,6 +567,7 @@ def _bootstrap_once(db: Session, settings) -> None:  # type: ignore[no-untyped-d
             admin = by_email
             admin.is_superadmin = True
             admin.email_verified = True
+            admin.admin_approved = True
             admin.password_set = True
             admin.is_active = True
             if settings.bootstrap_admin_password:
@@ -580,6 +581,7 @@ def _bootstrap_once(db: Session, settings) -> None:  # type: ignore[no-untyped-d
                 full_name="Platform Admin",
                 is_superadmin=True,
                 email_verified=True,
+                admin_approved=True,
                 password_set=True,
                 is_active=True,
             )
@@ -612,6 +614,7 @@ def _bootstrap_once(db: Session, settings) -> None:  # type: ignore[no-untyped-d
             admin.hashed_password = hash_password(settings.bootstrap_admin_password)
             admin.password_set = True
         admin.email_verified = True
+        admin.admin_approved = True
         admin.is_active = True
         admin.is_superadmin = True
 

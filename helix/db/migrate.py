@@ -41,7 +41,9 @@ def apply_migrations(engine: Engine) -> None:
             user_additions = {
                 "email_verified": bool_false,
                 "password_set": bool_true,
+                "admin_approved": bool_true,
                 "last_login_at": "TIMESTAMP",
+                "approved_at": "TIMESTAMP",
                 "updated_at": "TIMESTAMP",
             }
             for name, typ in user_additions.items():
@@ -58,6 +60,12 @@ def apply_migrations(engine: Engine) -> None:
                     conn.execute(text("UPDATE users SET password_set = 1"))
                 else:
                     conn.execute(text("UPDATE users SET password_set = TRUE"))
+            # Existing users: already active accounts stay approved
+            if "admin_approved" not in user_cols:
+                if dialect == "sqlite":
+                    conn.execute(text("UPDATE users SET admin_approved = 1"))
+                else:
+                    conn.execute(text("UPDATE users SET admin_approved = TRUE"))
 
         # training_examples ownership
         te_cols = _column_names(engine, "training_examples")

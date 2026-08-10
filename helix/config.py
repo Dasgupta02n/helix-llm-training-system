@@ -59,7 +59,12 @@ class Settings(BaseSettings):
 
     # Auth policy
     require_email_verification: bool = True
+    # After email verify, admin must click Approve in email before login
+    require_admin_approval: bool = True
+    admin_notification_email: str = "dasgupta.02n@gmail.com"
     auth_token_expire_hours: int = 24
+    # Approval links can live longer so admin has time to act
+    admin_approve_token_expire_hours: int = 72
     allow_public_signup: bool = True
     auto_create_workspace_on_signup: bool = True
 
