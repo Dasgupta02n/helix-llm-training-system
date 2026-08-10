@@ -35,7 +35,8 @@ services:
         find /app -mindepth 1 -maxdepth 1 ! -name data -exec rm -rf {} +
         cp -a /tmp/helix-src/. /app/
         pip install --no-cache-dir -r requirements.txt
-        exec uvicorn helix.api.main:app --host 0.0.0.0 --port 8000 --workers 2
+        # Single worker: avoids multi-process bootstrap races + duplicate job workers
+        exec uvicorn helix.api.main:app --host 0.0.0.0 --port 8000 --workers 1
     environment:
       HELIX_ENV: production
       HELIX_BASE_URL: ${HELIX_BASE_URL:-https://c7xai.in}

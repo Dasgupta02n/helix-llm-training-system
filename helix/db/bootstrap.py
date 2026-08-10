@@ -3,13 +3,17 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from helix.config import CATEGORIES, get_settings
 from helix.db import models as m
 from helix.security import hash_password
+
+log = logging.getLogger(__name__)
 
 
 def _uid(prefix: str = "") -> str:
@@ -339,64 +343,70 @@ def seed_tenant_data(db: Session, tenant_id: str) -> None:
         )
 
     # Default research brief for this tenant (demo domain; replace via UI for other trainings)
-    db.add(
-        m.ResearchProject(
-            id=_uid("prj_"),
-            tenant_id=tenant_id,
-            slug="default",
-            name="Default gold-mining project",
-            domain=(
-                "Influencer marketing strategy — mine verified campaign patterns and "
-                "turn them into high-quality supervised training examples."
-            ),
-            mission=(
-                "Build gold SFT datasets for campaign strategy, budget allocation, and "
-                "creator selection. Prefer high-evidence, cited, review-hardened examples."
-            ),
-            research_questions_json=json.dumps(
-                [
-                    "Which creator tiers and formats drive save-rate for awareness?",
-                    "How should mid-size budgets allocate across categories given ROAS history?",
-                    "What filters produce high-fit creator shortlists without vanity metrics?",
-                ]
-            ),
-            sources_json=json.dumps(["instagram", "tiktok", "youtube", "x", "blog"]),
-            categories_json=json.dumps(
-                ["beauty", "fitness", "tech", "food", "fashion", "gaming", "travel", "finance"]
-            ),
-            phase_targets_json=json.dumps(
-                {
-                    "beauty": 40,
-                    "tech": 40,
-                    "fashion": 40,
-                    "fitness": 25,
-                    "food": 25,
-                    "gaming": 25,
-                    "travel": 25,
-                    "finance": 25,
-                }
-            ),
-            success_metrics_json=json.dumps(
-                [
-                    {"name": "verified_campaigns", "target": "meet phase targets"},
-                    {"name": "approved_training_examples", "target": "growing per topic"},
-                    {"name": "benchmark_coverage", "target": "20/50/30 difficulty mix"},
-                    {"name": "open_escalations", "target": "resolved within 14 days"},
-                ]
-            ),
-            topic_keys_json=json.dumps(topic_keys),
-            agent_instructions=(
-                "Treat every pipeline stage as gold-data mining for LLM training. "
-                "Do not invent facts. Prefer escalation over low-confidence commits. "
-                "All synthetic examples must obey the active topic schema."
-            ),
-            output_notes=(
-                "Export JSONL with fields: input, output, rationale, difficulty, is_negative, "
-                "topic, split. Benchmark examples must never appear in train splits."
-            ),
-            is_active=True,
-        )
+    has_project = (
+        db.query(m.ResearchProject)
+        .filter_by(tenant_id=tenant_id, slug="default")
+        .first()
     )
+    if not has_project:
+        db.add(
+            m.ResearchProject(
+                id=_uid("prj_"),
+                tenant_id=tenant_id,
+                slug="default",
+                name="Default gold-mining project",
+                domain=(
+                    "Influencer marketing strategy — mine verified campaign patterns and "
+                    "turn them into high-quality supervised training examples."
+                ),
+                mission=(
+                    "Build gold SFT datasets for campaign strategy, budget allocation, and "
+                    "creator selection. Prefer high-evidence, cited, review-hardened examples."
+                ),
+                research_questions_json=json.dumps(
+                    [
+                        "Which creator tiers and formats drive save-rate for awareness?",
+                        "How should mid-size budgets allocate across categories given ROAS history?",
+                        "What filters produce high-fit creator shortlists without vanity metrics?",
+                    ]
+                ),
+                sources_json=json.dumps(["instagram", "tiktok", "youtube", "x", "blog"]),
+                categories_json=json.dumps(
+                    ["beauty", "fitness", "tech", "food", "fashion", "gaming", "travel", "finance"]
+                ),
+                phase_targets_json=json.dumps(
+                    {
+                        "beauty": 40,
+                        "tech": 40,
+                        "fashion": 40,
+                        "fitness": 25,
+                        "food": 25,
+                        "gaming": 25,
+                        "travel": 25,
+                        "finance": 25,
+                    }
+                ),
+                success_metrics_json=json.dumps(
+                    [
+                        {"name": "verified_campaigns", "target": "meet phase targets"},
+                        {"name": "approved_training_examples", "target": "growing per topic"},
+                        {"name": "benchmark_coverage", "target": "20/50/30 difficulty mix"},
+                        {"name": "open_escalations", "target": "resolved within 14 days"},
+                    ]
+                ),
+                topic_keys_json=json.dumps(topic_keys),
+                agent_instructions=(
+                    "Treat every pipeline stage as gold-data mining for LLM training. "
+                    "Do not invent facts. Prefer escalation over low-confidence commits. "
+                    "All synthetic examples must obey the active topic schema."
+                ),
+                output_notes=(
+                    "Export JSONL with fields: input, output, rationale, difficulty, is_negative, "
+                    "topic, split. Benchmark examples must never appear in train splits."
+                ),
+                is_active=True,
+            )
+        )
 
     db.add(
         m.Contract(
@@ -464,6 +474,8 @@ def seed_tenant_data(db: Session, tenant_id: str) -> None:
 
 def ensure_research_project_for_tenant(db: Session, tenant_id: str) -> None:
     """Backfill a default research project if tenant has none (existing DBs)."""
+    # autoflush=False session: flush so pending seed rows are visible to queries
+    db.flush()
     exists = (
         db.query(m.ResearchProject)
         .filter_by(tenant_id=tenant_id)
@@ -471,6 +483,10 @@ def ensure_research_project_for_tenant(db: Session, tenant_id: str) -> None:
     )
     if exists:
         return
+    # Also respect pending identity-map objects not yet flushed (belt-and-suspenders)
+    for obj in db.new:
+        if isinstance(obj, m.ResearchProject) and obj.tenant_id == tenant_id:
+            return
     # Minimal brief; user should edit in UI
     cats = (
         db.query(m.CategoryState)
@@ -513,21 +529,62 @@ def ensure_research_project_for_tenant(db: Session, tenant_id: str) -> None:
 
 
 def bootstrap(db: Session) -> None:
+    """Idempotent first-boot seed. Safe under multi-worker race (IntegrityError → retry)."""
     settings = get_settings()
+    for attempt in range(3):
+        try:
+            _bootstrap_once(db, settings)
+            return
+        except IntegrityError as exc:
+            db.rollback()
+            log.warning("bootstrap race/integrity attempt %s: %s", attempt + 1, exc)
+            if attempt == 2:
+                # Last attempt: read-only path — ensure admin flags only if present
+                try:
+                    admin = db.query(m.User).filter(m.User.is_superadmin.is_(True)).first()
+                    if admin:
+                        if not admin.email_verified:
+                            admin.email_verified = True
+                        if not admin.password_set:
+                            admin.password_set = True
+                        db.commit()
+                    return
+                except Exception:  # noqa: BLE001
+                    db.rollback()
+                    raise
+
+
+def _bootstrap_once(db: Session, settings) -> None:  # type: ignore[no-untyped-def]
     admin = db.query(m.User).filter(m.User.is_superadmin.is_(True)).first()
     if not admin:
-        admin = m.User(
-            id=_uid("usr_"),
-            email=settings.bootstrap_admin_email.lower(),
-            hashed_password=hash_password(settings.bootstrap_admin_password),
-            full_name="Platform Admin",
-            is_superadmin=True,
-            email_verified=True,
-            password_set=True,
-            is_active=True,
+        # Prefer configured email if a non-superadmin already owns it
+        by_email = (
+            db.query(m.User)
+            .filter(m.User.email == settings.bootstrap_admin_email.lower())
+            .first()
         )
-        db.add(admin)
-        db.flush()
+        if by_email:
+            admin = by_email
+            admin.is_superadmin = True
+            admin.email_verified = True
+            admin.password_set = True
+            admin.is_active = True
+            if settings.bootstrap_admin_password:
+                admin.hashed_password = hash_password(settings.bootstrap_admin_password)
+            db.flush()
+        else:
+            admin = m.User(
+                id=_uid("usr_"),
+                email=settings.bootstrap_admin_email.lower(),
+                hashed_password=hash_password(settings.bootstrap_admin_password),
+                full_name="Platform Admin",
+                is_superadmin=True,
+                email_verified=True,
+                password_set=True,
+                is_active=True,
+            )
+            db.add(admin)
+            db.flush()
     else:
         # Keep bootstrap admin usable after auth upgrades
         if not admin.email_verified:
@@ -546,15 +603,38 @@ def bootstrap(db: Session) -> None:
         )
         db.add(demo)
         db.flush()
-        db.add(
-            m.Membership(
-                id=_uid("mem_"),
-                user_id=admin.id,
-                tenant_id=demo.id,
-                role="owner",
-            )
+        mem = (
+            db.query(m.Membership)
+            .filter_by(user_id=admin.id, tenant_id=demo.id)
+            .first()
         )
+        if not mem:
+            db.add(
+                m.Membership(
+                    id=_uid("mem_"),
+                    user_id=admin.id,
+                    tenant_id=demo.id,
+                    role="owner",
+                )
+            )
         seed_tenant_data(db, demo.id)
+        db.flush()
+    else:
+        # Ensure admin is a member of demo
+        mem = (
+            db.query(m.Membership)
+            .filter_by(user_id=admin.id, tenant_id=demo.id)
+            .first()
+        )
+        if not mem:
+            db.add(
+                m.Membership(
+                    id=_uid("mem_"),
+                    user_id=admin.id,
+                    tenant_id=demo.id,
+                    role="owner",
+                )
+            )
 
     # Backfill research projects for any tenant missing one
     for tenant in db.query(m.Tenant).all():
