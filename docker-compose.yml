@@ -1,5 +1,5 @@
-# Production stack for Hostinger VPS
-# Serves Helix on host port 8000; edge TLS for c7xai.in is handled by the VPS Caddy (nocodegit project).
+# Production stack for Hostinger VPS Docker Manager
+# App clones from GitHub at start so no local build context is required.
 
 services:
   db:
@@ -15,13 +15,25 @@ services:
       test: ["CMD-SHELL", "pg_isready -U helix -d helix"]
       interval: 5s
       timeout: 5s
-      retries: 20
+      retries: 30
 
   app:
-    build:
-      context: https://github.com/Dasgupta02n/helix-llm-training-system.git#main
-      dockerfile: Dockerfile
+    image: python:3.12-slim
     restart: unless-stopped
+    working_dir: /app
+    command:
+      - bash
+      - -lc
+      - |
+        set -e
+        apt-get update -y
+        apt-get install -y --no-install-recommends git build-essential libpq-dev curl ca-certificates
+        rm -rf /tmp/helix-src
+        git clone --depth 1 --branch main https://github.com/Dasgupta02n/helix-llm-training-system.git /tmp/helix-src
+        find /app -mindepth 1 -maxdepth 1 ! -name data -exec rm -rf {} +
+        cp -a /tmp/helix-src/. /app/
+        pip install --no-cache-dir -r requirements.txt
+        exec uvicorn helix.api.main:app --host 0.0.0.0 --port 8000 --workers 2
     environment:
       HELIX_ENV: production
       HELIX_BASE_URL: ${HELIX_BASE_URL:-https://c7xai.in}
