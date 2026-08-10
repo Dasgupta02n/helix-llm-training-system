@@ -250,8 +250,8 @@ function slugify(name) {
 function showApp(show) {
   $("loginPanel").classList.toggle("hidden", show);
   $("appPanel").classList.toggle("hidden", !show);
-  $("logoutBtn").classList.toggle("hidden", !show);
-  $("userChip").classList.toggle("hidden", !show);
+  // logout lives in the ink sidebar (only visible when appPanel is shown)
+  if ($("logoutBtn")) $("logoutBtn").classList.toggle("hidden", !show);
 }
 
 function goTab(name) {
@@ -473,8 +473,12 @@ function logout() {
 async function bootstrap() {
   state.me = await api("/api/auth/me");
   const email = state.me.email || "";
-  $("userLabel").textContent = email;
-  $("userAvatar").textContent = (email[0] || "U").toUpperCase();
+  const name = (state.me && (state.me.full_name || state.me.name)) || email;
+  $("userLabel").textContent = name;
+  $("userAvatar").textContent = (name[0] || email[0] || "U").toUpperCase();
+  if ($("userRole")) {
+    $("userRole").textContent = state.me && state.me.is_superadmin ? "Admin" : "Owner";
+  }
   showApp(true);
 
   let tenants = state.me.tenants || [];
@@ -1075,6 +1079,7 @@ async function saveBrief() {
     }
     $("briefStatus").textContent = "Plan saved.";
     $("briefStatus").className = "status-line ok";
+    if ($("briefSavedChip")) $("briefSavedChip").textContent = "Saved just now";
     toast("Your plan is saved and active");
     await loadBrief();
   } catch (e) {
@@ -1442,6 +1447,7 @@ $("tenantSelect").onchange = () =>
 $("saveBriefBtn").onclick = saveBrief;
 $("saveSchemaBtn").onclick = saveSchema;
 $("newSchemaBtn").onclick = clearSchemaForm;
+if ($("newSchemaBtn2")) $("newSchemaBtn2").onclick = clearSchemaForm;
 $("snapshotBtn").onclick = snapshotPool;
 $("exportPoolBtn").onclick = () => downloadExport("approved-pool", "jsonl");
 $("runBtn").onclick = runAgent;
