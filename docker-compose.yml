@@ -1,5 +1,5 @@
-# Production stack for Hostinger VPS (c7xai.in)
-# Build context pulls app code from GitHub so Hostinger can deploy without a local context.
+# Production stack for Hostinger VPS
+# Serves Helix on host port 8000; edge TLS for c7xai.in is handled by the VPS Caddy (nocodegit project).
 
 services:
   db:
@@ -42,7 +42,7 @@ services:
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@c7xai.in}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
       ALLOW_PUBLIC_SIGNUP: ${ALLOW_PUBLIC_SIGNUP:-true}
-      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-true}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-false}
       AUTO_CREATE_WORKSPACE_ON_SIGNUP: ${AUTO_CREATE_WORKSPACE_ON_SIGNUP:-true}
       DEFAULT_GOLD_TARGET_COUNT: ${DEFAULT_GOLD_TARGET_COUNT:-5000}
       DEFAULT_VARIATIONS_PER_GOLD: ${DEFAULT_VARIATIONS_PER_GOLD:-4}
@@ -50,42 +50,11 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     volumes:
       - helix_data:/app/data
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - caddy_data:/data
-      - caddy_config:/config
-    configs:
-      - source: caddyfile
-        target: /etc/caddy/Caddyfile
-    depends_on:
-      - app
-
-configs:
-  caddyfile:
-    content: |
-      c7xai.in, www.c7xai.in {
-        encode gzip
-        reverse_proxy app:8000
-        header {
-          Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
-          X-Content-Type-Options nosniff
-          X-Frame-Options DENY
-          Referrer-Policy strict-origin-when-cross-origin
-        }
-      }
 
 volumes:
   helix_pg:
   helix_data:
-  caddy_data:
-  caddy_config:
