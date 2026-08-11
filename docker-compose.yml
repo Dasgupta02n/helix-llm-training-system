@@ -29,7 +29,18 @@ services:
         apt-get update -y
         apt-get install -y --no-install-recommends build-essential libpq-dev curl ca-certificates tar
         rm -rf /tmp/helix-src /tmp/helix.tgz
-        curl -fsSL https://codeload.github.com/Dasgupta02n/helix-llm-training-system/tar.gz/refs/heads/main -o /tmp/helix.tgz
+        # Private repos need GITHUB_TOKEN; public repos work without it
+        if [ -n "${GITHUB_TOKEN:-}" ]; then
+          curl -fsSL \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            "https://api.github.com/repos/Dasgupta02n/helix-llm-training-system/tarball/main" \
+            -o /tmp/helix.tgz
+        else
+          curl -fsSL \
+            "https://codeload.github.com/Dasgupta02n/helix-llm-training-system/tar.gz/refs/heads/main" \
+            -o /tmp/helix.tgz
+        fi
         mkdir -p /tmp/helix-src
         tar -xzf /tmp/helix.tgz -C /tmp/helix-src --strip-components=1
         find /app -mindepth 1 -maxdepth 1 ! -name data -exec rm -rf {} +
@@ -41,6 +52,7 @@ services:
       HELIX_ENV: production
       HELIX_BASE_URL: ${HELIX_BASE_URL:-https://c7xai.in}
       HELIX_SECRET_KEY: ${HELIX_SECRET_KEY}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
       DATABASE_URL: postgresql+psycopg2://helix:${POSTGRES_PASSWORD:-helix_change_me}@db:5432/helix
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
       OPENROUTER_BASE_URL: ${OPENROUTER_BASE_URL:-https://openrouter.ai/api/v1}
