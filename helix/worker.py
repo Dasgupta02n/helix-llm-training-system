@@ -103,20 +103,44 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             )
             items = int(result.get("items_processed") or 0)
             gold_new = int(result.get("gold_new") or 0)
+            # Accumulate job-level gold so final status isn't last-batch-only
+            try:
+                prev_summary = json.loads(job.result_summary_json or "{}")
+            except json.JSONDecodeError:
+                prev_summary = {}
+            total_gold = int(prev_summary.get("total_gold_new") or 0) + gold_new
+            total_synth = int(prev_summary.get("total_synth_new") or 0)
+            batch_log = list(prev_summary.get("batches") or [])
+            batch_log.append(
+                {
+                    "batch_index": batch_index,
+                    "gold_new": gold_new,
+                    "user_message": result.get("user_message"),
+                    "elapsed_seconds": result.get("elapsed_seconds"),
+                }
+            )
             summary = {
                 "last_batch": result,
                 "quality_mode": job.quality_mode,
-                "gold_new": gold_new,
-                "zero_evidence": bool(result.get("zero_evidence")),
+                "gold_new": gold_new,  # this batch only
+                "total_gold_new": total_gold,  # all batches so far
+                "total_synth_new": total_synth,
+                "batches": batch_log[-20:],
+                "zero_evidence": bool(result.get("zero_evidence")) and total_gold == 0,
                 "user_message": result.get("user_message"),
+                "job_user_message": (
+                    f"Job so far: {total_gold} new gold across {batch_index} batch(es). "
+                    f"This batch: {result.get('user_message') or f'{gold_new} gold'}."
+                ),
                 "warnings": result.get("warnings") or [],
             }
-            level = "warn" if result.get("zero_evidence") or gold_new == 0 else "info"
+            level = "warn" if gold_new == 0 else "info"
             _log(
                 db,
                 job,
                 f"Batch {batch_index}/{job.total_batches} done (pipeline mode {job.quality_mode}): "
-                f"gold_new={gold_new}, units~{items}, {result.get('elapsed_seconds')}s. "
+                f"gold_new={gold_new} (job total={total_gold}), units~{items}, "
+                f"{result.get('elapsed_seconds')}s. "
                 f"{result.get('user_message') or ''}",
                 level=level,
             )
@@ -134,12 +158,27 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 use_llm=use_llm,
             )
             items = int(result.get("synthesized_count") or 0)
-            summary = {"last_batch": result, "quality_mode": job.quality_mode}
+            try:
+                prev_summary = json.loads(job.result_summary_json or "{}")
+            except json.JSONDecodeError:
+                prev_summary = {}
+            total_synth = int(prev_summary.get("total_synth_new") or 0) + items
+            total_gold = int(prev_summary.get("total_gold_new") or 0)
+            summary = {
+                "last_batch": result,
+                "quality_mode": job.quality_mode,
+                "total_gold_new": total_gold,
+                "total_synth_new": total_synth,
+                "job_user_message": (
+                    f"Job so far: {total_synth} synthetic rows across "
+                    f"{batch_index} batch(es)."
+                ),
+            }
             _log(
                 db,
                 job,
                 f"Batch {batch_index}/{job.total_batches} done (synthesis mode {job.quality_mode}): "
-                f"{items} synthetic rows"
+                f"{items} synthetic rows (job total={total_synth})"
                 + ("" if result.get("ok") else f" — {result.get('message')}"),
                 level="info" if result.get("ok") else "warn",
             )
@@ -166,20 +205,44 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             job.status = "completed"
             job.finished_at = _now()
             job.eta_seconds = 0
-            # Prefer last batch user_message when available
             try:
                 summ = json.loads(job.result_summary_json or "{}")
-                um = (summ.get("user_message") or summ.get("last_batch", {}).get("user_message"))
             except Exception:  # noqa: BLE001
-                um = None
-            job.progress_message = um or (
-                f"Completed {job.completed_batches}/{job.total_batches} batches. "
-                f"{job.items_processed} items processed. Data is in your account."
-            )
+                summ = {}
+            total_gold = int(summ.get("total_gold_new") or 0)
+            total_synth = int(summ.get("total_synth_new") or 0)
+            if job.job_type == "pipeline":
+                if total_gold > 0:
+                    job.progress_message = (
+                        f"Completed {job.completed_batches}/{job.total_batches} batches — "
+                        f"{total_gold} new gold example(s) saved to your library."
+                    )
+                else:
+                    job.progress_message = (
+                        f"Completed {job.completed_batches}/{job.total_batches} batches — "
+                        f"0 new gold examples "
+                        f"(last batch: {summ.get('user_message') or 'no new rows'})."
+                    )
+            else:
+                job.progress_message = (
+                    f"Completed {job.completed_batches}/{job.total_batches} batches — "
+                    f"{total_synth} synthetic row(s) saved."
+                )
+            # Keep cumulative totals on the summary for the UI
+            summ["job_user_message"] = job.progress_message
+            summ["total_gold_new"] = total_gold
+            summ["total_synth_new"] = total_synth
+            job.result_summary_json = json.dumps(summ, default=str)
             _log(db, job, job.progress_message, level="info")
         else:
+            try:
+                summ = json.loads(job.result_summary_json or "{}")
+                total_gold = int(summ.get("total_gold_new") or 0)
+            except Exception:  # noqa: BLE001
+                total_gold = 0
             job.progress_message = (
-                f"Finished batch {job.completed_batches}/{job.total_batches}. "
+                f"Finished batch {job.completed_batches}/{job.total_batches} "
+                f"({total_gold} gold so far). "
                 f"ETA ~{int(job.eta_seconds or 0)}s. Continuing automatically…"
             )
             job.status = "pending"  # re-queue next batch

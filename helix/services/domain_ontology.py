@@ -21,15 +21,12 @@ def _slug_type(name: str) -> str:
     return s or "Entity"
 
 
-def ontology_for_brief(brief: dict[str, Any]) -> list[tuple[str, str, str]]:
-    """Return (type_name, kind, description) rows for this research brief."""
+def _is_support_domain(brief: dict[str, Any], topic: str = "") -> bool:
     domain = (brief.get("domain") or "").lower()
     mission = (brief.get("mission") or "").lower()
-    cats = [str(c).lower() for c in (brief.get("categories") or [])]
-    blob = " ".join([domain, mission, " ".join(cats)])
-
-    # Support / CX / helpdesk
-    if any(
+    cats = " ".join(str(c).lower() for c in (brief.get("categories") or []))
+    blob = f"{domain} {mission} {cats} {topic}".lower()
+    return any(
         k in blob
         for k in (
             "support",
@@ -43,8 +40,20 @@ def ontology_for_brief(brief: dict[str, Any]) -> list[tuple[str, str, str]]:
             "cx ",
             "saas",
             "delivery",
+            "order",
+            "help center",
         )
-    ):
+    )
+
+
+def ontology_for_brief(brief: dict[str, Any]) -> list[tuple[str, str, str]]:
+    """Return (type_name, kind, description) rows for this research brief."""
+    domain = (brief.get("domain") or "").lower()
+    mission = (brief.get("mission") or "").lower()
+    cats = [str(c).lower() for c in (brief.get("categories") or [])]
+    blob = " ".join([domain, mission, " ".join(cats)])
+
+    if _is_support_domain(brief):
         base = [
             ("Customer", "entity", "End user or account contacting support"),
             ("SupportTicket", "entity", "A support case or request"),
@@ -56,12 +65,11 @@ def ontology_for_brief(brief: dict[str, Any]) -> list[tuple[str, str, str]]:
             ("mentions", "relationship", "Ticket mentions Product or Policy"),
             ("resolved_by", "relationship", "Issue resolved by ResolutionStep"),
             ("requires", "relationship", "Resolution requires BillingAction or info"),
-            ("severity_window", "fact", "Allowed refund/return window if stated"),
+            ("opportunity_window", "fact", "Allowed refund/return window if stated"),
             ("eligibility", "fact", "Whether customer is eligible for the action"),
             ("channel", "fact", "chat, email, ticket, phone"),
             ("tone", "fact", "Expected reply tone"),
         ]
-    # Sales / coaching
     elif any(k in blob for k in ("sales", "coach", "crm", "pipeline", "lead")):
         base = [
             ("Buyer", "entity", "Prospect or customer persona"),
@@ -74,7 +82,6 @@ def ontology_for_brief(brief: dict[str, Any]) -> list[tuple[str, str, str]]:
             ("stage", "fact", "Funnel stage"),
             ("next_step", "fact", "Clear next action"),
         ]
-    # Influencer / marketing (legacy default only when clearly marketing)
     elif any(
         k in blob
         for k in ("influencer", "creator", "campaign", "instagram", "tiktok", "sponsor")
@@ -93,7 +100,6 @@ def ontology_for_brief(brief: dict[str, Any]) -> list[tuple[str, str, str]]:
             ("call_to_action", "fact", "Primary CTA"),
         ]
     else:
-        # Generic knowledge / Q&A domain
         base = [
             ("Entity", "entity", "Primary subject in the domain"),
             ("Concept", "entity", "Domain concept or term"),
@@ -108,7 +114,6 @@ def ontology_for_brief(brief: dict[str, Any]) -> list[tuple[str, str, str]]:
             ("source_url", "fact", "URL of grounding evidence"),
         ]
 
-    # Always add category-specific entity types from plan categories
     for cat in brief.get("categories") or []:
         tname = _slug_type(str(cat))
         if tname and tname not in {b[0] for b in base}:
@@ -130,7 +135,6 @@ def sync_ontology_from_brief(db: Session, tenant_id: str) -> dict[str, Any]:
     brief = project_to_dict(project)
     types = ontology_for_brief(brief)
 
-    # Remove old ontology rows so agents cannot keep using Brand/Creator for support domains
     old = db.query(m.OntologyType).filter_by(tenant_id=tenant_id).all()
     for row in old:
         db.delete(row)
@@ -155,6 +159,101 @@ def sync_ontology_from_brief(db: Session, tenant_id: str) -> dict[str, Any]:
     }
 
 
+def _clean_evidence(text: str) -> str:
+    t = re.sub(r"\s+", " ", (text or "").strip())
+    # Drop obvious UI chrome fragments
+    t = re.sub(r"(Like|Comment|Share|Follow)\s*$", "", t, flags=re.I)
+    return t.strip()
+
+
+def _customer_question_from_title(title: str, topic: str) -> str:
+    t = (title or topic or "my issue").strip()
+    # Prefer natural customer phrasing over "about: raw headline"
+    if t.lower().startswith("how ") or t.endswith("?"):
+        return t if t.endswith("?") else f"{t}?"
+    return f"Hi — I need help with this: {t}. What should I do next?"
+
+
+def _support_reply_thin(*, title: str, topic: str, fragment: str) -> str:
+    """Customer-facing reply when public evidence is thin — still helpful."""
+    topic_l = (topic or "this").replace("_", " ")
+    frag = (fragment or title or topic_l).strip()
+    short = frag[:120] + ("…" if len(frag) > 120 else "")
+    return (
+        f"Hey! Happy to help with {topic_l}.\n\n"
+        f"I can see this relates to “{short}”, but I want to make sure I give you the "
+        f"right next step for *your* account.\n\n"
+        f"Could you share:\n"
+        f"1) Your order ID or account email (whichever applies)\n"
+        f"2) What you expected to happen vs what you saw\n"
+        f"3) A screenshot if there’s an error message\n\n"
+        f"Once I have those, I’ll tell you exactly what we can do and the fastest path "
+        f"to fix it."
+    )
+
+
+def _support_reply_from_evidence(*, title: str, topic: str, evidence: str) -> str:
+    """Synthesize a support reply — never dump raw scrape/marketing text."""
+    text = _clean_evidence(evidence)
+    topic_l = (topic or "this").replace("_", " ")
+    # Pull useful snippets without pasting the whole scrape
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if len(s.strip()) > 20]
+    useful = []
+    for s in sentences:
+        low = s.lower()
+        # skip pure marketing fluff if possible
+        if any(x in low for x in ("click here", "follow us", "like and share", "subscribe")):
+            continue
+        useful.append(s)
+        if len(useful) >= 2:
+            break
+    if not useful:
+        useful = sentences[:2] if sentences else [text[:200]]
+
+    # Concrete next step from evidence cues
+    low_all = text.lower()
+    if "refund" in low_all or "30 day" in low_all or "30-day" in low_all:
+        next_step = (
+            "If this matches your case, reply with your order ID and I’ll start the "
+            "refund/check for you right away."
+        )
+    elif "deliver" in low_all or "shipping" in low_all or "track" in low_all:
+        next_step = (
+            "Send me your order ID and I’ll pull the latest tracking status and options."
+        )
+    elif "cancel" in low_all:
+        next_step = (
+            "Share your order ID and whether the order has already started preparing — "
+            "I’ll tell you if we can still cancel and how."
+        )
+    else:
+        next_step = (
+            "Reply with your order ID (or account email) and I’ll take the next step for you."
+        )
+
+    body_bits = " ".join(useful)[:420]
+    # Paraphrase wrapper — do not say "based on the available documentation" + dump
+    return (
+        f"Hey! Thanks for reaching out about {topic_l}.\n\n"
+        f"Here’s what I can help with based on how this usually works: {body_bits}\n\n"
+        f"{next_step}\n\n"
+        f"I’ll stick to what’s supported for your account—no guessing on promos or "
+        f"policies that don’t apply to you."
+    )
+
+
+def _general_reply_from_evidence(*, title: str, domain: str, mission: str, evidence: str) -> str:
+    text = _clean_evidence(evidence)
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if len(s.strip()) > 25]
+    take = " ".join(sentences[:3])[:500] if sentences else text[:400]
+    return (
+        f"Here’s a clear answer on “{title}” for {domain}:\n\n"
+        f"{take}\n\n"
+        f"Next step: if you tell me which part you need to act on "
+        f"(related to: {mission[:100]}), I can narrow this to a concrete action."
+    )
+
+
 def domain_gold_pair(
     *,
     brief: dict[str, Any],
@@ -163,71 +262,92 @@ def domain_gold_pair(
     topic: str,
     url: str = "",
 ) -> dict[str, Any]:
-    """Build a training Q/A pair grounded only in evidence (domain-agnostic)."""
+    """Build a training Q/A pair: helpful domain output, grounded, not refuse/echo scrape."""
     domain = (brief.get("domain") or "this product").strip()
     mission = (brief.get("mission") or "Answer helpfully and accurately").strip()
+    instructions = (brief.get("agent_instructions") or "").strip()
     cats = brief.get("categories") or []
     cat_hint = ", ".join(str(c) for c in cats[:6]) if cats else topic
-    text = (evidence or title or "").strip()
-    thin = len(text) < 60
+    text = _clean_evidence(evidence or title or "")
+    support = _is_support_domain(brief, topic)
+    thin = len(text) < 80
 
-    if thin:
-        return {
-            "input": (
-                f"Domain: {domain}\nTopic: {topic}\n"
-                f"User question: Based on available public material about “{title}”, "
-                f"what should a good assistant say?\n"
-                f"Evidence (may be incomplete):\n{text[:400] or '(none)'}"
-            ),
-            "output": (
-                "I don’t have enough verified evidence in the sources provided to answer "
-                "confidently. Please share the specific policy page, ticket field, or docs "
-                "section so I can answer without guessing."
-            ),
-            "rationale": (
-                "Faithfulness: evidence too thin; refusal avoids inventing domain facts."
-            ),
-            "difficulty": "edge-case",
-            "is_negative": True,
-        }
+    # Sample format from plan if present
+    sample_in = ""
+    sample_out = ""
+    # brief may carry sample via topic schemas externally; keep hooks clean
 
-    # Support-shaped default question when domain looks like support
-    blob = f"{domain} {mission} {cat_hint}".lower()
-    if any(k in blob for k in ("support", "refund", "billing", "ticket", "shipping", "delivery")):
-        user_q = (
-            f"A customer asks about: {title}. "
-            f"Using only the evidence below, write the ideal support reply "
-            f"(acknowledge the issue, state what you can do, ask for missing details if needed)."
-        )
-        output = (
-            f"Thanks for reaching out about this. Based on the available documentation:\n\n"
-            f"{text[:700]}\n\n"
-            f"If anything in your account differs (order ID, plan, or promo fields), share those "
-            f"details and I’ll confirm the exact next step—without inventing policies."
+    customer_q = _customer_question_from_title(title, topic)
+
+    if support:
+        if thin:
+            output = _support_reply_thin(title=title, topic=topic, fragment=text or title)
+            rationale = (
+                "Thin public evidence: still help the customer with a friendly reply "
+                "and ask for the account details needed for a concrete next step "
+                "(not an internal-docs demand)."
+            )
+            difficulty = "edge-case"
+            is_neg = False  # still a valid positive training example for support
+        else:
+            output = _support_reply_from_evidence(
+                title=title, topic=topic, evidence=text
+            )
+            rationale = (
+                "Synthesized a customer-facing support reply from public evidence: "
+                "acknowledge, paraphrase useful facts, give a concrete next step. "
+                "Does not paste raw scrape/marketing text or invent policies."
+            )
+            difficulty = "moderate"
+            is_neg = False
+
+        tone_note = ""
+        if instructions:
+            tone_note = f"\nStyle notes from plan: {instructions[:240]}"
+
+        input_text = (
+            f"You are a customer support agent for: {domain}.\n"
+            f"Topics: {cat_hint}\n"
+            f"Goal: {mission[:220]}{tone_note}\n\n"
+            f"Customer message:\n{customer_q}\n\n"
+            f"Internal notes (may include public web snippets — do not dump them raw; "
+            f"write a natural helpful reply; if info is incomplete ask the customer for "
+            f"order/account details, never for internal doc links):\n"
+            f"{text[:900] or title}\n"
+            + (f"Source: {url}\n" if url else "")
         )
     else:
-        user_q = (
-            f"Using only the evidence below about “{title}” in domain “{domain}”, "
-            f"write a high-quality answer that helps achieve: {mission[:180]}"
-        )
-        output = (
-            f"Based on the available evidence:\n\n{text[:700]}\n\n"
-            f"I limited this answer to what the sources state; I did not invent details."
-        )
+        if thin:
+            output = (
+                f"I can help with “{title}”. I only have a short note so far "
+                f"(“{(text or title)[:100]}”). Tell me what you’re trying to do and any "
+                f"constraints, and I’ll give a concrete next step."
+            )
+            rationale = "Thin evidence: ask clarifying questions and stay helpful."
+            difficulty = "edge-case"
+            is_neg = False
+        else:
+            output = _general_reply_from_evidence(
+                title=title, domain=domain, mission=mission, evidence=text
+            )
+            rationale = (
+                "Synthesized answer from evidence with a concrete next step; "
+                "not a raw echo of the source."
+            )
+            difficulty = "moderate"
+            is_neg = False
 
-    if url:
-        user_q += f"\nSource URL: {url}"
+        input_text = (
+            f"Domain: {domain}\nTopics: {cat_hint}\nMission: {mission[:200]}\n\n"
+            f"User: {customer_q}\n\n"
+            f"Evidence (paraphrase; do not invent):\n{text[:1200]}\n"
+            + (f"URL: {url}\n" if url else "")
+        )
 
     return {
-        "input": (
-            f"Domain: {domain}\nTopics: {cat_hint}\nMission: {mission[:200]}\n\n"
-            f"{user_q}\n\nEvidence:\n{text[:1200]}"
-        ),
+        "input": input_text[:4000],
         "output": output[:2000],
-        "rationale": (
-            f"Grounded only in gathered evidence for “{title}”. "
-            f"Does not invent facts beyond the source text. Topic “{topic}”."
-        ),
-        "difficulty": "moderate",
-        "is_negative": False,
+        "rationale": rationale[:1000],
+        "difficulty": difficulty,
+        "is_negative": is_neg,
     }

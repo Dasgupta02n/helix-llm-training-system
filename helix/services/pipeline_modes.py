@@ -514,6 +514,20 @@ def run_code_pipeline_batch(
     }
 
 
+def _user_gold_count(db: Session, owner_user_id: str | None, tenant_id: str) -> int:
+    if not owner_user_id:
+        return 0
+    return (
+        db.query(m.GoldExample)
+        .filter_by(
+            owner_user_id=owner_user_id,
+            tenant_id=tenant_id,
+            is_archived=False,
+        )
+        .count()
+    )
+
+
 def run_pipeline_batch(
     db: Session,
     *,
@@ -529,7 +543,6 @@ def run_pipeline_batch(
     t0 = time.time()
     results: list[dict[str, Any]] = []
     items = 0
-    gold_new = 0
     warnings: list[str] = []
     zero_evidence = False
 
@@ -540,6 +553,8 @@ def run_pipeline_batch(
             except Exception:  # noqa: BLE001
                 pass
 
+    gold_before = _user_gold_count(db, owner_user_id, tenant_id)
+
     _progress("Gathering sources (Apify/code) from your research plan…")
     code_res = run_code_pipeline_batch(
         db,
@@ -549,7 +564,6 @@ def run_pipeline_batch(
     )
     results.append({"step": "apify_gather_and_code", **code_res})
     items += int(code_res.get("items_processed") or 0)
-    gold_new += int(code_res.get("gold_new") or 0)
     zero_evidence = bool(code_res.get("zero_evidence"))
     warnings.extend(code_res.get("warnings") or [])
 
@@ -561,9 +575,10 @@ def run_pipeline_batch(
         f"Active domain: {domain}. "
         f"Process at most {batch_size} pending items. Quality mode {quality_mode}. "
         f"Obey the Research Brief. Do NOT invent posts/URLs or domain facts. "
-        f"If evidence is missing, say so — never fabricate. "
-        f"Faithfulness: if input describes missing/blank fields, the ideal output "
-        f"must acknowledge them, not invent values."
+        f"For customer-support domains: ideal replies must help the end customer "
+        f"(friendly tone, concrete next step). Never demand internal docs from them. "
+        f"Never approve outputs that only paste raw scraped marketing text. "
+        f"Faithfulness: if input describes missing/blank fields, acknowledge them."
     )
     for key in agents:
         _progress(f"Running helper: {key}…")
@@ -591,8 +606,15 @@ def run_pipeline_batch(
             if quality_mode == 1 and key in {"research_director", "discovery"}:
                 break
 
+    # Authoritative count: actual library delta (includes agent-promoted gold too)
+    gold_after = _user_gold_count(db, owner_user_id, tenant_id)
+    gold_new = max(0, gold_after - gold_before)
+    # Prefer DB delta; fall back to code path counter if owner missing
+    if owner_user_id is None:
+        gold_new = int(code_res.get("gold_new") or 0)
+
     elapsed = time.time() - t0
-    if gold_new == 0 and zero_evidence:
+    if gold_new == 0 and zero_evidence and int(code_res.get("gather_results") or 0) == 0:
         user_message = (
             "No verifiable sources found for this topic — 0 new gold examples. "
             "Old library items (if any) were not produced by this run."
@@ -605,7 +627,11 @@ def run_pipeline_batch(
             "Existing library rows are unchanged."
         )
     else:
-        user_message = f"Batch added {gold_new} new gold example(s)."
+        user_message = (
+            f"Batch added {gold_new} new gold example(s) "
+            f"(candidates={code_res.get('candidates_new', 0)}, "
+            f"gather_hits={code_res.get('gather_results', 0)})."
+        )
 
     return {
         "quality_mode": quality_mode,
@@ -613,7 +639,10 @@ def run_pipeline_batch(
         "elapsed_seconds": round(elapsed, 2),
         "items_processed": items,
         "gold_new": gold_new,
-        "zero_evidence": zero_evidence,
+        "gold_before": gold_before,
+        "gold_after": gold_after,
+        "code_gold_new": int(code_res.get("gold_new") or 0),
+        "zero_evidence": zero_evidence and gold_new == 0,
         "warnings": warnings,
         "user_message": user_message,
         "results": results,

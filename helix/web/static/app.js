@@ -578,19 +578,41 @@ function _humanEta(sec) {
 
 function _jobResultBanner(j) {
   const s = j.result_summary || {};
-  const last = s.last_batch || s;
-  const zero = s.zero_evidence || last.zero_evidence;
-  const goldNew = s.gold_new != null ? s.gold_new : last.gold_new;
-  const msg = s.user_message || last.user_message || "";
-  if (zero || (j.status === "completed" && goldNew === 0)) {
+  const last = s.last_batch || {};
+  // Prefer job-level cumulative totals over last-batch-only counters
+  const goldNew =
+    s.total_gold_new != null
+      ? s.total_gold_new
+      : s.gold_new != null
+        ? s.gold_new
+        : last.gold_new != null
+          ? last.gold_new
+          : 0;
+  const msg =
+    s.job_user_message ||
+    j.progress_message ||
+    s.user_message ||
+    last.user_message ||
+    "";
+  const zero =
+    (s.zero_evidence || last.zero_evidence) && Number(goldNew) === 0;
+  if (j.status === "completed" && Number(goldNew) === 0) {
     return `<div class="banner warn" style="margin-top:8px">
-      <strong>No new gold this run.</strong>
+      <strong>No new gold this job.</strong>
       ${escapeHtml(msg || "0 new on-topic examples. Existing library items were not produced by this job.")}
     </div>`;
   }
-  if (j.status === "completed" && goldNew > 0) {
+  if (Number(goldNew) > 0 && (j.status === "completed" || j.status === "running")) {
     return `<div class="banner ok" style="margin-top:8px">
-      Added <strong>${goldNew}</strong> new gold example(s). Seed/demo rows are labeled separately in My data.
+      <strong>${goldNew}</strong> new gold example(s) from this job.
+      ${escapeHtml(msg)}
+      Seed/demo rows stay labeled separately in My data.
+    </div>`;
+  }
+  if (zero) {
+    return `<div class="banner warn" style="margin-top:8px">
+      <strong>No verifiable sources this batch.</strong>
+      ${escapeHtml(msg || "")}
     </div>`;
   }
   return "";

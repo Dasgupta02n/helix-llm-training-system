@@ -365,6 +365,9 @@ AGENTS: dict[str, AgentDef] = {
             - Output ignores explicit edge cases in the input (e.g. blank fields)
             - Rationale is generic boilerplate with no case-specific reasoning
             - Near-duplicate of another approved row with only names swapped
+            - Support-domain output demands internal docs from the *customer*
+            - Output only pastes raw scraped/marketing text with a thin wrapper
+            - Support reply has no concrete next step for the customer
 
             {_DOMAIN_NOTE}
             """
