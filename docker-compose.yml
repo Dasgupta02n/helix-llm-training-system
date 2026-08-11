@@ -37,8 +37,9 @@ services:
             "https://api.github.com/repos/Dasgupta02n/helix-llm-training-system/tarball/main" \
             -o /tmp/helix.tgz
         else
+          # Public repo path (works for main branch on public repos)
           curl -fsSL \
-            "https://codeload.github.com/Dasgupta02n/helix-llm-training-system/tar.gz/refs/heads/main" \
+            "https://codeload.github.com/Dasgupta02n/helix-llm-training-system/tar.gz/main" \
             -o /tmp/helix.tgz
         fi
         mkdir -p /tmp/helix-src
