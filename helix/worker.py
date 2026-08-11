@@ -83,23 +83,42 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
 
     try:
         if job.job_type == "pipeline":
+            def _progress(msg: str) -> None:
+                job.progress_message = (
+                    f"Batch {batch_index}/{job.total_batches}: {msg}"
+                )
+                job.updated_at = _now()
+                try:
+                    db.commit()
+                except Exception:  # noqa: BLE001
+                    db.rollback()
+
             result = run_pipeline_batch(
                 db,
                 tenant_id=job.tenant_id,
                 owner_user_id=job.owner_user_id,
                 quality_mode=job.quality_mode,
                 batch_size=job.batch_size,
+                progress_cb=_progress,
             )
             items = int(result.get("items_processed") or 0)
+            gold_new = int(result.get("gold_new") or 0)
             summary = {
                 "last_batch": result,
                 "quality_mode": job.quality_mode,
+                "gold_new": gold_new,
+                "zero_evidence": bool(result.get("zero_evidence")),
+                "user_message": result.get("user_message"),
+                "warnings": result.get("warnings") or [],
             }
+            level = "warn" if result.get("zero_evidence") or gold_new == 0 else "info"
             _log(
                 db,
                 job,
                 f"Batch {batch_index}/{job.total_batches} done (pipeline mode {job.quality_mode}): "
-                f"~{items} units, {result.get('elapsed_seconds')}s",
+                f"gold_new={gold_new}, units~{items}, {result.get('elapsed_seconds')}s. "
+                f"{result.get('user_message') or ''}",
+                level=level,
             )
         else:
             # synthesis: modes 1–2 use LLM when available; 3–4 use templates (low tokens)
@@ -147,7 +166,13 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             job.status = "completed"
             job.finished_at = _now()
             job.eta_seconds = 0
-            job.progress_message = (
+            # Prefer last batch user_message when available
+            try:
+                summ = json.loads(job.result_summary_json or "{}")
+                um = (summ.get("user_message") or summ.get("last_batch", {}).get("user_message"))
+            except Exception:  # noqa: BLE001
+                um = None
+            job.progress_message = um or (
                 f"Completed {job.completed_batches}/{job.total_batches} batches. "
                 f"{job.items_processed} items processed. Data is in your account."
             )

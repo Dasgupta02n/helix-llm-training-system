@@ -137,13 +137,36 @@ def update_scope(
     return row
 
 
+_DEMO_TOPICS = {
+    "campaign_strategy",
+    "budget_allocation",
+    "creator_selection",
+    "beauty",
+    "fitness",
+    "fashion",
+    "gaming",
+    "travel",
+}
+
+
+def _is_seed_kind(kind: str | None, topic: str | None = None) -> bool:
+    if (kind or "").lower() in {"seed", "demo", "bootstrap", "sample"}:
+        return True
+    # Legacy bootstrap / influencer demo topics often labeled as pipeline
+    t = (topic or "").lower().strip()
+    return t in _DEMO_TOPICS
+
+
 def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
     scope = get_or_create_scope(db, user_id, tenant_id)
-    gold_count = (
+    gold_rows = (
         db.query(m.GoldExample)
         .filter_by(owner_user_id=user_id, tenant_id=tenant_id, is_archived=False)
-        .count()
+        .all()
     )
+    gold_count = len(gold_rows)
+    seed_gold = sum(1 for g in gold_rows if _is_seed_kind(g.source_kind, g.topic))
+    user_gold = gold_count - seed_gold
     synth_count = (
         db.query(m.SyntheticExample)
         .filter_by(owner_user_id=user_id, tenant_id=tenant_id, is_archived=False)
@@ -152,6 +175,8 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
     target_synth = scope.gold_target_count * scope.variations_per_gold
     return {
         "gold_count": gold_count,
+        "gold_seed_count": seed_gold,
+        "gold_user_count": user_gold,
         "gold_target": scope.gold_target_count,
         "gold_remaining": max(0, scope.gold_target_count - gold_count),
         "gold_progress_pct": min(
@@ -170,6 +195,7 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
 
 
 def gold_to_dict(g: m.GoldExample) -> dict[str, Any]:
+    seed = _is_seed_kind(g.source_kind, g.topic)
     return {
         "id": g.id,
         "owner_user_id": g.owner_user_id,
@@ -182,6 +208,8 @@ def gold_to_dict(g: m.GoldExample) -> dict[str, Any]:
         "is_negative": g.is_negative,
         "source_kind": g.source_kind,
         "source_ref": g.source_ref,
+        "is_seed": seed,
+        "origin_label": "Seed / demo" if seed else "Your generated data",
         "verification_status": g.verification_status,
         "created_at": g.created_at.isoformat() if g.created_at else None,
         "kind": "gold",

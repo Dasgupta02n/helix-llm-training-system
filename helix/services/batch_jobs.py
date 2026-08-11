@@ -10,7 +10,12 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from helix.db import models as m
-from helix.services.pipeline_modes import MODE_META, clamp_batch_size, clamp_mode
+from helix.services.pipeline_modes import (
+    MODE_META,
+    clamp_batch_size,
+    clamp_mode,
+    eta_prior_seconds,
+)
 
 
 def _uid(prefix: str = "job_") -> str:
@@ -39,10 +44,25 @@ def create_batch_job(
     batch_size = clamp_batch_size(batch_size)
     total_batches = max(1, min(int(total_batches), 500))
 
-    # Default ETA: rough priors by mode
-    prior = {1: 90.0, 2: 45.0, 3: 20.0, 4: 5.0}.get(quality_mode, 30.0)
-    if job_type == "synthesis":
-        prior = {1: 40.0, 2: 25.0, 3: 12.0, 4: 3.0}.get(quality_mode, 15.0)
+    # Conservative priors (recalibrated ~2–3× old heuristics from live runs)
+    prior = eta_prior_seconds(job_type, quality_mode)
+    # Prefer historical avg for this user/tenant if available
+    hist = (
+        db.query(m.BatchJob)
+        .filter(
+            m.BatchJob.owner_user_id == owner_user_id,
+            m.BatchJob.tenant_id == tenant_id,
+            m.BatchJob.job_type == job_type,
+            m.BatchJob.quality_mode == quality_mode,
+            m.BatchJob.status == "completed",
+            m.BatchJob.avg_batch_seconds > 0,
+        )
+        .order_by(m.BatchJob.finished_at.desc())
+        .limit(5)
+        .all()
+    )
+    if hist:
+        prior = sum(j.avg_batch_seconds for j in hist) / len(hist)
 
     job = m.BatchJob(
         id=_uid(),

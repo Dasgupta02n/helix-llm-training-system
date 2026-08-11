@@ -208,6 +208,11 @@ AGENTS: dict[str, AgentDef] = {
 
             Write reasoning before deciding: verified >= 0.75, rejected < 0.4,
             else request_more_evidence (max 2 cycles). Require corroboration when sources are weak.
+
+            FAITHFULNESS (critical):
+            - Never invent promo codes, prices, policies, or entities not present in evidence.
+            - If the input notes blank/missing fields, the verified judgment must treat them as missing.
+            - Prefer reject or request_more_evidence over a confident but unsupported claim.
             """
         ),
     ),
@@ -318,6 +323,12 @@ AGENTS: dict[str, AgentDef] = {
             Include negatives/counterfactuals (~1 in 5). Tag difficulty. All drafts go to
             Adversarial Reviewer — you do not ship.
 
+            QUALITY RULES:
+            - Do not produce near-duplicate rows that only swap names.
+            - Rationale must explain *why* the answer is correct for this input (not boilerplate).
+            - Faithfulness: if seed input mentions missing/blank data, outputs must not invent it.
+            - Prefer diverse difficulty and real edge cases over templated clones.
+
             {_DOMAIN_NOTE}
             """
         ),
@@ -346,6 +357,12 @@ AGENTS: dict[str, AgentDef] = {
             reassess difficulty, validate negatives, fact-check, and verify schema compliance.
             Stay adversarial — high approval rate means your review is too soft.
             Only approve rows fit to be gold training data.
+
+            REJECT when:
+            - Output invents facts not supported by evidence/seed (faithfulness bugs)
+            - Output ignores explicit edge cases in the input (e.g. blank fields)
+            - Rationale is generic boilerplate with no case-specific reasoning
+            - Near-duplicate of another approved row with only names swapped
 
             {_DOMAIN_NOTE}
             """

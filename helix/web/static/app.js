@@ -15,22 +15,23 @@ const QUALITY_COPY = {
   1: {
     label: "Mode 1 — Best quality",
     desc: "All 15 AI helpers. Highest token use, strongest judgment.",
-    etaBatch: { pipeline: 90, synthesis: 40 },
+    // Recalibrated ~2–3× after live runs (conservative)
+    etaBatch: { pipeline: 180, synthesis: 90 },
   },
   2: {
     label: "Mode 2 — High quality",
-    desc: "Core AI helpers + code for mechanical steps.",
-    etaBatch: { pipeline: 45, synthesis: 25 },
+    desc: "Core AI helpers + code for mechanical steps. Domain follows your Plan.",
+    etaBatch: { pipeline: 120, synthesis: 55 },
   },
   3: {
     label: "Mode 3 — Balanced",
     desc: "Mostly code; LLM only on quality gates (or templates for synthesis).",
-    etaBatch: { pipeline: 20, synthesis: 12 },
+    etaBatch: { pipeline: 75, synthesis: 30 },
   },
   4: {
     label: "Mode 4 — Lowest cost",
     desc: "Ultra lean: deterministic tools / templates only.",
-    etaBatch: { pipeline: 5, synthesis: 3 },
+    etaBatch: { pipeline: 40, synthesis: 12 },
   },
 };
 
@@ -78,8 +79,8 @@ const FRIENDLY_AGENTS = {
     role: "Structure",
   },
   campaign_strategist: {
-    title: "Pattern finder",
-    blurb: "Writes useful insights that can become examples.",
+    title: "Strategy synthesizer",
+    blurb: "Turns verified evidence into domain insights for gold examples (not limited to marketing).",
     role: "Insights",
   },
   dataset_curator: {
@@ -575,15 +576,42 @@ function _humanEta(sec) {
   return `~${h}h ${m % 60}m`;
 }
 
+function _jobResultBanner(j) {
+  const s = j.result_summary || {};
+  const last = s.last_batch || s;
+  const zero = s.zero_evidence || last.zero_evidence;
+  const goldNew = s.gold_new != null ? s.gold_new : last.gold_new;
+  const msg = s.user_message || last.user_message || "";
+  if (zero || (j.status === "completed" && goldNew === 0)) {
+    return `<div class="banner warn" style="margin-top:8px">
+      <strong>No new gold this run.</strong>
+      ${escapeHtml(msg || "0 new on-topic examples. Existing library items were not produced by this job.")}
+    </div>`;
+  }
+  if (j.status === "completed" && goldNew > 0) {
+    return `<div class="banner ok" style="margin-top:8px">
+      Added <strong>${goldNew}</strong> new gold example(s). Seed/demo rows are labeled separately in My data.
+    </div>`;
+  }
+  return "";
+}
+
 async function loadJobs() {
   if (!$("jobsList") || !state.tenantSlug) return;
   try {
     const data = await api(`/api/t/${state.tenantSlug}/jobs`);
     const jobs = data.jobs || [];
+    const active = (data.active || []).length;
+    if ($("jobsLiveHint")) {
+      $("jobsLiveHint").textContent = active
+        ? `${active} job(s) running — counters refresh every 2s`
+        : "No active jobs";
+    }
     if (!jobs.length) {
       $("jobsList").innerHTML = `<div class="empty"><div class="icon">⏱️</div>No jobs yet. Start a mining or synthesis job above.</div>`;
       return;
     }
+    // Visual progress: while a batch is running, show partial credit so UI doesn't freeze at 0%
     $("jobsList").innerHTML = jobs
       .map((j) => {
         const badge =
@@ -595,6 +623,13 @@ async function loadJobs() {
                 ? "accent"
                 : "warn";
         const typeLabel = j.job_type === "synthesis" ? "Synthesis" : "Mining";
+        let pct = Number(j.progress_pct) || 0;
+        if (j.status === "running" && pct < 100) {
+          // mid-batch pulse: at least show progress into current batch
+          const partial = ((j.completed_batches + 0.35) / Math.max(j.total_batches, 1)) * 100;
+          pct = Math.max(pct, Math.min(99, Math.round(partial * 10) / 10));
+        }
+        const updated = j.updated_at ? new Date(j.updated_at).toLocaleTimeString() : "—";
         return `<div class="job-card" data-job="${escapeHtml(j.id)}">
           <div class="job-head">
             <div>
@@ -610,14 +645,16 @@ async function loadJobs() {
               }
             </div>
           </div>
-          <div class="progress-bar"><i style="width:${j.progress_pct || 0}%"></i></div>
+          <div class="progress-bar"><i style="width:${pct}%"></i></div>
           <p class="hint mb-0">
-            Batches ${j.completed_batches}/${j.total_batches}
+            Batches <strong>${j.completed_batches}</strong>/${j.total_batches}
             · size ${j.batch_size}
-            · items ${j.items_processed}
+            · items <strong>${j.items_processed}</strong>
             · ETA ${escapeHtml(j.eta_human || "—")}
+            · updated ${escapeHtml(updated)}
           </p>
           <p class="hint mb-0">${escapeHtml(j.progress_message || "")}</p>
+          ${_jobResultBanner(j)}
         </div>`;
       })
       .join("");
@@ -643,8 +680,12 @@ function startJobPolling() {
   if (state.jobPollTimer) clearInterval(state.jobPollTimer);
   state.jobPollTimer = setInterval(() => {
     if (!state.token || !state.tenantSlug) return;
+    // Always refresh jobs + library counts so healthy jobs never look dead
     loadJobs().catch(() => {});
-  }, 4000);
+    if ($("tab-library") && !$("tab-library").classList.contains("hidden")) {
+      loadLibrary().catch(() => {});
+    }
+  }, 2000);
 }
 
 async function startPipelineJob() {
@@ -719,11 +760,18 @@ async function loadLibrary() {
     updateSynthHint();
     renderParamPicker(settings.available_parameters, settings.vary_parameters);
 
+    const seedN = stats.gold_seed_count || 0;
+    const userN =
+      stats.gold_user_count != null ? stats.gold_user_count : stats.gold_count;
     $("libraryProgress").innerHTML = `
       <div class="stat-card tone-accent">
-        <div class="label">Gold in your account</div>
-        <div class="value">${stats.gold_count.toLocaleString()}</div>
-        <div class="sub">of ${stats.gold_target.toLocaleString()} goal · ${stats.gold_progress_pct}% · kept forever</div>
+        <div class="label">Your generated gold</div>
+        <div class="value">${Number(userN).toLocaleString()}</div>
+        <div class="sub">of ${stats.gold_target.toLocaleString()} goal · ${stats.gold_progress_pct}% · kept forever${
+          seedN
+            ? ` · ${seedN} seed/demo row(s) listed separately`
+            : ""
+        }</div>
       </div>
       <div class="stat-card tone-ok">
         <div class="label">Synthesized in your account</div>
@@ -734,18 +782,29 @@ async function loadLibrary() {
     if (!gold.items.length) {
       $("goldList").innerHTML = `<div class="empty"><div class="icon">🥇</div>No gold yet. Run helpers, then “Save vetted data as gold”.</div>`;
     } else {
-      $("goldList").innerHTML = gold.items
-        .map(
-          (g) => `<div class="item">
+      const seedItems = gold.items.filter((g) => g.is_seed);
+      const userItems = gold.items.filter((g) => !g.is_seed);
+      const row = (g) => `<div class="item">
           <div>
-            <h4>${escapeHtml(g.topic)}</h4>
+            <h4>${escapeHtml(g.topic)} ${
+              g.is_seed
+                ? '<span class="badge warn">Seed / demo</span>'
+                : '<span class="badge ok">Your data</span>'
+            }</h4>
             <p><strong>Q:</strong> ${escapeHtml((g.input || "").slice(0, 120))}</p>
             <p><strong>A:</strong> ${escapeHtml((g.output || "").slice(0, 120))}</p>
           </div>
-          <span class="badge ok">gold</span>
-        </div>`
-        )
-        .join("") + `<p class="hint">Showing ${gold.items.length} of ${gold.total}</p>`;
+          <span class="badge">${escapeHtml(g.source_kind || "gold")}</span>
+        </div>`;
+      $("goldList").innerHTML =
+        (seedItems.length
+          ? `<div class="banner warn" style="margin-bottom:12px"><strong>Seed / demo data</strong> — not created by your latest mining run (${seedItems.length}).</div>`
+          : "") +
+        (userItems.length
+          ? `<div class="section-label">Your generated data (${userItems.length})</div>`
+          : `<div class="banner warn" style="margin-bottom:12px">No generated gold yet — only seed/demo or empty. A finished job with 0 new gold will not change this list.</div>`) +
+        [...userItems, ...seedItems].map(row).join("") +
+        `<p class="hint">Showing ${gold.items.length} of ${gold.total}</p>`;
     }
 
     if (!synth.items.length) {

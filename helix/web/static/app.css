@@ -1054,6 +1054,23 @@ select {
   .page-body { padding: 16px; }
 }
 
+/* Banners */
+.banner {
+  padding: 12px 14px;
+  border: 1px solid var(--line-soft);
+  background: var(--paper-2);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.banner.warn {
+  border-left: 3px solid var(--warn);
+  background: color-mix(in srgb, var(--warn) 8%, var(--paper));
+}
+.banner.ok {
+  border-left: 3px solid var(--ok);
+  background: color-mix(in srgb, var(--ok) 8%, var(--paper));
+}
+
 /* ── Riu chat ───────────────────────────────────────── */
 .riu-layout {
   display: grid;

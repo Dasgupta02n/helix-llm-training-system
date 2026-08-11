@@ -180,7 +180,7 @@
           <div>
             <span class="page-kicker">Home</span>
             <h2>How Helix works</h2>
-            <p class="hint">You don’t need to know programming. Follow the steps — Helix’s AI helpers do the heavy lifting.</p>
+            <p class="hint">You don’t need to know programming. Helix is <strong>domain-agnostic</strong>: set any product in Plan (support, sales, education, …). Mining follows that brief — not a fixed influencer demo. Helix’s AI helpers do the heavy lifting.</p>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" type="button" data-goto="riu">Talk to Riu</button>
@@ -428,7 +428,7 @@
           <div>
             <span class="page-kicker">Step 3 · Mining batches</span>
             <h2>Run collection batches</h2>
-            <p class="hint">Jobs keep running <strong>even if you sign out</strong>. Come back later — data is saved to your account.</p>
+            <p class="hint">Jobs keep running <strong>even if you sign out</strong>. Mining follows <strong>your Plan</strong> (any domain) — not a fixed vertical. Come back later — data is saved to your account.</p>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary btn-lg" id="startPipeJobBtn" type="button">Start mining job</button>
@@ -436,6 +436,11 @@
         </div>
 
         <div class="page-body">
+          <div class="banner" id="pipelineScopeBanner" style="margin-bottom:16px;border:1px solid var(--line);padding:12px 14px;background:var(--paper-2)">
+            <strong>Domain-agnostic mining.</strong>
+            Queries and gold promotion use your active Plan / categories. If a run finds no sources, you’ll see an explicit “0 new gold” message — existing library rows are not treated as results of that run.
+          </div>
+          <p class="hint" id="jobsLiveHint" style="margin-bottom:8px">Job status loads here</p>
           <div class="quality-slider-wrap">
             <div class="flex" style="justify-content:space-between;align-items:baseline">
               <label for="pipeQuality" class="mb-0">Quality ↔ Cost</label>
@@ -479,7 +484,7 @@
 
           <div style="margin-top:28px;border-top:2px solid var(--color-divider);padding-top:20px">
             <h3 class="mt-0">Your jobs</h3>
-            <p class="hint">Active and recent mining / synthesis jobs. Safe to leave this page.</p>
+            <p class="hint">Active and recent mining / synthesis jobs. Counters refresh every 2s while you stay signed in. Safe to leave this page.</p>
             <div id="jobsList"></div>
           </div>
 

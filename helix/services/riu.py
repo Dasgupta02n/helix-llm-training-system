@@ -13,7 +13,12 @@ from sqlalchemy.orm import Session
 from helix.config import get_settings
 from helix.db import models as m
 from helix.services.batch_jobs import create_batch_job, job_to_dict
-from helix.services.brief import get_active_project, project_to_dict, schema_to_dict
+from helix.services.brief import (
+    get_active_project,
+    project_to_dict,
+    schema_to_dict,
+    sync_workspace_from_brief,
+)
 from helix.services.library import update_scope
 
 RIU_NAME = "Riu"
@@ -95,6 +100,9 @@ Rules for actions:
 - Emit start_synthesis only if user wants variations and gold goals are set; usually after pipeline is started or they already have gold.
 - progress is 0–100 estimate of setup completeness.
 - Merge state_patch with prior state; only include keys you want to update.
+- progress must be non-decreasing (never go backward) as setup completes.
+- When defining a format, set replace_formats: true and a single topic_key —
+  do not list old demo formats.
 """
 
 
@@ -637,17 +645,14 @@ def _apply_save_plan(
         .filter_by(tenant_id=tenant.id, slug=slug)
         .first()
     )
-    # Merge topic keys — never wipe prior formats when topic_key not in state yet
-    prev_keys: list[str] = []
-    if existing:
-        prev_keys = _load_json(existing.topic_keys_json, [])
-        if not isinstance(prev_keys, list):
-            prev_keys = []
-    topic_keys = list(prev_keys)
+    # Replace formats when Riu sets a primary topic (avoid contaminating with old demo topics)
+    replace_formats = bool(state.get("replace_formats", True))
+    topic_keys: list[str] = []
     if state.get("topic_key"):
-        tk = _topic_key(str(state["topic_key"]))
-        if tk and tk not in topic_keys:
-            topic_keys.append(tk)
+        topic_keys = [_topic_key(str(state["topic_key"]))]
+    elif not replace_formats and existing:
+        prev = _load_json(existing.topic_keys_json, [])
+        topic_keys = list(prev) if isinstance(prev, list) else []
 
     if existing:
         existing.name = name
@@ -657,7 +662,8 @@ def _apply_save_plan(
         existing.categories_json = json.dumps(categories)
         existing.sources_json = json.dumps(sources)
         existing.phase_targets_json = json.dumps(targets)
-        existing.topic_keys_json = json.dumps(topic_keys)
+        if topic_keys or replace_formats:
+            existing.topic_keys_json = json.dumps(topic_keys)
         existing.agent_instructions = instructions
         existing.is_active = True
         existing.updated_at = _now()
@@ -667,7 +673,14 @@ def _apply_save_plan(
                 p.is_active = False
         db.commit()
         db.refresh(existing)
-        return {"ok": True, "action": "save_plan", "project": project_to_dict(existing)}
+        sync_workspace_from_brief(db, tenant.id, force_queue=True)
+        return {
+            "ok": True,
+            "action": "save_plan",
+            "project": project_to_dict(existing),
+            "formats_replaced": replace_formats,
+            "topic_keys": topic_keys,
+        }
 
     row = m.ResearchProject(
         id=_uid("prj_"),
@@ -695,7 +708,14 @@ def _apply_save_plan(
     db.add(row)
     db.commit()
     db.refresh(row)
-    return {"ok": True, "action": "save_plan", "project": project_to_dict(row)}
+    sync_workspace_from_brief(db, tenant.id, force_queue=True)
+    return {
+        "ok": True,
+        "action": "save_plan",
+        "project": project_to_dict(row),
+        "formats_replaced": True,
+        "topic_keys": topic_keys,
+    }
 
 
 def _apply_save_format(
@@ -743,17 +763,32 @@ def _apply_save_format(
         )
         db.add(row)
 
-    # attach topic to active plan
+    # Replace plan formats with this primary format (avoid merging demo + new topics)
     plan = get_active_project(db, tenant.id)
+    deactivated = []
     if plan:
-        keys = _load_json(plan.topic_keys_json, [])
-        if topic not in keys:
-            keys.append(topic)
-            plan.topic_keys_json = json.dumps(keys)
-            plan.updated_at = _now()
+        plan.topic_keys_json = json.dumps([topic])
+        plan.updated_at = _now()
+        # Deactivate other topic schemas so UI lists only the active training format
+        for other in (
+            db.query(m.TopicSchema)
+            .filter_by(tenant_id=tenant.id, is_active=True)
+            .all()
+        ):
+            if other.topic != topic:
+                other.is_active = False
+                other.updated_at = _now()
+                deactivated.append(other.topic)
     db.commit()
     db.refresh(row)
-    return {"ok": True, "action": "save_format", "schema": schema_to_dict(row)}
+    return {
+        "ok": True,
+        "action": "save_format",
+        "schema": schema_to_dict(row),
+        "formats_replaced": True,
+        "deactivated_topics": deactivated,
+        "active_topic": topic,
+    }
 
 
 def _apply_save_goals(
@@ -931,6 +966,23 @@ def handle_user_message(
         state["topic_key"] = _topic_key(state["format_name"])
     if state.get("categories") and not state.get("phase_targets"):
         state["phase_targets"] = {c: 40 for c in state["categories"][:12]}
+    # Formats from Riu replace demo defaults by default
+    state.setdefault("replace_formats", True)
+
+    # Monotonic setup progress (never go backward)
+    prev_progress = 0
+    for m in messages:
+        if m.get("role") == "assistant" and m.get("progress") is not None:
+            try:
+                prev_progress = max(prev_progress, int(m.get("progress") or 0))
+            except (TypeError, ValueError):
+                pass
+    try:
+        raw_progress = int(turn.get("progress") or 0)
+    except (TypeError, ValueError):
+        raw_progress = 0
+    progress = max(prev_progress, min(100, raw_progress))
+    turn["progress"] = progress
 
     action_results = execute_actions(
         db,
@@ -959,6 +1011,23 @@ def handle_user_message(
             reply += f"\n\nSynthesis job **{r['job']['id']}** is queued."
         if not r.get("ok") and r.get("error"):
             reply += f"\n\n(Note: {r.get('action')} failed: {r.get('error')})"
+
+    # Surface format replacement to the user when Riu rewrote topics
+    for ar in action_results:
+        if ar.get("ok") and ar.get("formats_replaced") and ar.get("active_topic"):
+            reply += (
+                f"\n\n_Formats updated: active format is **{ar['active_topic']}**"
+                + (
+                    f" (deactivated: {', '.join(ar.get('deactivated_topics') or [])})."
+                    if ar.get("deactivated_topics")
+                    else "."
+                )
+                + "_"
+            )
+        if ar.get("ok") and ar.get("topic_keys") is not None and ar.get("action") == "save_plan":
+            keys = ar.get("topic_keys") or []
+            if keys:
+                reply += f"\n\n_Plan formats set to: {', '.join(keys)}_"
 
     assistant_msg = {
         "id": _uid("msg_"),

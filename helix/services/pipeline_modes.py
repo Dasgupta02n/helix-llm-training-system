@@ -4,11 +4,15 @@ Mode 1 — best quality: all 15 agents (LLM)
 Mode 2 — balanced: key LLM agents + code for mechanical steps
 Mode 3 — lean: few LLM gates + heavy code path
 Mode 4 — ultra lean: code-only / template heuristics (lowest tokens)
+
+All modes are **domain-agnostic**: discovery queries and gold promotion follow
+the tenant's active Research Brief, not a fixed influencer-marketing vertical.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import time
 import uuid
 from typing import Any
@@ -18,6 +22,7 @@ from sqlalchemy.orm import Session
 from helix.agents.catalog import PIPELINE_ORDER
 from helix.agents.runner import run_agent
 from helix.db import models as m
+from helix.services.brief import get_active_project, project_to_dict, sync_workspace_from_brief
 from helix.services.library import add_gold_example, get_or_create_scope
 from helix.tools.handlers import ToolContext
 
@@ -27,26 +32,33 @@ MODE_META = {
         "short": "All 15 AI helpers",
         "cost": "Highest judge tokens",
         "description": "Apify gathers; all 15 agents judge via tools (no inventing scrapes).",
+        "eta_batch_prior_sec": 180.0,
     },
     2: {
         "label": "High quality",
         "short": "Core judges",
         "cost": "High judge tokens",
         "description": "Apify+code gather; OpenRouter for verify/extract/review/strategy.",
+        "eta_batch_prior_sec": 120.0,
     },
     3: {
         "label": "Balanced",
         "short": "Quality gates only",
         "cost": "Medium tokens",
         "description": "Apify+code gather; OpenRouter only for verification + adversarial.",
+        "eta_batch_prior_sec": 75.0,
     },
     4: {
         "label": "Lowest cost",
         "short": "Ultra lean",
         "cost": "Minimal tokens",
         "description": "Apify+code only — no multi-agent chat loops.",
+        "eta_batch_prior_sec": 40.0,
     },
 }
+
+# Synthesis priors (used by batch_jobs / UI)
+SYNTH_ETA_PRIOR = {1: 90.0, 2: 55.0, 3: 30.0, 4: 12.0}
 
 
 def _uid(prefix: str = "") -> str:
@@ -70,28 +82,85 @@ def clamp_batch_size(n: int) -> int:
 
 
 def mode_llm_agents(mode: int) -> list[str]:
-    """OpenRouter JUDGES only. Gathering is always Apify/code, never these prompts inventing data.
-
-    Mode 1 still runs all 15 agent *roles*, but discovery/evidence tools call Apify only.
-    Modes 2–4 drop gatherer personas from LLM to save tokens (code already gathered).
-    """
+    """OpenRouter JUDGES only. Gathering is always Apify/code."""
     mode = clamp_mode(mode)
     if mode == 1:
-        # Full quality: all roles. Gather tools underneath are Apify-only.
         return list(PIPELINE_ORDER)
     if mode == 2:
-        # No LLM discovery/evidence — Apify+code already filled queues
         return [
             "research_director",
             "fact_verification",
             "knowledge_extraction",
             "knowledge_graph",
             "adversarial_reviewer",
-            "campaign_strategist",
+            "campaign_strategist",  # Strategy Synthesizer — domain-agnostic role
         ]
     if mode == 3:
         return ["fact_verification", "adversarial_reviewer"]
-    return []  # mode 4 — ultra lean, code + Apify only
+    return []
+
+
+def eta_prior_seconds(job_type: str, quality_mode: int) -> float:
+    quality_mode = clamp_mode(quality_mode)
+    if job_type == "synthesis":
+        return SYNTH_ETA_PRIOR.get(quality_mode, 30.0)
+    return float(MODE_META.get(quality_mode, {}).get("eta_batch_prior_sec") or 90.0)
+
+
+def _brief_dict(db: Session, tenant_id: str) -> dict[str, Any]:
+    p = get_active_project(db, tenant_id)
+    return project_to_dict(p) if p else {}
+
+
+def _search_query(brief: dict[str, Any], category: str, source: str) -> str:
+    """Domain-agnostic search string from the research brief — never forces 'campaign'."""
+    domain = (brief.get("domain") or "").strip()
+    mission = (brief.get("mission") or "").strip()
+    # pull a short mission snippet
+    mission_bit = re.sub(r"\s+", " ", mission)[:120]
+    parts = [p for p in [category, domain, mission_bit, source] if p]
+    q = " ".join(parts).strip()
+    # strip influencer-default noise if user clearly set another domain
+    if domain and "influencer" not in domain.lower() and "campaign" not in domain.lower():
+        q = q.replace(" campaign ", " ")
+    return (q or category or domain or "training examples")[:240]
+
+
+def _primary_topic(brief: dict[str, Any], category: str) -> str:
+    keys = brief.get("topic_keys") or []
+    if isinstance(keys, list) and keys:
+        return str(keys[0])
+    cat = re.sub(r"[^a-z0-9]+", "_", (category or "general").lower()).strip("_")
+    return cat or "general"
+
+
+def _sample_pair(db: Session, tenant_id: str, topic: str) -> tuple[str, str, str]:
+    schema = (
+        db.query(m.TopicSchema)
+        .filter_by(tenant_id=tenant_id, topic=topic, is_active=True)
+        .first()
+    )
+    if schema and schema.sample_row_json:
+        try:
+            s = json.loads(schema.sample_row_json)
+            return (
+                str(s.get("input") or ""),
+                str(s.get("output") or ""),
+                str(s.get("rationale") or ""),
+            )
+        except json.JSONDecodeError:
+            pass
+    return ("", "", "")
+
+
+def _already_promoted_refs(db: Session, owner_user_id: str, tenant_id: str) -> set[str]:
+    rows = (
+        db.query(m.GoldExample.source_ref)
+        .filter_by(owner_user_id=owner_user_id, tenant_id=tenant_id, is_archived=False)
+        .filter(m.GoldExample.source_ref.isnot(None))
+        .all()
+    )
+    return {r[0] for r in rows if r[0]}
 
 
 def run_code_pipeline_batch(
@@ -101,48 +170,88 @@ def run_code_pipeline_batch(
     owner_user_id: str | None,
     batch_size: int,
 ) -> dict[str, Any]:
-    """Ultra-lean path: exercise tools without agent chat loops."""
+    """Domain-agnostic code path: brief-driven discovery + gold promotion."""
     batch_size = clamp_batch_size(batch_size)
     ctx = ToolContext(db, tenant_id, "pipeline_code", owner_user_id=owner_user_id)
     steps: list[str] = []
+    zero_evidence = False
+    warnings: list[str] = []
 
-    # Discovery: take open work items and create candidates
+    # Align category/source queues to the active research brief
+    sync = sync_workspace_from_brief(db, tenant_id)
+    steps.append(f"brief_sync:{sync.get('categories', 0)}c/{sync.get('queue', 0)}q")
+    brief = _brief_dict(db, tenant_id)
+
     from helix.tools import handlers as h
 
     assign = h.get_current_assignment(ctx)
+    if not assign.get("assignment"):
+        # force queue from brief once more
+        sync_workspace_from_brief(db, tenant_id, force_queue=True)
+        assign = h.get_current_assignment(ctx)
+
     created_candidates = 0
+    gather_results = 0
     if assign.get("assignment"):
         a = assign["assignment"]
+        query = _search_query(brief, a["category"], a["source"])
         job = h.trigger_discovery(
             ctx,
             category=a["category"],
-            source=a["source"],
-            query=f"{a['category']} campaign {a['source']}",
+            source=a["source"] or "web",
+            query=query,
         )
-        results = h.get_discovery_results(ctx, job_id=job["job_id"]).get("results") or []
+        if not job.get("ok"):
+            warnings.append(job.get("error") or job.get("message") or "Gather failed")
+            steps.append("discovery:error")
+        results = job.get("results") or []
+        gather_results = len(results)
+        if gather_results == 0:
+            zero_evidence = True
+            warnings.append(
+                f"No verifiable sources found for “{a['category']}” "
+                f"(query: {query[:80]}). 0 new candidates."
+            )
         for r in results[:batch_size]:
             scored = h.score_relevance(
-                ctx, title=r.get("title", ""), category=a["category"], snippet=r.get("snippet", "")
+                ctx,
+                title=r.get("title", ""),
+                category=a["category"],
+                snippet=r.get("snippet", ""),
             )
-            if scored.get("above_threshold"):
+            # also score against domain keywords from brief
+            if brief.get("domain"):
+                scored2 = h.score_relevance(
+                    ctx,
+                    title=r.get("title", ""),
+                    category=str(brief.get("domain")),
+                    snippet=r.get("snippet", ""),
+                )
+                if scored2.get("relevance_score", 0) > scored.get("relevance_score", 0):
+                    scored = scored2
+            if scored.get("above_threshold") or scored.get("needs_judgment"):
                 h.write_discovery_candidate(
                     ctx,
                     category=a["category"],
                     source=a["source"],
                     title=r.get("title", ""),
                     url=r.get("url", ""),
-                    brand=r.get("brand", ""),
+                    brand=r.get("brand", "") or brief.get("domain", ""),
                     creator=r.get("creator", ""),
-                    relevance_score=scored["relevance_score"],
+                    relevance_score=scored.get("relevance_score", 0.5),
                 )
                 created_candidates += 1
         h.record_search(
             ctx,
             source=a["source"],
-            query=f"{a['category']} campaign",
+            query=query,
             category=a["category"],
         )
-        steps.append(f"discovery:{created_candidates}")
+        steps.append(f"discovery:{created_candidates}/{gather_results}")
+    else:
+        zero_evidence = True
+        warnings.append("No discovery assignment — set categories/sources in Plan.")
+        steps.append("discovery:no_assignment")
 
     # Evidence for pending candidates
     pending = (
@@ -171,6 +280,7 @@ def run_code_pipeline_batch(
             identity_signals={
                 "brand": content.get("brand") or cand.brand,
                 "creator": content.get("creator") or cand.creator,
+                "domain": brief.get("domain"),
             },
         )
         staged += 1
@@ -199,7 +309,11 @@ def run_code_pipeline_batch(
                 ctx, staging_id=item["id"], campaign_id=sim["campaign_id"]
             )
         elif score["band"] == "low":
-            h.create_campaign_stub(ctx, staging_id=item["id"], category="general")
+            h.create_campaign_stub(
+                ctx,
+                staging_id=item["id"],
+                category=item.get("category") or "general",
+            )
             stubs += 1
         else:
             h.flag_ambiguous_match(
@@ -211,7 +325,7 @@ def run_code_pipeline_batch(
             )
     steps.append(f"dedup_stubs:{stubs}")
 
-    # Auto-verify high preliminary confidence pending campaigns (lean heuristic)
+    # Auto-verify high preliminary confidence pending records
     pending_camps = (
         db.query(m.Campaign)
         .filter(
@@ -223,53 +337,125 @@ def run_code_pipeline_batch(
     )
     verified = 0
     for camp in pending_camps:
-        # simple lean verify
         h.update_verification_status(
             ctx,
             campaign_id=camp.id,
             status="verified",
-            confidence=0.78,
-            reasoning="Lean-mode heuristic verification (mode 3/4). Review later if needed.",
+            confidence=0.72,
+            reasoning=(
+                "Code-path verification for domain-agnostic mining. "
+                "Treat as provisional gold seed; adversarial review should re-check."
+            ),
         )
         verified += 1
     steps.append(f"verified:{verified}")
 
-    # Promote simple gold from approved training or create from verified campaigns
+    # Promote NEW gold only (skip already-promoted campaign refs)
     gold_made = 0
+    gold_skipped_dup = 0
     if owner_user_id:
         scope = get_or_create_scope(db, owner_user_id, tenant_id)
+        promoted_refs = _already_promoted_refs(db, owner_user_id, tenant_id)
         camps = (
             db.query(m.Campaign)
             .filter_by(tenant_id=tenant_id, verification_status="verified")
             .order_by(m.Campaign.updated_at.desc())
-            .limit(batch_size)
+            .limit(batch_size * 3)
             .all()
         )
+        domain = brief.get("domain") or "this domain"
+        mission = brief.get("mission") or "answer accurately using only grounded evidence"
+
+        known_ids = {
+            g.id
+            for g in db.query(m.GoldExample.id)
+            .filter_by(owner_user_id=owner_user_id, tenant_id=tenant_id, is_archived=False)
+            .all()
+        }
         for c in camps:
             if gold_made >= batch_size:
                 break
+            if c.id in promoted_refs:
+                gold_skipped_dup += 1
+                continue
             ev = (
                 db.query(m.CampaignEvidence)
                 .filter_by(tenant_id=tenant_id, campaign_id=c.id)
                 .first()
             )
-            text = (ev.content_text if ev else "") or c.title or ""
+            text = ((ev.content_text if ev else "") or c.title or "").strip()
+            if len(text) < 20:
+                continue
+            topic = _primary_topic(brief, c.category or "general")
+            # Faithfulness: if evidence is thin, mark as edge/negative teaching case
+            thin = len(text) < 80
+            input_text = (
+                f"Using only the evidence below about “{c.title}”, "
+                f"produce a high-quality answer for domain “{domain}”.\n"
+                f"Mission context: {mission[:200]}\n"
+                f"Evidence:\n{text[:600]}"
+            )
+            if thin:
+                output_text = (
+                    "I don’t have enough verified evidence to answer confidently. "
+                    "Please provide a primary source or more detail."
+                )
+                rationale = (
+                    "Faithfulness: evidence was too thin to support a confident claim; "
+                    "refusal avoids inventing details."
+                )
+                difficulty = "edge-case"
+                is_neg = True
+            else:
+                # Never invent fields beyond evidence
+                output_text = text[:500]
+                rationale = (
+                    f"Grounded in gathered evidence for {c.title}. "
+                    f"Does not invent facts beyond the source text. "
+                    f"Topic “{topic}”."
+                )
+                difficulty = "moderate"
+                is_neg = False
+
             g = add_gold_example(
                 db,
                 owner_user_id=owner_user_id,
                 tenant_id=tenant_id,
-                topic=c.category or "general",
-                input_text=f"Campaign brief: {c.title} ({c.brand} / {c.creator})",
-                output_text=text[:800] or f"Verified campaign {c.title}",
-                rationale="Promoted from lean pipeline verified campaign",
-                difficulty="moderate",
+                topic=topic,
+                input_text=input_text[:4000],
+                output_text=output_text[:2000],
+                rationale=rationale[:1000],
+                difficulty=difficulty,
+                is_negative=is_neg,
                 source_kind="pipeline",
                 source_ref=c.id,
                 enforce_cap=True,
+                metadata={
+                    "title": c.title,
+                    "category": c.category,
+                    "domain": domain,
+                    "run": "code_pipeline",
+                },
             )
-            if g:
+            if not g:
+                continue
+            if g.id in known_ids:
+                gold_skipped_dup += 1
+            else:
+                known_ids.add(g.id)
                 gold_made += 1
-        steps.append(f"gold:{gold_made}/target{scope.gold_target_count}")
+                promoted_refs.add(c.id)
+        steps.append(
+            f"gold_new:{gold_made}/skipped_dup:{gold_skipped_dup}/target:{scope.gold_target_count}"
+        )
+
+    if gold_made == 0 and (zero_evidence or gather_results == 0):
+        zero_evidence = True
+        if not any("No verifiable" in w for w in warnings):
+            warnings.append(
+                "No new gold examples created this batch — 0 on-topic verifiable sources "
+                "or all candidates already in your library."
+            )
 
     db.commit()
     return {
@@ -277,6 +463,13 @@ def run_code_pipeline_batch(
         "batch_size": batch_size,
         "steps": steps,
         "items_processed": staged + verified + gold_made,
+        "gold_new": gold_made,
+        "candidates_new": created_candidates,
+        "gather_results": gather_results,
+        "zero_evidence": zero_evidence,
+        "warnings": warnings,
+        "domain": brief.get("domain") or "",
+        "mission_snippet": (brief.get("mission") or "")[:120],
     }
 
 
@@ -287,6 +480,7 @@ def run_pipeline_batch(
     owner_user_id: str | None,
     quality_mode: int,
     batch_size: int,
+    progress_cb: Any | None = None,
 ) -> dict[str, Any]:
     """Run one mining batch at the given quality/cost mode."""
     quality_mode = clamp_mode(quality_mode)
@@ -294,8 +488,18 @@ def run_pipeline_batch(
     t0 = time.time()
     results: list[dict[str, Any]] = []
     items = 0
+    gold_new = 0
+    warnings: list[str] = []
+    zero_evidence = False
 
-    # ALL modes: Apify gather + code path first (never leave gathering to the LLM)
+    def _progress(msg: str) -> None:
+        if progress_cb:
+            try:
+                progress_cb(msg)
+            except Exception:  # noqa: BLE001
+                pass
+
+    _progress("Gathering sources (Apify/code) from your research plan…")
     code_res = run_code_pipeline_batch(
         db,
         tenant_id=tenant_id,
@@ -304,15 +508,24 @@ def run_pipeline_batch(
     )
     results.append({"step": "apify_gather_and_code", **code_res})
     items += int(code_res.get("items_processed") or 0)
+    gold_new += int(code_res.get("gold_new") or 0)
+    zero_evidence = bool(code_res.get("zero_evidence"))
+    warnings.extend(code_res.get("warnings") or [])
 
     agents = mode_llm_agents(quality_mode)
+    brief = _brief_dict(db, tenant_id)
+    domain = brief.get("domain") or "the active research domain"
     msg = (
         f"JUDGE only — gathering already done by Apify/code. "
+        f"Active domain: {domain}. "
         f"Process at most {batch_size} pending items. Quality mode {quality_mode}. "
-        f"Do NOT invent posts/URLs. Use only stored candidates/evidence. "
-        f"Call gather tools only if a tool must refresh cache; never fabricate."
+        f"Obey the Research Brief. Do NOT invent posts/URLs or domain facts. "
+        f"If evidence is missing, say so — never fabricate. "
+        f"Faithfulness: if input describes missing/blank fields, the ideal output "
+        f"must acknowledge them, not invent values."
     )
     for key in agents:
+        _progress(f"Running helper: {key}…")
         try:
             r = run_agent(
                 db,
@@ -333,16 +546,35 @@ def run_pipeline_batch(
             items += 1
         except Exception as e:  # noqa: BLE001
             results.append({"agent": key, "status": "error", "error": str(e)})
-            # continue other agents unless mode 1 critical failure on early agents
+            warnings.append(f"{key}: {e}")
             if quality_mode == 1 and key in {"research_director", "discovery"}:
                 break
 
     elapsed = time.time() - t0
+    if gold_new == 0 and zero_evidence:
+        user_message = (
+            "No verifiable sources found for this topic — 0 new gold examples. "
+            "Old library items (if any) were not produced by this run."
+        )
+    elif gold_new == 0:
+        user_message = (
+            f"Batch finished with 0 new gold examples "
+            f"(candidates={code_res.get('candidates_new', 0)}, "
+            f"gather_hits={code_res.get('gather_results', 0)}). "
+            "Existing library rows are unchanged."
+        )
+    else:
+        user_message = f"Batch added {gold_new} new gold example(s)."
+
     return {
         "quality_mode": quality_mode,
         "batch_size": batch_size,
         "elapsed_seconds": round(elapsed, 2),
         "items_processed": items,
+        "gold_new": gold_new,
+        "zero_evidence": zero_evidence,
+        "warnings": warnings,
+        "user_message": user_message,
         "results": results,
         "meta": MODE_META[quality_mode],
     }

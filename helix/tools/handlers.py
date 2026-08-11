@@ -232,6 +232,22 @@ def get_current_assignment(ctx: ToolContext, **_: Any) -> dict:
         .first()
     )
     if not item:
+        # Fall back to research brief so mining never sticks on empty bootstrap queue
+        try:
+            from helix.services.brief import sync_workspace_from_brief
+
+            sync_workspace_from_brief(ctx.db, ctx.tenant_id, force_queue=True)
+            item = (
+                ctx.db.query(m.WorkQueueItem)
+                .filter_by(
+                    tenant_id=ctx.tenant_id, status="open", assigned_agent="discovery"
+                )
+                .order_by(m.WorkQueueItem.priority_score.desc())
+                .first()
+            )
+        except Exception:  # noqa: BLE001
+            item = None
+    if not item:
         return {"assignment": None}
     return {
         "assignment": {
