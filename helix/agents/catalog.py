@@ -365,9 +365,17 @@ AGENTS: dict[str, AgentDef] = {
             - Output ignores explicit edge cases in the input (e.g. blank fields)
             - Rationale is generic boilerplate with no case-specific reasoning
             - Near-duplicate of another approved row with only names swapped
-            - Support-domain output demands internal docs from the *customer*
+            - Support-domain output demands internal docs / policy pages / ticket fields
+              from the *customer* (refuse-for-docs pattern)
+            - Support output refuses to help ("don't have enough verified evidence",
+              "cannot answer confidently") instead of asking for order/account details
             - Output only pastes raw scraped/marketing text with a thin wrapper
+              (e.g. "Based on the available documentation:" + dump, like-and-share chrome)
             - Support reply has no concrete next step for the customer
+            - auto_quality_flags is non-empty on the pending batch item → MUST reject
+
+            If you call update_review_status with approved and hard quality gates fire,
+            the tool auto-rejects — treat that as correct, do not re-approve the same text.
 
             {_DOMAIN_NOTE}
             """

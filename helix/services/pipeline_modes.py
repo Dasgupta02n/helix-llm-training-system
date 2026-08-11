@@ -23,7 +23,7 @@ from helix.agents.catalog import PIPELINE_ORDER
 from helix.agents.runner import run_agent
 from helix.db import models as m
 from helix.services.brief import get_active_project, project_to_dict, sync_workspace_from_brief
-from helix.services.domain_ontology import domain_gold_pair
+from helix.services.gold_quality import synthesize_gold_pair
 from helix.services.library import add_gold_example, get_or_create_scope
 from helix.tools.handlers import ToolContext
 
@@ -354,6 +354,7 @@ def run_code_pipeline_batch(
     # Promote NEW gold from gathered evidence (not only influencer Campaign graph)
     gold_made = 0
     gold_skipped_dup = 0
+    gold_rejected = 0
     if owner_user_id:
         scope = get_or_create_scope(db, owner_user_id, tenant_id)
         promoted_refs = _already_promoted_refs(db, owner_user_id, tenant_id)
@@ -365,6 +366,8 @@ def run_code_pipeline_batch(
             .all()
         }
 
+        tenant_row = db.query(m.Tenant).filter_by(id=tenant_id).first()
+
         def _try_add_gold(
             *,
             source_ref: str,
@@ -374,7 +377,7 @@ def run_code_pipeline_batch(
             url: str = "",
             meta: dict | None = None,
         ) -> None:
-            nonlocal gold_made, gold_skipped_dup
+            nonlocal gold_made, gold_skipped_dup, gold_rejected
             if gold_made >= batch_size or not source_ref:
                 return
             if source_ref in promoted_refs:
@@ -384,13 +387,19 @@ def run_code_pipeline_batch(
             if len(body) < 15:
                 return
             topic = _primary_topic(brief, category or "general")
-            pair = domain_gold_pair(
+            # LLM synthesis when available; hard quality gates reject echo/refuse patterns
+            pair = synthesize_gold_pair(
                 brief=brief,
                 title=title or topic,
                 evidence=body,
                 topic=topic,
                 url=url,
+                tenant=tenant_row,
+                prefer_llm=True,
             )
+            if not pair or not pair.get("quality_ok"):
+                gold_rejected += 1
+                return
             g = add_gold_example(
                 db,
                 owner_user_id=owner_user_id,
@@ -398,17 +407,19 @@ def run_code_pipeline_batch(
                 topic=topic,
                 input_text=pair["input"][:4000],
                 output_text=pair["output"][:2000],
-                rationale=pair["rationale"][:1000],
+                rationale=(pair.get("rationale") or "")[:1000],
                 difficulty=pair.get("difficulty") or "moderate",
                 is_negative=bool(pair.get("is_negative")),
                 source_kind="pipeline",
                 source_ref=source_ref,
+                verification_status=pair.get("verification_status") or "verified",
                 enforce_cap=True,
                 metadata={
                     "title": title,
                     "category": category,
                     "domain": domain,
                     "run": "code_pipeline",
+                    "synth": pair.get("synth"),
                     **(meta or {}),
                 },
             )
@@ -487,7 +498,8 @@ def run_code_pipeline_batch(
                 )
 
         steps.append(
-            f"gold_new:{gold_made}/skipped_dup:{gold_skipped_dup}/target:{scope.gold_target_count}"
+            f"gold_new:{gold_made}/skipped_dup:{gold_skipped_dup}/"
+            f"quality_rejected:{gold_rejected}/target:{scope.gold_target_count}"
         )
 
     if gold_made == 0 and (zero_evidence or gather_results == 0):
@@ -505,6 +517,7 @@ def run_code_pipeline_batch(
         "steps": steps,
         "items_processed": staged + verified + gold_made,
         "gold_new": gold_made,
+        "gold_rejected": gold_rejected,
         "candidates_new": created_candidates,
         "gather_results": gather_results,
         "zero_evidence": zero_evidence,
@@ -620,10 +633,12 @@ def run_pipeline_batch(
             "Old library items (if any) were not produced by this run."
         )
     elif gold_new == 0:
+        rejected = int(code_res.get("gold_rejected") or 0)
         user_message = (
             f"Batch finished with 0 new gold examples "
             f"(candidates={code_res.get('candidates_new', 0)}, "
-            f"gather_hits={code_res.get('gather_results', 0)}). "
+            f"gather_hits={code_res.get('gather_results', 0)}"
+            f"{f', quality_rejected={rejected}' if rejected else ''}). "
             "Existing library rows are unchanged."
         )
     else:

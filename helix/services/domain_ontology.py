@@ -192,27 +192,57 @@ def _support_reply_thin(*, title: str, topic: str, fragment: str) -> str:
     )
 
 
+def _paraphrase_support_facts(evidence: str, topic: str) -> list[str]:
+    """Turn evidence cues into short paraphrased bullets — never paste scrape text."""
+    low = (evidence or "").lower()
+    topic_l = (topic or "this").replace("_", " ")
+    facts: list[str] = []
+
+    if re.search(r"\brefund\b|\bmoney back\b|\breturn\b", low):
+        if re.search(r"30[-\s]?day", low):
+            facts.append(
+                "When food quality is the issue, refunds are often available within a "
+                "limited window (around 30 days)—I’ll confirm exactly what applies to your order."
+            )
+        else:
+            facts.append(
+                "Refunds may be available depending on what went wrong and how recently "
+                "it happened—I’ll check against your order details."
+            )
+    if re.search(r"\bdeliver|\bshipping|\btrack(ing)?\b|\blate\b|\bmissing\b", low):
+        facts.append(
+            "I can look up live tracking and delivery options as soon as I have your order ID."
+        )
+    if re.search(r"\bcancel", low):
+        facts.append(
+            "Cancellation is usually possible if the kitchen hasn’t started preparing yet—"
+            "I’ll check the status and tell you the fastest path."
+        )
+    if re.search(r"\bcold\b|\bspoil|\bwarm|\bwrong item|\bmissing item", low):
+        facts.append(
+            "If something arrived cold, spoiled, wrong, or incomplete, that’s something "
+            "we can usually fix—credit, re-delivery, or refund depending on your case."
+        )
+    if re.search(r"\bpayment|\bcharg|\bbill|\bcoupon|\bpromo", low) and not facts:
+        facts.append(
+            "I can review the charge or offer on your account once I can pull up the order."
+        )
+    if not facts:
+        facts.append(
+            f"I can help with {topic_l}, and I’ll stick to what’s actually available "
+            f"for your account rather than generic promo copy."
+        )
+    return facts[:3]
+
+
 def _support_reply_from_evidence(*, title: str, topic: str, evidence: str) -> str:
     """Synthesize a support reply — never dump raw scrape/marketing text."""
     text = _clean_evidence(evidence)
     topic_l = (topic or "this").replace("_", " ")
-    # Pull useful snippets without pasting the whole scrape
-    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if len(s.strip()) > 20]
-    useful = []
-    for s in sentences:
-        low = s.lower()
-        # skip pure marketing fluff if possible
-        if any(x in low for x in ("click here", "follow us", "like and share", "subscribe")):
-            continue
-        useful.append(s)
-        if len(useful) >= 2:
-            break
-    if not useful:
-        useful = sentences[:2] if sentences else [text[:200]]
-
-    # Concrete next step from evidence cues
     low_all = text.lower()
-    if "refund" in low_all or "30 day" in low_all or "30-day" in low_all:
+    facts = _paraphrase_support_facts(text, topic)
+
+    if "refund" in low_all or "30 day" in low_all or "30-day" in low_all or "return" in low_all:
         next_step = (
             "If this matches your case, reply with your order ID and I’ll start the "
             "refund/check for you right away."
@@ -231,26 +261,42 @@ def _support_reply_from_evidence(*, title: str, topic: str, evidence: str) -> st
             "Reply with your order ID (or account email) and I’ll take the next step for you."
         )
 
-    body_bits = " ".join(useful)[:420]
-    # Paraphrase wrapper — do not say "based on the available documentation" + dump
+    fact_block = " ".join(facts)
+    # Genuine customer-facing reply: paraphrase only, concrete next step, no doc dump
     return (
         f"Hey! Thanks for reaching out about {topic_l}.\n\n"
-        f"Here’s what I can help with based on how this usually works: {body_bits}\n\n"
+        f"I’m sorry this happened — here’s how I can help: {fact_block}\n\n"
         f"{next_step}\n\n"
-        f"I’ll stick to what’s supported for your account—no guessing on promos or "
-        f"policies that don’t apply to you."
+        f"I won’t invent promos or policies that don’t apply to you; once I have your "
+        f"details I’ll confirm the exact fix."
     )
 
 
 def _general_reply_from_evidence(*, title: str, domain: str, mission: str, evidence: str) -> str:
     text = _clean_evidence(evidence)
+    # Paraphrase: keep short cue phrases, not multi-sentence dumps
     sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text) if len(s.strip()) > 25]
-    take = " ".join(sentences[:3])[:500] if sentences else text[:400]
+    cues: list[str] = []
+    skip = ("click here", "follow us", "like and share", "subscribe", "#ad", "sponsored")
+    for s in sentences:
+        low = s.lower()
+        if any(x in low for x in skip):
+            continue
+        # compress to first clause
+        bit = re.split(r"[,;:]", s)[0].strip()
+        if 20 <= len(bit) <= 120:
+            cues.append(bit)
+        if len(cues) >= 2:
+            break
+    if cues:
+        summary = "; ".join(cues)
+    else:
+        summary = (text[:140] + "…") if len(text) > 140 else (text or title)
     return (
         f"Here’s a clear answer on “{title}” for {domain}:\n\n"
-        f"{take}\n\n"
-        f"Next step: if you tell me which part you need to act on "
-        f"(related to: {mission[:100]}), I can narrow this to a concrete action."
+        f"Key points: {summary}.\n\n"
+        f"Next step: tell me which part you need to act on "
+        f"(related to: {mission[:100]}), and I’ll give a concrete action."
     )
 
 

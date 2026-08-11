@@ -1423,8 +1423,32 @@ def get_pending_review_batch(ctx: ToolContext, **_: Any) -> dict:
         .limit(20)
         .all()
     )
-    return {
-        "batch": [
+    brief: dict = {}
+    try:
+        from helix.services.brief import get_active_project, project_to_dict
+
+        proj = get_active_project(ctx.db, ctx.tenant_id)
+        if proj:
+            brief = project_to_dict(proj)
+    except Exception:  # noqa: BLE001
+        brief = {}
+    try:
+        from helix.services.gold_quality import quality_reject_reasons
+    except Exception:  # noqa: BLE001
+        quality_reject_reasons = None  # type: ignore[assignment]
+
+    batch = []
+    for r in rows:
+        auto_flags: list[str] = []
+        if quality_reject_reasons:
+            auto_flags = quality_reject_reasons(
+                brief=brief,
+                topic=r.topic or "",
+                evidence="",
+                output=r.output_text or "",
+                input_text=r.input_text or "",
+            )
+        batch.append(
             {
                 "id": r.id,
                 "topic": r.topic,
@@ -1433,10 +1457,11 @@ def get_pending_review_batch(ctx: ToolContext, **_: Any) -> dict:
                 "difficulty": r.difficulty,
                 "is_negative": r.is_negative,
                 "rationale": r.rationale,
+                "auto_quality_flags": auto_flags,
+                "must_reject_if_flags": bool(auto_flags),
             }
-            for r in rows
-        ]
-    }
+        )
+    return {"batch": batch}
 
 
 def construct_counter_argument(
@@ -1505,10 +1530,54 @@ def update_review_status(
     )
     if not row:
         return {"ok": False, "error": "not found"}
+
+    # Hard quality gate: refuse / raw-scrape echo can never be marked approved/verified
+    status_l = (status or "").strip().lower()
+    if status_l in {"approved", "verified", "pass", "passed"}:
+        brief: dict = {}
+        try:
+            from helix.services.brief import get_active_project, project_to_dict
+
+            proj = get_active_project(ctx.db, ctx.tenant_id)
+            if proj:
+                brief = project_to_dict(proj)
+        except Exception:  # noqa: BLE001
+            brief = {}
+        try:
+            from helix.services.gold_quality import quality_reject_reasons
+
+            reasons = quality_reject_reasons(
+                brief=brief,
+                topic=row.topic or "",
+                evidence="",
+                output=row.output_text or "",
+                input_text=row.input_text or "",
+            )
+        except Exception:  # noqa: BLE001
+            reasons = []
+        if reasons:
+            auto_note = (
+                "AUTO-REJECT by quality gates (cannot verify refuse/echo patterns): "
+                + "; ".join(reasons)
+            )
+            row.review_status = "rejected"
+            row.review_reasoning = (
+                f"{(reasoning or '').strip()} | {auto_note}".strip(" |")
+            )
+            return {
+                "ok": False,
+                "id": row.id,
+                "status": "rejected",
+                "auto_rejected": True,
+                "reasons": reasons,
+                "promoted_to_user_gold": None,
+                "message": auto_note,
+            }
+
     row.review_status = status
     row.review_reasoning = reasoning
     promoted_gold_id = None
-    if status == "approved" and ctx.owner_user_id:
+    if status_l == "approved" and ctx.owner_user_id:
         from helix.services.library import get_or_create_scope, promote_training_example_to_gold
 
         if not row.owner_user_id:
