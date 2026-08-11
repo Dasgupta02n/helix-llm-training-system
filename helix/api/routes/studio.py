@@ -191,6 +191,17 @@ def update_project(
         _sync_phase_targets(db, tenant.id, targets, cats)
     db.commit()
     db.refresh(p)
+    # Keep discovery queue + ontology aligned with the plan domain
+    if p.is_active and (
+        "categories" in data
+        or "sources" in data
+        or "domain" in data
+        or "mission" in data
+        or "phase_targets" in data
+    ):
+        from helix.services.brief import sync_workspace_from_brief
+
+        sync_workspace_from_brief(db, tenant.id, force_queue=True)
     return project_to_dict(p)
 
 
@@ -213,6 +224,10 @@ def activate_project(
         r.is_active = r.id == p.id
         r.updated_at = _now()
     db.commit()
+    # Align categories, discovery queue, and domain ontology to this plan
+    from helix.services.brief import sync_workspace_from_brief
+
+    sync_workspace_from_brief(db, tenant.id, force_queue=True)
     return project_to_dict(p)
 
 

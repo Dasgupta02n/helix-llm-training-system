@@ -1054,6 +1054,14 @@ select {
   .page-body { padding: 16px; }
 }
 
+.item-seed {
+  border-left: 3px solid color-mix(in srgb, var(--warn) 70%, transparent);
+  background: color-mix(in srgb, var(--warn) 6%, transparent);
+}
+.item-user {
+  border-left: 3px solid color-mix(in srgb, var(--ok) 70%, transparent);
+}
+
 /* Banners */
 .banner {
   padding: 12px 14px;

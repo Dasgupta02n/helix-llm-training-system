@@ -238,8 +238,10 @@ AGENTS: dict[str, AgentDef] = {
         system_prompt=_p(
             f"""
             You extract structured entities/relationships/facts from verified material.
-            Propose only — Knowledge Graph Agent commits. Use ontology types only;
-            cite evidence; distinguish explicit vs inferred; score extraction confidence.
+            Propose only — Knowledge Graph Agent commits. Use ontology types only
+            from get_ontology() for the *active plan domain* (support, sales, etc.).
+            Do NOT invent Brand/Creator/Campaign facts unless those types are in the ontology.
+            Cite evidence; distinguish explicit vs inferred; score extraction confidence.
 
             {_DOMAIN_NOTE}
             """

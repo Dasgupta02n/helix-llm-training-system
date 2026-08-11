@@ -146,15 +146,71 @@ _DEMO_TOPICS = {
     "fashion",
     "gaming",
     "travel",
+    "food",
+    "tech",
 }
 
 
-def _is_seed_kind(kind: str | None, topic: str | None = None) -> bool:
+def _meta_dict(raw: str | None) -> dict:
+    try:
+        d = json.loads(raw or "{}")
+        return d if isinstance(d, dict) else {}
+    except json.JSONDecodeError:
+        return {}
+
+
+def _is_seed_kind(
+    kind: str | None,
+    topic: str | None = None,
+    *,
+    input_text: str | None = None,
+    metadata_json: str | None = None,
+    source_ref: str | None = None,
+) -> bool:
     if (kind or "").lower() in {"seed", "demo", "bootstrap", "sample"}:
         return True
-    # Legacy bootstrap / influencer demo topics often labeled as pipeline
+    meta = _meta_dict(metadata_json)
+    if meta.get("is_seed") or meta.get("seed") or meta.get("demo"):
+        return True
     t = (topic or "").lower().strip()
-    return t in _DEMO_TOPICS
+    if t in _DEMO_TOPICS:
+        return True
+    # Old lean pipeline format used for bootstrap influencer demos
+    inp = input_text or ""
+    if inp.startswith("Campaign brief:") or "Verified campaign" in (inp[:80] + ("")):
+        return True
+    # Bootstrap campaigns were never prefixed cand:
+    if source_ref and not str(source_ref).startswith("cand:") and t in _DEMO_TOPICS:
+        return True
+    return False
+
+
+def backfill_seed_marks(db: Session, user_id: str, tenant_id: str) -> int:
+    """Ensure legacy demo/bootstrap gold rows are consistently tagged source_kind=seed."""
+    rows = (
+        db.query(m.GoldExample)
+        .filter_by(owner_user_id=user_id, tenant_id=tenant_id, is_archived=False)
+        .all()
+    )
+    n = 0
+    for g in rows:
+        if _is_seed_kind(
+            g.source_kind,
+            g.topic,
+            input_text=g.input_text,
+            metadata_json=g.metadata_json,
+            source_ref=g.source_ref,
+        ):
+            if (g.source_kind or "").lower() != "seed":
+                g.source_kind = "seed"
+                meta = _meta_dict(g.metadata_json)
+                meta["is_seed"] = True
+                meta["seed_backfill"] = True
+                g.metadata_json = json.dumps(meta)
+                n += 1
+    if n:
+        db.commit()
+    return n
 
 
 def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
@@ -165,7 +221,17 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
         .all()
     )
     gold_count = len(gold_rows)
-    seed_gold = sum(1 for g in gold_rows if _is_seed_kind(g.source_kind, g.topic))
+    seed_gold = sum(
+        1
+        for g in gold_rows
+        if _is_seed_kind(
+            g.source_kind,
+            g.topic,
+            input_text=g.input_text,
+            metadata_json=g.metadata_json,
+            source_ref=g.source_ref,
+        )
+    )
     user_gold = gold_count - seed_gold
     synth_count = (
         db.query(m.SyntheticExample)
@@ -195,7 +261,13 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
 
 
 def gold_to_dict(g: m.GoldExample) -> dict[str, Any]:
-    seed = _is_seed_kind(g.source_kind, g.topic)
+    seed = _is_seed_kind(
+        g.source_kind,
+        g.topic,
+        input_text=g.input_text,
+        metadata_json=g.metadata_json,
+        source_ref=g.source_ref,
+    )
     return {
         "id": g.id,
         "owner_user_id": g.owner_user_id,
@@ -206,7 +278,7 @@ def gold_to_dict(g: m.GoldExample) -> dict[str, Any]:
         "rationale": g.rationale,
         "difficulty": g.difficulty,
         "is_negative": g.is_negative,
-        "source_kind": g.source_kind,
+        "source_kind": "seed" if seed else (g.source_kind or "pipeline"),
         "source_ref": g.source_ref,
         "is_seed": seed,
         "origin_label": "Seed / demo" if seed else "Your generated data",

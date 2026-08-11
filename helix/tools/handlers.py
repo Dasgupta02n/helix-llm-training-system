@@ -991,12 +991,27 @@ def get_campaign_evidence_content(ctx: ToolContext, campaign_id: str = "", **_: 
 
 
 def get_ontology(ctx: ToolContext, **_: Any) -> dict:
+    # Refresh ontology from active plan so agents never stay on Brand/Creator defaults
+    try:
+        from helix.services.brief import sync_workspace_from_brief
+
+        sync_workspace_from_brief(ctx.db, ctx.tenant_id, force_queue=False)
+    except Exception:  # noqa: BLE001
+        pass
     rows = ctx.db.query(m.OntologyType).filter_by(tenant_id=ctx.tenant_id).all()
+    brief = get_research_brief(ctx).get("brief") or {}
     return {
+        "domain": brief.get("domain"),
+        "mission": brief.get("mission"),
+        "note": (
+            "Use ONLY these ontology types for extraction. They are derived from the "
+            "active Research Plan — do not assume influencer Brand/Creator/Campaign "
+            "unless those types are listed."
+        ),
         "ontology": [
             {"type_name": r.type_name, "kind": r.kind, "description": r.description}
             for r in rows
-        ]
+        ],
     }
 
 
@@ -1064,11 +1079,25 @@ def write_candidate_fact(
         )
     )
     if extraction_confidence < 0.5:
+        preview = (value or "")[:280]
         create_escalation(
             ctx,
             kind="low_extraction_confidence",
-            message=f"Fact {fid} confidence {extraction_confidence}",
-            payload={"candidate_fact_id": fid},
+            message=(
+                f"Low-confidence fact ({extraction_confidence}): "
+                f"{entity or '—'} / {fact_type or '—'} = {preview or '(empty)'}"
+            ),
+            payload={
+                "candidate_fact_id": fid,
+                "entity": entity,
+                "fact_type": fact_type,
+                "value": value,
+                "relationship": relationship or "",
+                "citation": citation,
+                "extraction_confidence": extraction_confidence,
+                "is_inferred": is_inferred,
+                "campaign_id": campaign_id,
+            },
         )
     return {"ok": True, "candidate_fact_id": fid}
 
@@ -1079,8 +1108,13 @@ def flag_ontology_gap(
     return create_escalation(
         ctx,
         kind="ontology_gap",
-        message=description,
-        payload={"campaign_id": campaign_id},
+        message=description or "Ontology gap: plan types do not cover this content.",
+        payload={
+            "campaign_id": campaign_id,
+            "description": description,
+            "needs_input": True,
+            "prompt": "What entity/fact type should we add to the ontology?",
+        },
     )
 
 
@@ -1891,18 +1925,74 @@ def get_unified_escalation_queue(ctx: ToolContext, **_: Any) -> dict:
         .order_by(m.Escalation.created_at.desc())
         .all()
     )
-    return {
-        "escalations": [
+    escalations = []
+    for r in rows:
+        try:
+            payload = json.loads(r.payload_json or "{}")
+        except json.JSONDecodeError:
+            payload = {"message": r.payload_json}
+        if not isinstance(payload, dict):
+            payload = {"message": str(payload)}
+
+        # Enrich low_extraction_confidence with live candidate fact content
+        if r.kind == "low_extraction_confidence":
+            cf_id = payload.get("candidate_fact_id")
+            if cf_id and not payload.get("value"):
+                cf = (
+                    ctx.db.query(m.CandidateFact)
+                    .filter_by(id=cf_id, tenant_id=ctx.tenant_id)
+                    .first()
+                )
+                if cf:
+                    payload.update(
+                        {
+                            "entity": cf.entity,
+                            "fact_type": cf.fact_type,
+                            "value": cf.value,
+                            "relationship": cf.relationship or "",
+                            "citation": cf.citation,
+                            "extraction_confidence": cf.extraction_confidence,
+                            "is_inferred": bool(cf.is_inferred),
+                            "campaign_id": cf.campaign_id,
+                        }
+                    )
+            # Human-readable summary always present
+            if not payload.get("message"):
+                payload["message"] = (
+                    f"{payload.get('entity') or '—'} · {payload.get('fact_type') or '—'} "
+                    f"= {(payload.get('value') or '')[:200]}"
+                )
+            payload.setdefault("needs_input", False)
+            payload.setdefault(
+                "action_label",
+                "Acknowledge",
+            )
+
+        elif r.kind in {"ontology_gap", "off_domain_categories"}:
+            payload.setdefault("needs_input", True)
+            payload.setdefault(
+                "prompt",
+                payload.get("prompt")
+                or "What should Helix treat as in-scope for this plan?",
+            )
+            payload.setdefault("action_label", "Save decision")
+            if not payload.get("message") and r.kind:
+                payload["message"] = payload.get("description") or r.kind
+        else:
+            payload.setdefault("needs_input", False)
+            payload.setdefault("action_label", "Acknowledge")
+            payload.setdefault("message", payload.get("message") or r.kind)
+
+        escalations.append(
             {
                 "id": r.id,
                 "source_agent": r.source_agent,
                 "kind": r.kind,
-                "payload": json.loads(r.payload_json or "{}"),
+                "payload": payload,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
-            for r in rows
-        ]
-    }
+        )
+    return {"escalations": escalations}
 
 
 def route_human_decision(

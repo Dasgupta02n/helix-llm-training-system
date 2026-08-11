@@ -130,12 +130,21 @@ def sync_workspace_from_brief(
                     )
                 )
                 created_q += 1
+
+    # Ontology must follow the active plan (not bootstrap Brand/Creator/Campaign)
+    from helix.services.domain_ontology import sync_ontology_from_brief
+
+    db.flush()
+    ont = sync_ontology_from_brief(db, tenant_id)
+
     db.commit()
     return {
         "ok": True,
         "categories": len(categories),
         "queue": created_q,
         "domain": d.get("domain"),
+        "ontology_types": ont.get("types", 0),
+        "ontology": ont.get("type_names") or [],
     }
 
 
@@ -161,7 +170,7 @@ def build_domain_context(db: Session, tenant_id: str) -> str:
             + (f" ({s.display_name})" if s.display_name else "")
             + (f": {s.description}" if s.description else "")
         )
-    return (
+    text = (
         "\n\n=== ACTIVE RESEARCH BRIEF ===\n"
         f"Project: {d['name']} ({d['slug']})\n"
         f"Domain: {d['domain']}\n"
@@ -177,8 +186,19 @@ def build_domain_context(db: Session, tenant_id: str) -> str:
         + "\n"
         f"Agent instructions: {d['agent_instructions'] or '(none)'}\n"
         f"Output notes: {d['output_notes'] or '(none)'}\n"
-        "=== END RESEARCH BRIEF ===\n"
     )
+    ont_rows = db.query(m.OntologyType).filter_by(tenant_id=tenant_id).all()
+    if ont_rows:
+        ont_lines = [
+            f"- {o.type_name} ({o.kind}): {o.description or ''}" for o in ont_rows[:40]
+        ]
+        text += (
+            "Domain ontology (use these types only for extraction):\n"
+            + "\n".join(ont_lines)
+            + "\n"
+        )
+    text += "=== END RESEARCH BRIEF ===\n"
+    return text
 
 
 def schema_to_dict(s: m.TopicSchema) -> dict[str, Any]:

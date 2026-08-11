@@ -784,17 +784,16 @@ async function loadLibrary() {
     } else {
       const seedItems = gold.items.filter((g) => g.is_seed);
       const userItems = gold.items.filter((g) => !g.is_seed);
-      const row = (g) => `<div class="item">
+      const row = (g) => `<div class="item ${g.is_seed ? "item-seed" : "item-user"}">
           <div>
-            <h4>${escapeHtml(g.topic)} ${
-              g.is_seed
-                ? '<span class="badge warn">Seed / demo</span>'
-                : '<span class="badge ok">Your data</span>'
-            }</h4>
+            <h4>${escapeHtml(g.topic)}</h4>
             <p><strong>Q:</strong> ${escapeHtml((g.input || "").slice(0, 120))}</p>
             <p><strong>A:</strong> ${escapeHtml((g.output || "").slice(0, 120))}</p>
+            <p class="hint mb-0">${escapeHtml(g.origin_label || (g.is_seed ? "Seed / demo" : "Your generated data"))}</p>
           </div>
-          <span class="badge">${escapeHtml(g.source_kind || "gold")}</span>
+          <span class="badge ${g.is_seed ? "warn" : "ok"}">${
+            g.is_seed ? "Seed / demo" : "Your data"
+          }</span>
         </div>`;
       $("goldList").innerHTML =
         (seedItems.length
@@ -969,31 +968,73 @@ async function refreshDashboard() {
     $("escalations").innerHTML = `<div class="item-list">
       ${esc
         .map((e) => {
-          const msg =
-            (e.payload && (e.payload.message || e.payload.reason)) ||
-            e.kind ||
-            "Needs a decision";
+          const p = e.payload || {};
           const helper = FRIENDLY_AGENTS[e.source_agent]?.title || e.source_agent;
-          return `<div class="item">
-            <div>
-              <h4>${escapeHtml(helper)}</h4>
+          const needsInput = !!p.needs_input;
+          const label = p.action_label || (needsInput ? "Save decision" : "Acknowledge");
+          const msg =
+            p.message || p.reason || p.description || e.kind || "Needs your attention";
+          // Surface candidate fact content when present
+          let detail = "";
+          if (e.kind === "low_extraction_confidence" || p.value) {
+            const bits = [
+              p.entity ? `Entity: ${p.entity}` : "",
+              p.fact_type ? `Type: ${p.fact_type}` : "",
+              p.value ? `Value: ${p.value}` : "",
+              p.citation ? `Citation: ${p.citation}` : "",
+              p.extraction_confidence != null
+                ? `Confidence: ${p.extraction_confidence}`
+                : "",
+            ].filter(Boolean);
+            if (bits.length) {
+              detail = `<div class="hint" style="margin-top:6px;white-space:pre-wrap">${bits
+                .map((b) => escapeHtml(b))
+                .join("<br>")}</div>`;
+            }
+          }
+          const inputBlock = needsInput
+            ? `<label class="field-help" for="esc-in-${escapeHtml(e.id)}">${escapeHtml(
+                p.prompt || "Your decision"
+              )}</label>
+               <input id="esc-in-${escapeHtml(e.id)}" class="esc-input" type="text" placeholder="Type your decision…" style="width:100%;margin:4px 0 8px" />`
+            : `<p class="hint mb-0" style="margin-top:4px">No free-text answer required — acknowledge to clear.</p>`;
+          return `<div class="item" data-esc-card="${escapeHtml(e.id)}">
+            <div style="flex:1;min-width:0">
+              <h4>${escapeHtml(helper)} · <span class="badge">${escapeHtml(
+                e.kind || "note"
+              )}</span></h4>
               <p>${escapeHtml(msg)}</p>
+              ${detail}
+              ${inputBlock}
             </div>
-            <button class="btn btn-secondary btn-sm" data-esc="${escapeHtml(e.id)}" type="button">Answer</button>
+            <button class="btn btn-secondary btn-sm" data-esc="${escapeHtml(
+              e.id
+            )}" data-needs-input="${needsInput ? "1" : "0"}" type="button">${escapeHtml(
+              label
+            )}</button>
           </div>`;
         })
         .join("")}
     </div>`;
     $("escalations").querySelectorAll("button[data-esc]").forEach((btn) => {
       btn.onclick = async () => {
-        const decision = prompt("Your decision or answer:");
-        if (!decision) return;
+        const id = btn.dataset.esc;
+        const needs = btn.dataset.needsInput === "1";
+        let decision = "acknowledged";
+        if (needs) {
+          const inp = document.getElementById(`esc-in-${id}`);
+          decision = (inp && inp.value.trim()) || "";
+          if (!decision) {
+            toast("Please enter a decision before saving", "err");
+            return;
+          }
+        }
         try {
-          await api(`/api/t/${state.tenantSlug}/escalations/${btn.dataset.esc}/resolve`, {
+          await api(`/api/t/${state.tenantSlug}/escalations/${id}/resolve`, {
             method: "POST",
             body: JSON.stringify({ decision }),
           });
-          toast("Saved your answer");
+          toast(needs ? "Saved your decision" : "Acknowledged");
           await refreshDashboard();
         } catch (err) {
           toast(err.message, "err");

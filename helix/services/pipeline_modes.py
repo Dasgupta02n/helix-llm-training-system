@@ -23,6 +23,7 @@ from helix.agents.catalog import PIPELINE_ORDER
 from helix.agents.runner import run_agent
 from helix.db import models as m
 from helix.services.brief import get_active_project, project_to_dict, sync_workspace_from_brief
+from helix.services.domain_ontology import domain_gold_pair
 from helix.services.library import add_gold_example, get_or_create_scope
 from helix.tools.handlers import ToolContext
 
@@ -350,101 +351,141 @@ def run_code_pipeline_batch(
         verified += 1
     steps.append(f"verified:{verified}")
 
-    # Promote NEW gold only (skip already-promoted campaign refs)
+    # Promote NEW gold from gathered evidence (not only influencer Campaign graph)
     gold_made = 0
     gold_skipped_dup = 0
     if owner_user_id:
         scope = get_or_create_scope(db, owner_user_id, tenant_id)
         promoted_refs = _already_promoted_refs(db, owner_user_id, tenant_id)
-        camps = (
-            db.query(m.Campaign)
-            .filter_by(tenant_id=tenant_id, verification_status="verified")
-            .order_by(m.Campaign.updated_at.desc())
-            .limit(batch_size * 3)
-            .all()
-        )
         domain = brief.get("domain") or "this domain"
-        mission = brief.get("mission") or "answer accurately using only grounded evidence"
-
         known_ids = {
             g.id
             for g in db.query(m.GoldExample.id)
             .filter_by(owner_user_id=owner_user_id, tenant_id=tenant_id, is_archived=False)
             .all()
         }
-        for c in camps:
-            if gold_made >= batch_size:
-                break
-            if c.id in promoted_refs:
-                gold_skipped_dup += 1
-                continue
-            ev = (
-                db.query(m.CampaignEvidence)
-                .filter_by(tenant_id=tenant_id, campaign_id=c.id)
-                .first()
-            )
-            text = ((ev.content_text if ev else "") or c.title or "").strip()
-            if len(text) < 20:
-                continue
-            topic = _primary_topic(brief, c.category or "general")
-            # Faithfulness: if evidence is thin, mark as edge/negative teaching case
-            thin = len(text) < 80
-            input_text = (
-                f"Using only the evidence below about “{c.title}”, "
-                f"produce a high-quality answer for domain “{domain}”.\n"
-                f"Mission context: {mission[:200]}\n"
-                f"Evidence:\n{text[:600]}"
-            )
-            if thin:
-                output_text = (
-                    "I don’t have enough verified evidence to answer confidently. "
-                    "Please provide a primary source or more detail."
-                )
-                rationale = (
-                    "Faithfulness: evidence was too thin to support a confident claim; "
-                    "refusal avoids inventing details."
-                )
-                difficulty = "edge-case"
-                is_neg = True
-            else:
-                # Never invent fields beyond evidence
-                output_text = text[:500]
-                rationale = (
-                    f"Grounded in gathered evidence for {c.title}. "
-                    f"Does not invent facts beyond the source text. "
-                    f"Topic “{topic}”."
-                )
-                difficulty = "moderate"
-                is_neg = False
 
+        def _try_add_gold(
+            *,
+            source_ref: str,
+            title: str,
+            text: str,
+            category: str,
+            url: str = "",
+            meta: dict | None = None,
+        ) -> None:
+            nonlocal gold_made, gold_skipped_dup
+            if gold_made >= batch_size or not source_ref:
+                return
+            if source_ref in promoted_refs:
+                gold_skipped_dup += 1
+                return
+            body = (text or title or "").strip()
+            if len(body) < 15:
+                return
+            topic = _primary_topic(brief, category or "general")
+            pair = domain_gold_pair(
+                brief=brief,
+                title=title or topic,
+                evidence=body,
+                topic=topic,
+                url=url,
+            )
             g = add_gold_example(
                 db,
                 owner_user_id=owner_user_id,
                 tenant_id=tenant_id,
                 topic=topic,
-                input_text=input_text[:4000],
-                output_text=output_text[:2000],
-                rationale=rationale[:1000],
-                difficulty=difficulty,
-                is_negative=is_neg,
+                input_text=pair["input"][:4000],
+                output_text=pair["output"][:2000],
+                rationale=pair["rationale"][:1000],
+                difficulty=pair.get("difficulty") or "moderate",
+                is_negative=bool(pair.get("is_negative")),
                 source_kind="pipeline",
-                source_ref=c.id,
+                source_ref=source_ref,
                 enforce_cap=True,
                 metadata={
-                    "title": c.title,
-                    "category": c.category,
+                    "title": title,
+                    "category": category,
                     "domain": domain,
                     "run": "code_pipeline",
+                    **(meta or {}),
                 },
             )
             if not g:
-                continue
+                return
             if g.id in known_ids:
                 gold_skipped_dup += 1
             else:
                 known_ids.add(g.id)
                 gold_made += 1
-                promoted_refs.add(c.id)
+                promoted_refs.add(source_ref)
+
+        # 1) Direct from discovery candidates (most reliable domain-agnostic path)
+        cands = (
+            db.query(m.DiscoveryCandidate)
+            .filter_by(tenant_id=tenant_id)
+            .order_by(m.DiscoveryCandidate.created_at.desc())
+            .limit(batch_size * 4)
+            .all()
+        )
+        for cand in cands:
+            # Prefer staged evidence text if present
+            staging = (
+                db.query(m.EvidenceStaging)
+                .filter_by(tenant_id=tenant_id, candidate_id=cand.id)
+                .order_by(m.EvidenceStaging.created_at.desc())
+                .first()
+            )
+            text = ""
+            if staging and staging.content_text:
+                text = staging.content_text
+            else:
+                text = " ".join(
+                    p
+                    for p in [cand.title or "", getattr(cand, "snippet", "") or ""]
+                    if p
+                )
+            # pull snippet from raw if available
+            if len(text) < 40 and cand.url:
+                text = f"{cand.title or ''}\nSource: {cand.url}"
+            _try_add_gold(
+                source_ref=f"cand:{cand.id}",
+                title=cand.title or cand.category or "source",
+                text=text,
+                category=cand.category or "general",
+                url=cand.url or "",
+                meta={"from": "discovery_candidate"},
+            )
+            if gold_made >= batch_size:
+                break
+
+        # 2) Also promote newly verified campaign stubs (legacy path)
+        if gold_made < batch_size:
+            camps = (
+                db.query(m.Campaign)
+                .filter_by(tenant_id=tenant_id, verification_status="verified")
+                .order_by(m.Campaign.updated_at.desc())
+                .limit(batch_size * 3)
+                .all()
+            )
+            for c in camps:
+                if gold_made >= batch_size:
+                    break
+                ev = (
+                    db.query(m.CampaignEvidence)
+                    .filter_by(tenant_id=tenant_id, campaign_id=c.id)
+                    .first()
+                )
+                text = ((ev.content_text if ev else "") or c.title or "").strip()
+                _try_add_gold(
+                    source_ref=c.id,
+                    title=c.title or "record",
+                    text=text,
+                    category=c.category or "general",
+                    meta={"from": "campaign"},
+                )
+
         steps.append(
             f"gold_new:{gold_made}/skipped_dup:{gold_skipped_dup}/target:{scope.gold_target_count}"
         )

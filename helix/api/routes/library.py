@@ -16,6 +16,7 @@ from helix.db import models as m
 from helix.db.session import get_db
 from helix.services.library import (
     add_gold_example,
+    backfill_seed_marks,
     get_or_create_scope,
     gold_to_dict,
     library_stats,
@@ -112,6 +113,7 @@ def stats(
     db: Session = Depends(get_db),
 ) -> dict:
     tenant = _tenant_for(user, slug, db)
+    backfill_seed_marks(db, user.id, tenant.id)
     return library_stats(db, user.id, tenant.id)
 
 
@@ -125,6 +127,7 @@ def list_gold(
     db: Session = Depends(get_db),
 ) -> dict:
     tenant = _tenant_for(user, slug, db)
+    backfill_seed_marks(db, user.id, tenant.id)
     q = db.query(m.GoldExample).filter_by(
         owner_user_id=user.id, tenant_id=tenant.id, is_archived=False
     )
