@@ -28,8 +28,11 @@ def _hash_text(text: str) -> str:
 
 
 def _clean(text: str, limit: int = 50_000) -> str:
-    t = re.sub(r"\s+", " ", (text or "").strip())
-    return t[:limit]
+    # Preserve blank lines / question boundaries; only collapse runs of spaces/tabs
+    t = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    t = re.sub(r"[ \t]+", " ", t)
+    t = re.sub(r"\n{3,}", "\n\n", t)
+    return t.strip()[:limit]
 
 
 def document_to_dict(row: m.CorpusDocument) -> dict[str, Any]:
@@ -208,19 +211,24 @@ def extract_training_units(
     """
     Split a pasted FAQ / policy doc into training units (title + evidence body).
     Handles Q1/Q2, 'Question N', numbered lists, or falls back to whole doc.
+    Works even if newlines were collapsed to spaces.
     """
     text = (content or "").strip()
     if not text:
         return []
-    # Prefer splitting on explicit Q markers
+    # Prefer splitting on explicit Q markers (line-start OR mid-string after collapse)
     chunks = re.split(
-        r"(?=(?:^|\n)\s*(?:Q(?:uestion)?\s*\d*\s*[:.)\-]|#{1,3}\s+|\d{1,2}[\.)]\s+))",
+        r"(?=(?:^|[\n\r]|\s)(?:Q(?:uestion)?\s*\d+\s*[:.)\-]|#{1,3}\s+\S|\d{1,2}[\.)]\s+[A-Z]))",
         text,
-        flags=re.I,
+        flags=re.I | re.M,
     )
+    # Also try strict Qn: split if still a single blob
+    if len([c for c in chunks if len((c or "").strip()) >= 40]) < 2:
+        chunks = re.split(r"(?=(?:Q(?:uestion)?\s*\d+\s*[:.)\-]))", text, flags=re.I)
     units: list[dict[str, str]] = []
     for raw in chunks:
-        part = re.sub(r"\s+", " ", (raw or "").strip())
+        part = re.sub(r"[ \t]+", " ", (raw or "").strip())
+        part = re.sub(r"\n{2,}", "\n", part).strip()
         if len(part) < 40:
             continue
         # first sentence / line as local title
@@ -230,7 +238,7 @@ def extract_training_units(
             re.I,
         )
         local_title = (m.group(1) if m else part[:80]).strip()
-        if not local_title.endswith("?") and "?" in part[:120]:
+        if not local_title.endswith("?") and "?" in part[:160]:
             local_title = part[: part.index("?") + 1]
         units.append(
             {
@@ -240,10 +248,11 @@ def extract_training_units(
             }
         )
     if not units:
+        flat = re.sub(r"\s+", " ", text)
         units.append(
             {
                 "title": (title or "Corpus document")[:200],
-                "evidence": text[:4000],
+                "evidence": flat[:4000],
                 "category": category or "general",
             }
         )
