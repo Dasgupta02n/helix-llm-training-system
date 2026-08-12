@@ -651,12 +651,30 @@ def run_code_pipeline_batch(
                 f"rej={gold_write.get('corpus_gold_rejected', 0)}"
             )
             if corpus_units and corpus_gold_new == 0:
+                detail_bits = []
+                for d in (gold_write.get("details") or [])[:5]:
+                    st = d.get("status")
+                    if st == "goal_cap_reached":
+                        detail_bits.append(
+                            f"{d.get('source_ref')}:goal_cap_reached"
+                            f"(verified={d.get('verified_count')}/"
+                            f"target={d.get('gold_target')})"
+                        )
+                    elif st == "write_returned_null":
+                        detail_bits.append(
+                            f"{d.get('source_ref')}:write_returned_null"
+                        )
+                    else:
+                        detail_bits.append(
+                            f"{d.get('source_ref')}:{st}"
+                            f"{(':' + ','.join(d.get('reasons') or [])[:80]) if d.get('reasons') else ''}"
+                        )
                 warnings.append(
                     f"Corpus units={len(corpus_units)} but 0 GoldExample rows written "
                     f"(skipped={gold_write.get('corpus_gold_skipped')}, "
                     f"rejected={gold_write.get('corpus_gold_rejected')}, "
                     f"errors={gold_write.get('errors')}). "
-                    f"details={gold_write.get('details')[:5]}"
+                    f"details=[{'; '.join(detail_bits)}]"
                 )
         except Exception as e:  # noqa: BLE001
             warnings.append(f"corpus: {e}")

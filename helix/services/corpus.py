@@ -220,7 +220,11 @@ def write_corpus_units_as_gold(
     or rejected-ref bookkeeping.
     """
     from helix.services.gold_quality import synthesize_gold_pair
-    from helix.services.library import add_gold_example
+    from helix.services.library import (
+        add_gold_example,
+        count_gold_toward_cap,
+        get_or_create_scope,
+    )
 
     made = 0
     skipped = 0
@@ -228,6 +232,7 @@ def write_corpus_units_as_gold(
     errors: list[str] = []
     created_ids: list[str] = []
     details: list[dict[str, Any]] = []
+    scope = get_or_create_scope(db, owner_user_id, tenant_id)
 
     known_ids = {
         r[0]
@@ -297,6 +302,11 @@ def write_corpus_units_as_gold(
             )
             continue
 
+        verified_toward_cap = count_gold_toward_cap(
+            db, owner_user_id=owner_user_id, tenant_id=tenant_id
+        )
+        at_cap = verified_toward_cap >= int(scope.gold_target_count or 0)
+
         try:
             g = add_gold_example(
                 db,
@@ -329,8 +339,35 @@ def write_corpus_units_as_gold(
             continue
 
         if not g:
-            rejected += 1
-            details.append({"source_ref": ref, "status": "cap_or_null"})
+            # Distinct statuses so ops can tell goal-cap vs unexpected null
+            if at_cap:
+                skipped += 1
+                details.append(
+                    {
+                        "source_ref": ref,
+                        "status": "goal_cap_reached",
+                        "verified_count": verified_toward_cap,
+                        "gold_target": scope.gold_target_count,
+                        "note": (
+                            "Gold goal already met by verified rows only "
+                            "(rejected rows do not count toward the goal)."
+                        ),
+                    }
+                )
+            else:
+                rejected += 1
+                details.append(
+                    {
+                        "source_ref": ref,
+                        "status": "write_returned_null",
+                        "verified_count": verified_toward_cap,
+                        "gold_target": scope.gold_target_count,
+                        "note": (
+                            "add_gold_example returned None without being at verified cap "
+                            "(possible exact-dup race or unexpected filter)."
+                        ),
+                    }
+                )
             continue
 
         if g.id in known_ids:

@@ -300,6 +300,28 @@ def find_near_duplicate_gold(
     return best
 
 
+def count_gold_toward_cap(
+    db: Session,
+    *,
+    owner_user_id: str,
+    tenant_id: str,
+) -> int:
+    """Rows that consume the gold goal: verified (or non-rejected) only.
+
+    Rejected quality-backfill rows must NOT fill the goal and block new mining.
+    """
+    return (
+        db.query(m.GoldExample)
+        .filter_by(
+            owner_user_id=owner_user_id,
+            tenant_id=tenant_id,
+            is_archived=False,
+        )
+        .filter(m.GoldExample.verification_status != "rejected")
+        .count()
+    )
+
+
 def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
     scope = get_or_create_scope(db, user_id, tenant_id)
     gold_rows = (
@@ -308,11 +330,18 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
         .all()
     )
     gold_count = len(gold_rows)
+    verified_rows = [
+        g
+        for g in gold_rows
+        if (g.verification_status or "").lower() != "rejected"
+    ]
+    verified_count = len(verified_rows)
+    rejected_count = gold_count - verified_count
     tenant = db.query(m.Tenant).filter_by(id=tenant_id).first()
     slug = tenant.slug if tenant else None
     seed_gold = sum(
         1
-        for g in gold_rows
+        for g in verified_rows
         if _is_seed_kind(
             g.source_kind,
             g.topic,
@@ -323,21 +352,24 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
             tenant_slug=slug,
         )
     )
-    user_gold = gold_count - seed_gold
+    user_gold = verified_count - seed_gold
     synth_count = (
         db.query(m.SyntheticExample)
         .filter_by(owner_user_id=user_id, tenant_id=tenant_id, is_archived=False)
         .count()
     )
     target_synth = scope.gold_target_count * scope.variations_per_gold
+    # Progress / remaining use verified count (rejected does not fill the goal)
     return {
         "gold_count": gold_count,
+        "gold_verified_count": verified_count,
+        "gold_rejected_count": rejected_count,
         "gold_seed_count": seed_gold,
         "gold_user_count": user_gold,
         "gold_target": scope.gold_target_count,
-        "gold_remaining": max(0, scope.gold_target_count - gold_count),
+        "gold_remaining": max(0, scope.gold_target_count - verified_count),
         "gold_progress_pct": min(
-            100.0, round(100.0 * gold_count / max(scope.gold_target_count, 1), 1)
+            100.0, round(100.0 * verified_count / max(scope.gold_target_count, 1), 1)
         ),
         "synthetic_count": synth_count,
         "synthetic_target": target_synth,
@@ -438,21 +470,18 @@ def add_gold_example(
     enforce_cap: bool = True,
     skip_near_duplicate: bool = False,
 ) -> m.GoldExample | None:
-    """Add gold to user account. Returns None if gold target already reached.
+    """Add gold to user account. Returns None if gold target already reached
+    (verified count only — see count_gold_toward_cap) or insert failed.
 
     skip_near_duplicate: when True (used for BYO corpus), only exact I/O and
     same source_ref block a write — Jaccard near-dup must not swallow corpus gold.
     """
     scope = get_or_create_scope(db, owner_user_id, tenant_id)
     if enforce_cap:
-        count = (
-            db.query(m.GoldExample)
-            .filter_by(
-                owner_user_id=owner_user_id,
-                tenant_id=tenant_id,
-                is_archived=False,
-            )
-            .count()
+        # Cap against verified-only count. Rejected quality-backfill rows must not
+        # fill the goal (production bug: goal=10, 5 verified + 5 rejected → blocked).
+        count = count_gold_toward_cap(
+            db, owner_user_id=owner_user_id, tenant_id=tenant_id
         )
         if count >= scope.gold_target_count:
             return None
@@ -556,10 +585,8 @@ def promote_approved_pool(
 ) -> dict[str, Any]:
     """Promote approved non-benchmark training examples into user gold library."""
     scope = get_or_create_scope(db, owner_user_id, tenant_id)
-    before = (
-        db.query(m.GoldExample)
-        .filter_by(owner_user_id=owner_user_id, tenant_id=tenant_id, is_archived=False)
-        .count()
+    before = count_gold_toward_cap(
+        db, owner_user_id=owner_user_id, tenant_id=tenant_id
     )
     remaining = max(0, scope.gold_target_count - before)
     if remaining <= 0:
