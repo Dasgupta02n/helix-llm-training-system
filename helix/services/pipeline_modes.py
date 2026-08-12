@@ -186,6 +186,14 @@ def run_code_pipeline_batch(
     try:
         from helix.services.corpus import promote_corpus_into_pipeline
 
+        # Attach active project id so corpus is plan-scoped
+        from helix.services.brief import get_active_project, project_to_dict as _p2d
+
+        _proj = get_active_project(db, tenant_id)
+        if _proj:
+            brief = {**_p2d(_proj), **(brief or {})}
+            brief["id"] = _proj.id
+            brief["project_id"] = _proj.id
         early_corpus = promote_corpus_into_pipeline(
             db,
             tenant_id=tenant_id,
@@ -578,6 +586,16 @@ def run_code_pipeline_batch(
                 write_corpus_units_as_gold,
             )
 
+            from helix.services.brief import get_active_project, project_to_dict
+            from helix.services.corpus import domain_relevance_score
+
+            # Ensure brief carries project id for plan-scoped corpus
+            proj = get_active_project(db, tenant_id)
+            if proj:
+                brief = {**project_to_dict(proj), **(brief or {})}
+                brief["id"] = proj.id
+                brief["project_id"] = proj.id
+
             promo = promote_corpus_into_pipeline(
                 db,
                 tenant_id=tenant_id,
@@ -586,17 +604,23 @@ def run_code_pipeline_batch(
                 batch_size=batch_size,
             )
             corpus_units = promo.get("units") or []
-            # Also collect units from already-verified [corpus] campaigns (retry path)
+            # Retry path: only [corpus] campaigns that match THIS plan's domain
+            # (never re-inject another plan's food-delivery FAQ into HR mining).
             if not corpus_units:
                 camps = (
                     db.query(m.Campaign)
                     .filter_by(tenant_id=tenant_id, verification_status="verified")
                     .order_by(m.Campaign.updated_at.desc())
-                    .limit(batch_size * 4)
+                    .limit(batch_size * 6)
                     .all()
                 )
+                domain_l = (brief.get("domain") or "").lower()
                 for c in camps:
                     if not (c.title or "").startswith("[corpus]"):
+                        continue
+                    # Brand is set to plan domain at campaign create time
+                    brand_l = (c.brand or "").lower()
+                    if domain_l and brand_l and domain_l not in brand_l and brand_l not in domain_l:
                         continue
                     ev = (
                         db.query(m.CampaignEvidence)
@@ -605,6 +629,8 @@ def run_code_pipeline_batch(
                     )
                     body = ((ev.content_text if ev else "") or "").strip()
                     if len(body) < 40:
+                        continue
+                    if domain_relevance_score(f"{c.title or ''}\n{body}", brief) < 0.12:
                         continue
                     corpus_units.append(
                         {
@@ -615,6 +641,7 @@ def run_code_pipeline_batch(
                             "url": f"corpus://campaign/{c.id}",
                             "corpus_id": c.id,
                             "candidate_id": None,
+                            "project_id": brief.get("id"),
                         }
                     )
 
@@ -681,11 +708,13 @@ def run_code_pipeline_batch(
             steps.append(f"corpus:error:{e}")
 
         # 1) Direct from discovery candidates (most reliable domain-agnostic path)
+        from helix.services.corpus import domain_relevance_score as _dom_score
+
         cands = (
             db.query(m.DiscoveryCandidate)
             .filter_by(tenant_id=tenant_id)
             .order_by(m.DiscoveryCandidate.created_at.desc())
-            .limit(batch_size * 4)
+            .limit(batch_size * 6)
             .all()
         )
         for cand in cands:
@@ -708,6 +737,13 @@ def run_code_pipeline_batch(
             # pull snippet from raw if available
             if len(text) < 40 and cand.url:
                 text = f"{cand.title or ''}\nSource: {cand.url}"
+            # Never promote another plan's corpus candidates into this plan's gold
+            is_corpus_cand = (cand.source or "") == "corpus" or (
+                cand.url or ""
+            ).startswith("corpus://")
+            if is_corpus_cand:
+                # Corpus gold is written only via write_corpus_units_as_gold (plan-scoped)
+                continue
             _try_add_gold(
                 source_ref=f"cand:{cand.id}",
                 title=cand.title or cand.category or "source",

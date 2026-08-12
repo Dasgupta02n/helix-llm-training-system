@@ -73,3 +73,20 @@ def apply_migrations(engine: Engine) -> None:
             conn.execute(
                 text("ALTER TABLE training_examples ADD COLUMN owner_user_id VARCHAR(32)")
             )
+
+        # corpus_documents: plan/project scoping (cross-plan contamination fix)
+        corpus_cols = _column_names(engine, "corpus_documents")
+        if corpus_cols and "project_id" not in corpus_cols:
+            conn.execute(
+                text("ALTER TABLE corpus_documents ADD COLUMN project_id VARCHAR(32)")
+            )
+            # Index for plan-scoped lookups (name may already exist on recreate)
+            try:
+                conn.execute(
+                    text(
+                        "CREATE INDEX IF NOT EXISTS ix_corpus_documents_project_id "
+                        "ON corpus_documents (project_id)"
+                    )
+                )
+            except Exception:
+                pass

@@ -638,15 +638,22 @@ class Escalation(Base):
 
 
 class CorpusDocument(Base):
-    """User-supplied evidence corpus (paste or URL) for niche domains."""
+    """User-supplied evidence corpus (paste or URL), scoped to a research plan."""
 
     __tablename__ = "corpus_documents"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "content_hash", name="uq_tenant_corpus_hash"),
+        # Same content may be pasted under two plans; scope uniqueness by project
+        UniqueConstraint(
+            "tenant_id", "project_id", "content_hash", name="uq_tenant_project_corpus_hash"
+        ),
     )
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True)
     tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id"), index=True)
+    # Active research plan this doc belongs to (null = legacy unscoped; filtered out of other plans)
+    project_id: Mapped[str | None] = mapped_column(
+        String(32), index=True, nullable=True
+    )
     owner_user_id: Mapped[str | None] = mapped_column(
         ForeignKey("users.id"), index=True, nullable=True
     )

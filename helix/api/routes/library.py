@@ -172,8 +172,15 @@ def get_corpus(
     db: Session = Depends(get_db),
 ) -> dict:
     tenant = _tenant_for(user, slug, db)
-    rows = list_corpus(db, tenant_id=tenant.id, owner_user_id=user.id)
-    return {"items": [document_to_dict(r) for r in rows], "total": len(rows)}
+    # Default: only corpus for the active research plan (prevents cross-plan UI mix)
+    rows = list_corpus(
+        db, tenant_id=tenant.id, owner_user_id=user.id, scope_to_plan=True
+    )
+    return {
+        "items": [document_to_dict(r) for r in rows],
+        "total": len(rows),
+        "scoped_to_active_plan": True,
+    }
 
 
 @router.post("/corpus/paste")
@@ -191,6 +198,8 @@ def corpus_paste(
         title=body.title,
         content=body.content,
         category=body.category,
+        # Bound to active research plan so mining for another plan cannot reuse it
+        project_id=None,  # resolved inside add_paste via active_project_id
     )
     if not out.get("ok"):
         raise HTTPException(400, out.get("error") or "Failed to add document")
@@ -213,6 +222,7 @@ def corpus_url(
         title=body.title,
         category=body.category,
         fetch=body.fetch,
+        project_id=None,
     )
     if not out.get("ok"):
         raise HTTPException(400, out.get("error") or "Failed to fetch URL")
