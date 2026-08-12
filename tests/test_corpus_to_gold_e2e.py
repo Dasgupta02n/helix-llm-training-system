@@ -240,6 +240,11 @@ def test_corpus_reaches_gold_via_code_pipeline(db_session, monkeypatch):
     assert result.get("gold_new", 0) >= 1, (
         f"expected corpus gold, got result={result}"
     )
+    # Explicit hand-off metric — not just generic gold_new
+    assert int(result.get("corpus_gold_new") or 0) >= 1, (
+        f"corpus_gold_new must be >=1 (verified campaign alone is not enough); "
+        f"result={result}"
+    )
 
     gold_rows = (
         db_session.query(m.GoldExample)
@@ -250,16 +255,13 @@ def test_corpus_reaches_gold_via_code_pipeline(db_session, monkeypatch):
         )
         .all()
     )
-    corpus_gold = [
-        g
-        for g in gold_rows
-        if (g.source_kind or "") == "corpus"
-        or (g.source_ref or "").startswith("corpus:")
-        or "user_corpus" in (g.metadata_json or "")
-    ]
-    assert corpus_gold, (
-        f"no corpus-sourced gold; all rows={[ (g.source_kind, g.source_ref) for g in gold_rows ]}"
+    # Strict: source_kind must be corpus (this is the gap production hit)
+    corpus_kind_count = sum(1 for g in gold_rows if (g.source_kind or "") == "corpus")
+    assert corpus_kind_count >= 1, (
+        f"expected GoldExample.source_kind=='corpus' count>=1; "
+        f"got kinds={[ (g.source_kind, g.source_ref, g.verification_status) for g in gold_rows ]}"
     )
+    corpus_gold = [g for g in gold_rows if (g.source_kind or "") == "corpus"]
     for g in corpus_gold:
         assert (g.verification_status or "").lower() == "verified"
         assert (g.source_ref or "").startswith("corpus:")
@@ -278,6 +280,86 @@ def test_corpus_reaches_gold_via_code_pipeline(db_session, monkeypatch):
         .count()
         >= 1
     )
+
+
+def test_corpus_gold_despite_near_dup_library_pollution(db_session, monkeypatch):
+    """Near-dup Jaccard against existing template-ish gold must not block corpus writes."""
+    tenant_id, user_id = _seed_workspace(db_session)
+    # Pollute library with a similar support reply (verified)
+    db_session.add(
+        m.GoldExample(
+            id=_uid("gold_"),
+            owner_user_id=user_id,
+            tenant_id=tenant_id,
+            topic="refunds",
+            input_text="You are a support agent.\nCustomer: late delivery",
+            output_text=(
+                "Hey! Thanks for reaching out about late delivery. "
+                "Reply with your order ID and I'll look it up right away."
+            ),
+            source_kind="pipeline",
+            source_ref="cand:pollution",
+            verification_status="verified",
+            metadata_json="{}",
+        )
+    )
+    db_session.commit()
+
+    out = add_paste(
+        db_session,
+        tenant_id=tenant_id,
+        owner_user_id=user_id,
+        title="Support FAQ",
+        content=FAQ,
+        category="general",
+    )
+    assert out["ok"]
+
+    monkeypatch.setattr(
+        "helix.tools.handlers.trigger_discovery",
+        lambda *a, **k: {
+            "ok": True,
+            "job_id": "x",
+            "results": [],
+            "needs_judgment": [],
+            "result_count": 0,
+        },
+    )
+    from helix.services import gold_quality as gq
+
+    real = gq.synthesize_gold_pair
+
+    def _no_llm(**kw):
+        kw = dict(kw)
+        kw["prefer_llm"] = False
+        return real(**kw)
+
+    monkeypatch.setattr(
+        "helix.services.pipeline_modes.synthesize_gold_pair", _no_llm
+    )
+    monkeypatch.setattr(
+        "helix.services.gold_quality.synthesize_gold_pair", _no_llm
+    )
+
+    result = run_code_pipeline_batch(
+        db_session,
+        tenant_id=tenant_id,
+        owner_user_id=user_id,
+        batch_size=5,
+    )
+    db_session.commit()
+    corpus_n = (
+        db_session.query(m.GoldExample)
+        .filter_by(
+            owner_user_id=user_id,
+            tenant_id=tenant_id,
+            source_kind="corpus",
+            is_archived=False,
+        )
+        .count()
+    )
+    assert corpus_n >= 1, f"near-dup pollution blocked corpus gold; result={result}"
+    assert int(result.get("corpus_gold_new") or 0) >= 1
 
 
 def test_gold_to_dict_exposes_rejection_reason(db_session):

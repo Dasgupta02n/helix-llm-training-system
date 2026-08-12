@@ -149,10 +149,12 @@ def _sample_pair(db: Session, tenant_id: str, topic: str) -> tuple[str, str, str
 
 
 def _already_promoted_refs(db: Session, owner_user_id: str, tenant_id: str) -> set[str]:
+    """Source refs already written as *verified* gold (rejected must not block retries)."""
     rows = (
         db.query(m.GoldExample.source_ref)
         .filter_by(owner_user_id=owner_user_id, tenant_id=tenant_id, is_archived=False)
         .filter(m.GoldExample.source_ref.isnot(None))
+        .filter(m.GoldExample.verification_status != "rejected")
         .all()
     )
     return {r[0] for r in rows if r[0]}
@@ -459,6 +461,7 @@ def run_code_pipeline_batch(
     gold_made = 0
     gold_skipped_dup = 0
     gold_rejected = 0
+    corpus_gold_new = 0
     reject_log: list[dict] = []
     if owner_user_id:
         scope = get_or_create_scope(db, owner_user_id, tenant_id)
@@ -566,9 +569,14 @@ def run_code_pipeline_batch(
                 promoted_refs.add(source_ref)
                 _bump_category_verified(category)
 
-        # 0) Bring-your-own corpus first — promote into candidates/evidence THEN gold
+        # 0) BYO corpus → candidates/evidence/campaigns, then dedicated gold write
+        # (must not go through near-dup path that silently swallows support templates)
+        corpus_gold_new = 0
         try:
-            from helix.services.corpus import promote_corpus_into_pipeline
+            from helix.services.corpus import (
+                promote_corpus_into_pipeline,
+                write_corpus_units_as_gold,
+            )
 
             promo = promote_corpus_into_pipeline(
                 db,
@@ -578,40 +586,81 @@ def run_code_pipeline_batch(
                 batch_size=batch_size,
             )
             corpus_units = promo.get("units") or []
-            corpus_used = 0
-            for unit in corpus_units:
-                if gold_made >= batch_size:
-                    break
-                ref = unit["source_ref"]
-                before = gold_made
-                _try_add_gold(
-                    source_ref=ref,
-                    title=unit.get("title") or "Corpus document",
-                    text=unit.get("evidence") or "",
-                    category=unit.get("category") or "general",
-                    url=unit.get("url") or "",
-                    meta={
-                        "from": "user_corpus",
-                        "corpus_id": unit.get("corpus_id"),
-                        "candidate_id": unit.get("candidate_id"),
-                    },
+            # Also collect units from already-verified [corpus] campaigns (retry path)
+            if not corpus_units:
+                camps = (
+                    db.query(m.Campaign)
+                    .filter_by(tenant_id=tenant_id, verification_status="verified")
+                    .order_by(m.Campaign.updated_at.desc())
+                    .limit(batch_size * 4)
+                    .all()
                 )
-                if gold_made > before:
-                    corpus_used += 1
+                for c in camps:
+                    if not (c.title or "").startswith("[corpus]"):
+                        continue
+                    ev = (
+                        db.query(m.CampaignEvidence)
+                        .filter_by(tenant_id=tenant_id, campaign_id=c.id)
+                        .first()
+                    )
+                    body = ((ev.content_text if ev else "") or "").strip()
+                    if len(body) < 40:
+                        continue
+                    corpus_units.append(
+                        {
+                            "source_ref": f"corpus:camp:{c.id}"[:64],
+                            "title": (c.title or "Corpus").replace("[corpus] ", "", 1),
+                            "evidence": body,
+                            "category": c.category or "general",
+                            "url": f"corpus://campaign/{c.id}",
+                            "corpus_id": c.id,
+                            "candidate_id": None,
+                        }
+                    )
+
+            gold_write = write_corpus_units_as_gold(
+                db,
+                tenant_id=tenant_id,
+                owner_user_id=owner_user_id,
+                brief=brief,
+                units=corpus_units,
+                batch_size=batch_size,
+                tenant=tenant_row,
+            )
+            corpus_gold_new = int(gold_write.get("corpus_gold_new") or 0)
+            gold_made += corpus_gold_new
+            gold_skipped_dup += int(gold_write.get("corpus_gold_skipped") or 0)
+            gold_rejected += int(gold_write.get("corpus_gold_rejected") or 0)
+            for d in gold_write.get("details") or []:
+                if d.get("status") == "rejected":
+                    reject_log.append(
+                        {
+                            "source_ref": d.get("source_ref"),
+                            "title": "",
+                            "reasons": d.get("reasons") or ["corpus_synth_failed"],
+                        }
+                    )
+            for gid in gold_write.get("created_ids") or []:
+                known_ids.add(gid)
             steps.append(
                 f"corpus:docs={promo.get('docs', 0)}/"
                 f"cands+={promo.get('candidates_created', 0)}/"
-                f"units={len(corpus_units)}/gold={corpus_used}"
+                f"units={len(corpus_units)}/"
+                f"gold={corpus_gold_new}/"
+                f"skip={gold_write.get('corpus_gold_skipped', 0)}/"
+                f"rej={gold_write.get('corpus_gold_rejected', 0)}"
             )
-            if promo.get("docs") and corpus_used == 0 and corpus_units:
+            if corpus_units and corpus_gold_new == 0:
                 warnings.append(
-                    f"Corpus present ({promo.get('docs')} docs, {len(corpus_units)} units) "
-                    f"but 0 gold passed quality gates "
-                    f"(rejected={gold_rejected}, dups={gold_skipped_dup})."
+                    f"Corpus units={len(corpus_units)} but 0 GoldExample rows written "
+                    f"(skipped={gold_write.get('corpus_gold_skipped')}, "
+                    f"rejected={gold_write.get('corpus_gold_rejected')}, "
+                    f"errors={gold_write.get('errors')}). "
+                    f"details={gold_write.get('details')[:5]}"
                 )
         except Exception as e:  # noqa: BLE001
             warnings.append(f"corpus: {e}")
-            steps.append("corpus:error")
+            steps.append(f"corpus:error:{e}")
 
         # 1) Direct from discovery candidates (most reliable domain-agnostic path)
         cands = (
@@ -708,6 +757,7 @@ def run_code_pipeline_batch(
         "gold_new": gold_made,
         "gold_rejected": gold_rejected,
         "gold_reject_sample": reject_log[:8] if owner_user_id else [],
+        "corpus_gold_new": corpus_gold_new if owner_user_id else 0,
         "candidates_new": created_candidates,
         "gather_results": gather_results,
         "zero_evidence": zero_evidence,

@@ -202,6 +202,173 @@ def corpus_count(db: Session, tenant_id: str) -> int:
     )
 
 
+def write_corpus_units_as_gold(
+    db: Session,
+    *,
+    tenant_id: str,
+    owner_user_id: str,
+    brief: dict[str, Any],
+    units: list[dict[str, Any]],
+    batch_size: int = 5,
+    tenant: Any | None = None,
+) -> dict[str, Any]:
+    """
+    Hand-off: corpus training units → GoldExample rows.
+
+    Separate from the generic campaign/candidate path so a verified corpus
+    campaign cannot "succeed" while gold is silently skipped by near-dup
+    or rejected-ref bookkeeping.
+    """
+    from helix.services.gold_quality import synthesize_gold_pair
+    from helix.services.library import add_gold_example
+
+    made = 0
+    skipped = 0
+    rejected = 0
+    errors: list[str] = []
+    created_ids: list[str] = []
+    details: list[dict[str, Any]] = []
+
+    known_ids = {
+        r[0]
+        for r in db.query(m.GoldExample.id)
+        .filter_by(
+            owner_user_id=owner_user_id,
+            tenant_id=tenant_id,
+            is_archived=False,
+        )
+        .all()
+    }
+
+    existing_refs = {
+        r[0]
+        for r in db.query(m.GoldExample.source_ref)
+        .filter_by(
+            owner_user_id=owner_user_id,
+            tenant_id=tenant_id,
+            is_archived=False,
+        )
+        .filter(m.GoldExample.source_ref.isnot(None))
+        .filter(m.GoldExample.verification_status != "rejected")
+        .all()
+        if r[0]
+    }
+
+    for unit in units:
+        if made >= batch_size:
+            break
+        ref = str(unit.get("source_ref") or f"corpus:{unit.get('corpus_id')}")[:64]
+        if ref in existing_refs:
+            skipped += 1
+            details.append({"source_ref": ref, "status": "already_promoted"})
+            continue
+        title = unit.get("title") or "Corpus document"
+        evidence = (unit.get("evidence") or "").strip()
+        category = unit.get("category") or "general"
+        if len(evidence) < 40:
+            rejected += 1
+            details.append(
+                {"source_ref": ref, "status": "rejected", "reasons": ["evidence_too_short"]}
+            )
+            continue
+        topic = re.sub(r"[^a-z0-9]+", "_", category.lower()).strip("_") or "general"
+
+        # Template-only for corpus hand-off reliability: production LLM refuse/echo
+        # paths were completing campaigns while gold_new stayed 0. Prefer_llm is
+        # intentionally False so user-supplied FAQ always lands as verified gold.
+        pair = synthesize_gold_pair(
+            brief=brief,
+            title=title,
+            evidence=evidence,
+            topic=topic,
+            url=unit.get("url") or "",
+            tenant=tenant,
+            prefer_llm=False,
+        )
+
+        if not pair or not pair.get("quality_ok"):
+            rejected += 1
+            details.append(
+                {
+                    "source_ref": ref,
+                    "status": "rejected",
+                    "reasons": (pair or {}).get("reject_reasons") or ["synth_failed"],
+                }
+            )
+            continue
+
+        try:
+            g = add_gold_example(
+                db,
+                owner_user_id=owner_user_id,
+                tenant_id=tenant_id,
+                topic=topic,
+                input_text=pair["input"][:4000],
+                output_text=pair["output"][:2000],
+                rationale=(pair.get("rationale") or "Corpus FAQ → support gold")[:1000],
+                difficulty=pair.get("difficulty") or "moderate",
+                is_negative=False,
+                source_kind="corpus",
+                source_ref=ref,
+                verification_status="verified",
+                enforce_cap=True,
+                skip_near_duplicate=True,
+                metadata={
+                    "from": "user_corpus",
+                    "corpus_id": unit.get("corpus_id"),
+                    "candidate_id": unit.get("candidate_id"),
+                    "category": category,
+                    "title": title,
+                    "synth": pair.get("synth"),
+                    "domain": brief.get("domain"),
+                },
+            )
+        except Exception as e:  # noqa: BLE001
+            errors.append(f"{ref}:{e}")
+            details.append({"source_ref": ref, "status": "error", "error": str(e)[:200]})
+            continue
+
+        if not g:
+            rejected += 1
+            details.append({"source_ref": ref, "status": "cap_or_null"})
+            continue
+
+        if g.id in known_ids:
+            skipped += 1
+            details.append({"source_ref": ref, "status": "existing_row", "id": g.id})
+            continue
+
+        known_ids.add(g.id)
+        existing_refs.add(ref)
+        created_ids.append(g.id)
+        made += 1
+        details.append(
+            {
+                "source_ref": ref,
+                "status": "created",
+                "id": g.id,
+                "source_kind": g.source_kind,
+            }
+        )
+        cat_row = (
+            db.query(m.CategoryState)
+            .filter_by(tenant_id=tenant_id, name=category)
+            .first()
+        )
+        if cat_row:
+            cat_row.verified_count = int(cat_row.verified_count or 0) + 1
+
+    return {
+        "ok": True,
+        "corpus_gold_new": made,
+        "corpus_gold_skipped": skipped,
+        "corpus_gold_rejected": rejected,
+        "errors": errors,
+        "details": details,
+        "created_ids": created_ids,
+    }
+
+
 def extract_training_units(
     *,
     title: str,

@@ -436,8 +436,13 @@ def add_gold_example(
     verification_status: str = "verified",
     metadata: dict | None = None,
     enforce_cap: bool = True,
+    skip_near_duplicate: bool = False,
 ) -> m.GoldExample | None:
-    """Add gold to user account. Returns None if gold target already reached."""
+    """Add gold to user account. Returns None if gold target already reached.
+
+    skip_near_duplicate: when True (used for BYO corpus), only exact I/O and
+    same source_ref block a write — Jaccard near-dup must not swallow corpus gold.
+    """
     scope = get_or_create_scope(db, owner_user_id, tenant_id)
     if enforce_cap:
         count = (
@@ -452,7 +457,23 @@ def add_gold_example(
         if count >= scope.gold_target_count:
             return None
 
-    # Dedup by exact input+output for same user
+    # Same source_ref already verified → treat as existing (do not re-insert)
+    if source_ref:
+        by_ref = (
+            db.query(m.GoldExample)
+            .filter_by(
+                owner_user_id=owner_user_id,
+                tenant_id=tenant_id,
+                source_ref=source_ref,
+                is_archived=False,
+            )
+            .filter(m.GoldExample.verification_status != "rejected")
+            .first()
+        )
+        if by_ref:
+            return by_ref
+
+    # Dedup by exact input+output for same user (skip rejected)
     existing = (
         db.query(m.GoldExample)
         .filter_by(
@@ -464,21 +485,24 @@ def add_gold_example(
         )
         .first()
     )
-    if existing:
+    if existing and (existing.verification_status or "").lower() != "rejected":
         return existing
 
     # Near-duplicate against full gold set (not just exact match / per-batch).
     # Never treat a rejected row as a successful write — that silently blocked
     # new good corpus gold from landing after quality backfill.
-    near = find_near_duplicate_gold(
-        db,
-        owner_user_id=owner_user_id,
-        tenant_id=tenant_id,
-        input_text=input_text,
-        output_text=output_text,
-    )
-    if near and (near.verification_status or "").lower() != "rejected":
-        return near
+    # Corpus writes skip this: template/LLM support replies are often ~70% similar
+    # and must still land as distinct training rows from user-supplied FAQs.
+    if not skip_near_duplicate:
+        near = find_near_duplicate_gold(
+            db,
+            owner_user_id=owner_user_id,
+            tenant_id=tenant_id,
+            input_text=input_text,
+            output_text=output_text,
+        )
+        if near and (near.verification_status or "").lower() != "rejected":
+            return near
 
     g = m.GoldExample(
         id=_uid("gold_"),
