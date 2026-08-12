@@ -115,16 +115,10 @@ def _brief_dict(db: Session, tenant_id: str) -> dict[str, Any]:
 
 def _search_query(brief: dict[str, Any], category: str, source: str) -> str:
     """Domain-agnostic search string from the research brief — never forces 'campaign'."""
-    domain = (brief.get("domain") or "").strip()
-    mission = (brief.get("mission") or "").strip()
-    # pull a short mission snippet
-    mission_bit = re.sub(r"\s+", " ", mission)[:120]
-    parts = [p for p in [category, domain, mission_bit, source] if p]
-    q = " ".join(parts).strip()
-    # strip influencer-default noise if user clearly set another domain
-    if domain and "influencer" not in domain.lower() and "campaign" not in domain.lower():
-        q = q.replace(" campaign ", " ")
-    return (q or category or domain or "training examples")[:240]
+    from helix.services.research_targets import build_search_queries
+
+    qs = build_search_queries(brief, category=category, source=source, attempt=0, max_queries=1)
+    return qs[0] if qs else (category or brief.get("domain") or "training examples")[:240]
 
 
 def _primary_topic(brief: dict[str, Any], category: str) -> str:
@@ -193,40 +187,128 @@ def run_code_pipeline_batch(
 
     created_candidates = 0
     gather_results = 0
+    queries_tried: list[str] = []
     if assign.get("assignment"):
-        a = assign["assignment"]
-        query = _search_query(brief, a["category"], a["source"])
-        job = h.trigger_discovery(
-            ctx,
-            category=a["category"],
-            source=a["source"] or "web",
-            query=query,
+        from helix.services.research_targets import (
+            build_search_queries,
+            min_evidence_threshold,
+            preferred_sources,
+            research_domain_kind,
+            score_item_for_kind,
         )
-        if not job.get("ok"):
-            warnings.append(job.get("error") or job.get("message") or "Gather failed")
-            steps.append("discovery:error")
-        results = job.get("results") or []
-        gather_results = len(results)
+
+        a = assign["assignment"]
+        kind = research_domain_kind(brief, a.get("category") or "")
+        # Ontology-routed source preference (support → web/help docs, not social ads)
+        preferred = preferred_sources(kind)
+        source = a.get("source") or preferred[0] or "web"
+        if kind == "support" and source in {"instagram", "tiktok", "youtube", "x", "facebook"}:
+            source = "web"
+            steps.append("source_reroute:support→web")
+
+        min_hits = min_evidence_threshold(batch_size)
+        # Adaptive gather: vary queries and deepen crawl until min evidence or max attempts
+        max_attempts = 3
+        seen_urls: set[str] = set()
+        all_results: list[dict[str, Any]] = []
+
+        for attempt in range(max_attempts):
+            deep = attempt >= 1
+            qs = build_search_queries(
+                brief,
+                category=a["category"],
+                source=source,
+                attempt=attempt,
+                max_queries=2 if attempt == 0 else 3,
+            )
+            attempt_hits = 0
+            for query in qs:
+                if query in queries_tried:
+                    continue
+                queries_tried.append(query)
+                job = h.trigger_discovery(
+                    ctx,
+                    category=a["category"],
+                    source=source,
+                    query=query,
+                    max_results=15 if deep else None,
+                    force_refresh=attempt > 0,  # bust dedupe/cache on broaden
+                    deep=deep,
+                    domain_kind=kind,
+                )
+                if not job.get("ok"):
+                    warnings.append(
+                        job.get("error") or job.get("message") or "Gather failed"
+                    )
+                    continue
+                for r in job.get("results") or []:
+                    url = (r.get("url") or "").strip()
+                    key = url or (r.get("title") or "")
+                    if key and key in seen_urls:
+                        continue
+                    if key:
+                        seen_urls.add(key)
+                    # Domain filter: drop ad-like for support before candidate write
+                    kind_sc = score_item_for_kind(
+                        kind=kind,
+                        title=r.get("title") or "",
+                        snippet=r.get("snippet") or "",
+                        url=url,
+                        category=a["category"],
+                        query=query,
+                    )
+                    if kind == "support" and kind_sc.get("ad_like") and not kind_sc.get(
+                        "help_like"
+                    ):
+                        continue
+                    r = {**r, "_kind_score": kind_sc["relevance_score"], "_query": query}
+                    all_results.append(r)
+                    attempt_hits += 1
+                h.record_search(
+                    ctx, source=source, query=query, category=a["category"]
+                )
+            gather_results = len(all_results)
+            steps.append(
+                f"gather_attempt{attempt}:q={len(qs)},hits={attempt_hits},"
+                f"total={gather_results},deep={deep}"
+            )
+            if gather_results >= min_hits:
+                break
+            # thin yield → broaden next attempt
+            if attempt + 1 < max_attempts:
+                warnings.append(
+                    f"Thin yield ({gather_results}<{min_hits}) — broadening research "
+                    f"(attempt {attempt + 2}/{max_attempts})."
+                )
+
+        # Sort by domain-aware score and promote best
+        all_results.sort(key=lambda x: float(x.get("_kind_score") or 0), reverse=True)
+        gather_results = len(all_results)
         if gather_results == 0:
             zero_evidence = True
             warnings.append(
                 f"No verifiable sources found for “{a['category']}” "
-                f"(query: {query[:80]}). 0 new candidates."
+                f"after {len(queries_tried)} varied queries. 0 new candidates."
             )
-        for r in results[:batch_size]:
+
+        for r in all_results[: max(batch_size * 2, min_hits)]:
             scored = h.score_relevance(
                 ctx,
                 title=r.get("title", ""),
                 category=a["category"],
                 snippet=r.get("snippet", ""),
+                url=r.get("url", ""),
+                query=r.get("_query", ""),
+                domain_kind=kind,
             )
-            # also score against domain keywords from brief
             if brief.get("domain"):
                 scored2 = h.score_relevance(
                     ctx,
                     title=r.get("title", ""),
                     category=str(brief.get("domain")),
                     snippet=r.get("snippet", ""),
+                    url=r.get("url", ""),
+                    domain_kind=kind,
                 )
                 if scored2.get("relevance_score", 0) > scored.get("relevance_score", 0):
                     scored = scored2
@@ -234,21 +316,20 @@ def run_code_pipeline_batch(
                 h.write_discovery_candidate(
                     ctx,
                     category=a["category"],
-                    source=a["source"],
+                    source=source,
                     title=r.get("title", ""),
                     url=r.get("url", ""),
                     brand=r.get("brand", "") or brief.get("domain", ""),
                     creator=r.get("creator", ""),
                     relevance_score=scored.get("relevance_score", 0.5),
+                    gather_item_id=r.get("gather_item_id") or r.get("id") or "",
                 )
                 created_candidates += 1
-        h.record_search(
-            ctx,
-            source=a["source"],
-            query=query,
-            category=a["category"],
+            if created_candidates >= batch_size:
+                break
+        steps.append(
+            f"discovery:{created_candidates}/{gather_results}/queries={len(queries_tried)}/kind={kind}"
         )
-        steps.append(f"discovery:{created_candidates}/{gather_results}")
     else:
         zero_evidence = True
         warnings.append("No discovery assignment — set categories/sources in Plan.")

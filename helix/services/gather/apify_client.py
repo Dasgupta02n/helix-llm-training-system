@@ -124,13 +124,20 @@ def fetch_dataset_items(dataset_id: str, limit: int = 50) -> list[dict[str, Any]
         return data.get("items") or data.get("data") or []
 
 
-def search_web(query: str, max_results: int = 10) -> tuple[list[dict[str, Any]], dict[str, Any]]:
+def search_web(
+    query: str,
+    max_results: int = 10,
+    *,
+    max_pages: int = 1,
+) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     """Batch web search via Google Search scraper — primary discovery gatherer."""
     actor = ACTORS["search"]
+    pages = max(1, min(int(max_pages or 1), 3))
+    per_page = min(max(max_results, 5), 10)
     run_input = {
         "queries": query,
-        "maxPagesPerQuery": 1,
-        "resultsPerPage": min(max_results, 10),
+        "maxPagesPerQuery": pages,
+        "resultsPerPage": per_page,
         "mobileResults": False,
         "languageCode": "en",
         "forceExactMatch": False,
@@ -138,8 +145,14 @@ def search_web(query: str, max_results: int = 10) -> tuple[list[dict[str, Any]],
     }
     run = run_actor(actor, run_input, memory_mbytes=2048)
     dataset_id = run.get("defaultDatasetId")
-    items = fetch_dataset_items(dataset_id, limit=max_results) if dataset_id else []
-    return items, {"run_id": run.get("id"), "dataset_id": dataset_id, "actor": actor}
+    fetch_limit = max(max_results, per_page * pages)
+    items = fetch_dataset_items(dataset_id, limit=fetch_limit) if dataset_id else []
+    return items, {
+        "run_id": run.get("id"),
+        "dataset_id": dataset_id,
+        "actor": actor,
+        "max_pages": pages,
+    }
 
 
 def fetch_page(url: str) -> tuple[dict[str, Any], dict[str, Any]]:

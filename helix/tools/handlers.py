@@ -275,7 +275,15 @@ def check_recent_searches(
 
 
 def trigger_discovery(
-    ctx: ToolContext, category: str = "", source: str = "", query: str = "", **_: Any
+    ctx: ToolContext,
+    category: str = "",
+    source: str = "",
+    query: str = "",
+    max_results: int | None = None,
+    force_refresh: bool = False,
+    deep: bool = False,
+    domain_kind: str = "",
+    **_: Any,
 ) -> dict:
     """GATHER via Apify only — never invent results in the LLM."""
     from helix.services.gather.smart import gather_search
@@ -285,9 +293,12 @@ def trigger_discovery(
             ctx.db,
             tenant_id=ctx.tenant_id,
             category=category,
-            source=source or "blog",
+            source=source or "web",
             query=query or category,
-            max_results=ctx.settings.apify_max_results_per_search,
+            max_results=max_results or ctx.settings.apify_max_results_per_search,
+            force_refresh=bool(force_refresh),
+            deep=bool(deep),
+            domain_kind=domain_kind or "",
         )
     except Exception as e:  # noqa: BLE001
         return {
@@ -310,8 +321,10 @@ def trigger_discovery(
         "needs_judgment_count": len(out.get("needs_judgment") or []),
         "discarded_low_relevance": out.get("discarded_low_relevance", 0),
         "from_cache": out.get("from_cache", False),
+        "deduped_query": out.get("deduped_query", False),
         "gatherer": "apify",
         "message": out.get("message"),
+        "query": query,
         # convenience: same as get_discovery_results
         "results": out.get("needs_judgment") or [],
     }
@@ -351,12 +364,26 @@ def get_discovery_results(ctx: ToolContext, job_id: str = "", **_: Any) -> dict:
 
 
 def score_relevance(
-    ctx: ToolContext, title: str = "", category: str = "", snippet: str = "", **_: Any
+    ctx: ToolContext,
+    title: str = "",
+    category: str = "",
+    snippet: str = "",
+    url: str = "",
+    query: str = "",
+    domain_kind: str = "",
+    **_: Any,
 ) -> dict:
     """Code-only relevance (not OpenRouter). Used for double-check; gather already filtered."""
     from helix.services.gather.smart import code_relevance
 
-    return code_relevance(title, snippet, category)
+    return code_relevance(
+        title,
+        snippet,
+        category,
+        query=query,
+        url=url,
+        domain_kind=domain_kind,
+    )
 
 
 def write_discovery_candidate(
@@ -391,7 +418,9 @@ def write_discovery_candidate(
         category = gitem.category or category
         relevance_score = gitem.relevance_score
 
-    if relevance_score < ctx.settings.relevance_threshold:
+    # Allow domain-aware scores slightly below global threshold (support FAQ path)
+    min_score = max(0.40, float(ctx.settings.relevance_threshold) - 0.12)
+    if relevance_score < min_score:
         return {"ok": False, "error": "below relevance threshold", "score": relevance_score}
     if not url and not gather_item_id:
         return {

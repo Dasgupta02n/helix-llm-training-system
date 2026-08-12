@@ -30,29 +30,59 @@ def _hash(*parts: str) -> str:
     return hashlib.sha256(blob.encode("utf-8")).hexdigest()
 
 
-def code_relevance(title: str, snippet: str, category: str, query: str = "") -> dict[str, Any]:
+def code_relevance(
+    title: str,
+    snippet: str,
+    category: str,
+    query: str = "",
+    *,
+    url: str = "",
+    domain_kind: str = "",
+) -> dict[str, Any]:
     """Cheap deterministic relevance — runs BEFORE any OpenRouter judgment."""
-    text = f"{title} {snippet} {query}".lower()
-    cat = (category or "").lower()
-    base = 0.3
-    if cat and cat in text:
-        base += 0.28
-    # token overlap
-    words = {w for w in re.findall(r"[a-z0-9]{3,}", text)}
-    cwords = {w for w in re.findall(r"[a-z0-9]{3,}", cat)}
-    if cwords:
-        base += 0.25 * (len(words & cwords) / max(len(cwords), 1))
-    for w in ("sponsored", "partner", "collab", "campaign", "#ad", "review", "launch", "promo"):
-        if w in text:
-            base += 0.08
-            break
-    if query:
-        qwords = {w for w in re.findall(r"[a-z0-9]{3,}", query.lower())}
-        if qwords:
-            base += 0.15 * (len(words & qwords) / max(len(qwords), 1))
-    score = round(min(base, 0.99), 3)
+    # Domain-aware scoring (support demotes ads, boosts FAQ/help)
+    if domain_kind:
+        try:
+            from helix.services.research_targets import score_item_for_kind
+
+            kind_score = score_item_for_kind(
+                kind=domain_kind,
+                title=title or "",
+                snippet=snippet or "",
+                url=url or "",
+                category=category or "",
+                query=query or "",
+            )
+            score = float(kind_score["relevance_score"])
+        except Exception:  # noqa: BLE001
+            domain_kind = ""
+            score = 0.3
+    if not domain_kind:
+        text = f"{title} {snippet} {query}".lower()
+        cat = (category or "").lower()
+        base = 0.3
+        if cat and cat in text:
+            base += 0.28
+        words = {w for w in re.findall(r"[a-z0-9]{3,}", text)}
+        cwords = {w for w in re.findall(r"[a-z0-9]{3,}", cat)}
+        if cwords:
+            base += 0.25 * (len(words & cwords) / max(len(cwords), 1))
+        for w in ("sponsored", "partner", "collab", "campaign", "#ad", "review", "launch", "promo"):
+            if w in text:
+                base += 0.08
+                break
+        if query:
+            qwords = {w for w in re.findall(r"[a-z0-9]{3,}", query.lower())}
+            if qwords:
+                base += 0.15 * (len(words & qwords) / max(len(qwords), 1))
+        score = round(min(base, 0.99), 3)
+    else:
+        score = round(min(score, 0.99), 3)
+
     threshold = get_settings().relevance_threshold
-    # Only borderline / high scores need LLM judgment; low scores discarded in code
+    # Support domains: slightly lower threshold so FAQ hits survive, ads already demoted
+    if domain_kind == "support":
+        threshold = max(0.42, threshold - 0.08)
     needs_judgment = score >= threshold
     return {
         "relevance_score": score,
@@ -60,6 +90,7 @@ def code_relevance(title: str, snippet: str, category: str, query: str = "") -> 
         "threshold": threshold,
         "needs_judgment": needs_judgment,
         "scored_by": "code",
+        "domain_kind": domain_kind or None,
     }
 
 
@@ -161,26 +192,33 @@ def gather_search(
     source: str,
     query: str,
     max_results: int | None = None,
+    force_refresh: bool = False,
+    deep: bool = False,
+    domain_kind: str = "",
 ) -> dict[str, Any]:
     """
     Smart Apify search:
-    - batch size capped
-    - cache hit within apify_cache_hours
-    - query dedupe within apify_dedupe_hours
-    - code relevance filter; only needs_judgment items proceed toward OpenRouter
+    - batch size capped (higher when deep=True for thin-yield expansion)
+    - cache hit within apify_cache_hours (skipped when force_refresh)
+    - query dedupe within apify_dedupe_hours (skipped when force_refresh)
+    - domain-aware code relevance; only needs_judgment items proceed toward OpenRouter
     """
     settings = get_settings()
-    max_results = max(
-        1, min(int(max_results or settings.apify_max_results_per_search), 10)
-    )
+    cap = 20 if deep else 10
+    default_max = settings.apify_max_results_per_search
+    if deep:
+        default_max = max(default_max, 15)
+    max_results = max(1, min(int(max_results or default_max), cap))
     source = (source or "blog").lower()
-    query = (query or category or "marketing").strip()
+    query = (query or category or "training").strip()
     # Enrich query for platform without LLM
-    search_q = f"{query} {category}".strip()
+    search_q = f"{query}".strip()
+    if category and category.lower() not in search_q.lower():
+        search_q = f"{search_q} {category}".strip()
     if source in {"instagram", "tiktok", "youtube", "x"}:
         search_q = f"{search_q} site:{_site_hint(source)}"
 
-    cache_key = _hash(tenant_id, source, search_q, str(max_results))
+    cache_key = _hash(tenant_id, source, search_q, str(max_results), domain_kind or "")
     job = m.GatherJob(
         id=_uid("gjob_"),
         tenant_id=tenant_id,
@@ -192,7 +230,7 @@ def gather_search(
     db.add(job)
     db.commit()
 
-    if _recent_search_dup(db, tenant_id, source, search_q):
+    if not force_refresh and _recent_search_dup(db, tenant_id, source, search_q):
         job.status = "cached"
         job.from_cache = True
         job.error = "Skipped Apify — same query within dedupe window"
@@ -220,7 +258,7 @@ def gather_search(
             "message": "Query recently run — reused stored items (no new Apify spend).",
         }
 
-    cached = _cache_get(db, tenant_id, cache_key)
+    cached = None if force_refresh else _cache_get(db, tenant_id, cache_key)
     raw_items: list[dict[str, Any]] = []
     meta: dict[str, Any] = {}
 
@@ -240,7 +278,10 @@ def gather_search(
             db.commit()
             raise RuntimeError("APIFY_API_KEY not configured — gathering requires Apify")
         try:
-            raw_items, meta = apify_client.search_web(search_q, max_results=max_results)
+            pages = 2 if deep else 1
+            raw_items, meta = apify_client.search_web(
+                search_q, max_results=max_results, max_pages=pages
+            )
             raw_items = _flatten_google_items(raw_items)[:max_results]
             # store cache
             db.add(
@@ -293,7 +334,12 @@ def gather_search(
             continue
 
         rel = code_relevance(
-            norm["title"], norm["snippet"] or "", category, query=search_q
+            norm["title"],
+            norm["snippet"] or "",
+            category,
+            query=search_q,
+            url=norm.get("url") or "",
+            domain_kind=domain_kind,
         )
         item = m.GatherItem(
             id=_uid("gitm_"),
