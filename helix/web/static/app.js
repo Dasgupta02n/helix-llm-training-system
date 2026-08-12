@@ -68,6 +68,26 @@ const FRIENDLY_AGENTS = {
     blurb: "Approves only trustworthy material.",
     role: "Quality",
   },
+  strategy_synthesizer: {
+    title: "Strategy synthesizer",
+    blurb: "Turns verified clusters into training-ready strategic notes.",
+    role: "Structure",
+  },
+  training_quality_reviewer: {
+    title: "Training quality reviewer",
+    blurb: "Tries to break draft training rows before they become gold.",
+    role: "Quality",
+  },
+  campaign_strategist: {
+    title: "Strategy synthesizer",
+    blurb: "Turns verified clusters into training-ready strategic notes.",
+    role: "Structure",
+  },
+  adversarial_reviewer: {
+    title: "Training quality reviewer",
+    blurb: "Tries to break draft training rows before they become gold.",
+    role: "Quality",
+  },
   knowledge_extraction: {
     title: "Fact extractor",
     blurb: "Pulls clean facts from approved material.",
@@ -141,7 +161,20 @@ async function api(path, opts = {}) {
     headers["Content-Type"] = "application/json";
   }
   if (state.token) headers.Authorization = `Bearer ${state.token}`;
-  const res = await fetch(path, { ...opts, headers });
+  const method = (opts.method || "GET").toUpperCase();
+  // Prevent stale job/library counters after redeploy or mid-batch progress
+  const fetchOpts = {
+    ...opts,
+    headers,
+    cache: opts.cache || "no-store",
+  };
+  // Cache-bust GETs so polling always hits the live API (not a frozen browser cache)
+  let url = path;
+  if (method === "GET" && path.startsWith("/api/")) {
+    const sep = path.includes("?") ? "&" : "?";
+    url = `${path}${sep}_=${Date.now()}`;
+  }
+  const res = await fetch(url, fetchOpts);
   const text = await res.text();
   let data;
   try {
@@ -618,21 +651,46 @@ function _jobResultBanner(j) {
   return "";
 }
 
+function _jobRenderKey(j) {
+  // Force re-render whenever any live counter changes
+  return [
+    j.id,
+    j.status,
+    j.completed_batches,
+    j.items_processed,
+    j.progress_pct,
+    j.progress_message,
+    j.updated_at,
+    j.eta_seconds,
+    JSON.stringify(j.result_summary || {}),
+  ].join("|");
+}
+
 async function loadJobs() {
   if (!$("jobsList") || !state.tenantSlug) return;
+  if (state._jobsLoading) return; // prevent stacked polls from racing
+  state._jobsLoading = true;
   try {
     const data = await api(`/api/t/${state.tenantSlug}/jobs`);
     const jobs = data.jobs || [];
     const active = (data.active || []).length;
     if ($("jobsLiveHint")) {
       $("jobsLiveHint").textContent = active
-        ? `${active} job(s) running — counters refresh every 2s`
+        ? `${active} job(s) running — live counters (no-cache poll every 2s)`
         : "No active jobs";
     }
     if (!jobs.length) {
       $("jobsList").innerHTML = `<div class="empty"><div class="icon">⏱️</div>No jobs yet. Start a mining or synthesis job above.</div>`;
+      state._jobsRenderKey = "";
       return;
     }
+    const renderKey = jobs.map(_jobRenderKey).join("||");
+    // Still re-render if anything moved; skip only exact same snapshot
+    if (state._jobsRenderKey === renderKey && $("jobsList").children.length) {
+      return;
+    }
+    state._jobsRenderKey = renderKey;
+
     // Visual progress: while a batch is running, show partial credit so UI doesn't freeze at 0%
     $("jobsList").innerHTML = jobs
       .map((j) => {
@@ -647,12 +705,14 @@ async function loadJobs() {
         const typeLabel = j.job_type === "synthesis" ? "Synthesis" : "Mining";
         let pct = Number(j.progress_pct) || 0;
         if (j.status === "running" && pct < 100) {
-          // mid-batch pulse: at least show progress into current batch
-          const partial = ((j.completed_batches + 0.35) / Math.max(j.total_batches, 1)) * 100;
+          // mid-batch pulse based on updated_at recency so bar moves during long gathers
+          const tick = (Date.now() / 1000) % 1;
+          const partial =
+            ((j.completed_batches + 0.2 + 0.6 * tick) / Math.max(j.total_batches, 1)) * 100;
           pct = Math.max(pct, Math.min(99, Math.round(partial * 10) / 10));
         }
         const updated = j.updated_at ? new Date(j.updated_at).toLocaleTimeString() : "—";
-        return `<div class="job-card" data-job="${escapeHtml(j.id)}">
+        return `<div class="job-card" data-job="${escapeHtml(j.id)}" data-updated="${escapeHtml(j.updated_at || "")}">
           <div class="job-head">
             <div>
               <strong>${typeLabel}</strong>
@@ -668,14 +728,14 @@ async function loadJobs() {
             </div>
           </div>
           <div class="progress-bar"><i style="width:${pct}%"></i></div>
-          <p class="hint mb-0">
-            Batches <strong>${j.completed_batches}</strong>/${j.total_batches}
+          <p class="hint mb-0 job-counters">
+            Batches <strong class="job-batches">${j.completed_batches}</strong>/${j.total_batches}
             · size ${j.batch_size}
-            · items <strong>${j.items_processed}</strong>
+            · items <strong class="job-items">${j.items_processed}</strong>
             · ETA ${escapeHtml(j.eta_human || "—")}
             · updated ${escapeHtml(updated)}
           </p>
-          <p class="hint mb-0">${escapeHtml(j.progress_message || "")}</p>
+          <p class="hint mb-0 job-progress-msg"><strong>${escapeHtml(j.progress_message || "…")}</strong></p>
           ${_jobResultBanner(j)}
         </div>`;
       })
@@ -687,6 +747,7 @@ async function loadJobs() {
             method: "POST",
           });
           toast("Job cancel requested");
+          state._jobsRenderKey = "";
           await loadJobs();
         } catch (e) {
           toast(e.message, "err");
@@ -695,6 +756,8 @@ async function loadJobs() {
     });
   } catch (e) {
     $("jobsList").innerHTML = `<p class="status-line error">${escapeHtml(e.message)}</p>`;
+  } finally {
+    state._jobsLoading = false;
   }
 }
 
@@ -766,6 +829,47 @@ function selectedParams() {
   );
 }
 
+async function loadCorpus() {
+  if (!$("corpusList") || !state.tenantSlug) return;
+  try {
+    const data = await api(`/api/t/${state.tenantSlug}/library/corpus`);
+    const items = data.items || [];
+    if (!items.length) {
+      $("corpusList").innerHTML =
+        `<p class="hint mb-0">No corpus docs yet — paste a FAQ or add a support URL for niche domains.</p>`;
+      return;
+    }
+    $("corpusList").innerHTML = items
+      .map(
+        (d) => `<div class="item">
+        <div>
+          <h4>${escapeHtml(d.title || "Document")}</h4>
+          <p class="hint mb-0">${escapeHtml(d.category || "")} · ${d.content_length || 0} chars
+          ${d.url ? ` · <a href="${escapeHtml(d.url)}" target="_blank" rel="noopener">source</a>` : ""}</p>
+          <p>${escapeHtml((d.content_text || "").slice(0, 160))}</p>
+        </div>
+        <button class="btn btn-ghost btn-sm" data-corpus-del="${escapeHtml(d.id)}" type="button">Remove</button>
+      </div>`
+      )
+      .join("");
+    $("corpusList").querySelectorAll("[data-corpus-del]").forEach((btn) => {
+      btn.onclick = async () => {
+        try {
+          await api(`/api/t/${state.tenantSlug}/library/corpus/${btn.dataset.corpusDel}`, {
+            method: "DELETE",
+          });
+          toast("Corpus doc removed");
+          await loadCorpus();
+        } catch (e) {
+          toast(e.message, "err");
+        }
+      };
+    });
+  } catch (e) {
+    $("corpusList").innerHTML = `<p class="status-line error">${escapeHtml(e.message)}</p>`;
+  }
+}
+
 async function loadLibrary() {
   if (!$("libraryProgress")) return;
   try {
@@ -806,17 +910,38 @@ async function loadLibrary() {
     } else {
       const seedItems = gold.items.filter((g) => g.is_seed);
       const userItems = gold.items.filter((g) => !g.is_seed);
-      const row = (g) => `<div class="item ${g.is_seed ? "item-seed" : "item-user"}">
+      const row = (g) => {
+        const seed = !!g.is_seed;
+        const rejected = (g.verification_status || "").toLowerCase() === "rejected";
+        const origin = g.origin_label || (seed ? "Seed / demo" : "Your generated data");
+        const badgeClass = rejected ? "err" : seed ? "warn" : "ok";
+        const badgeText = rejected
+          ? "Rejected"
+          : seed
+            ? "Seed / demo"
+            : origin.includes("corpus")
+              ? "Corpus"
+              : "Your data";
+        return `<div class="item ${seed ? "item-seed" : "item-user"}${rejected ? " item-rejected" : ""}">
           <div>
-            <h4>${escapeHtml(g.topic)}</h4>
+            <h4>${escapeHtml(g.topic)} ${
+              seed
+                ? `<span class="badge warn" title="Bootstrap/demo training row">Seed / demo</span>`
+                : `<span class="badge ok" title="${escapeHtml(origin)}">${escapeHtml(badgeText)}</span>`
+            }${
+              rejected
+                ? ` <span class="badge err" title="Failed quality gates">Quality reject</span>`
+                : ""
+            }</h4>
             <p><strong>Q:</strong> ${escapeHtml((g.input || "").slice(0, 120))}</p>
             <p><strong>A:</strong> ${escapeHtml((g.output || "").slice(0, 120))}</p>
-            <p class="hint mb-0">${escapeHtml(g.origin_label || (g.is_seed ? "Seed / demo" : "Your generated data"))}</p>
+            <p class="hint mb-0 origin-label">${escapeHtml(origin)}${
+              g.verification_status ? ` · ${escapeHtml(g.verification_status)}` : ""
+            }</p>
           </div>
-          <span class="badge ${g.is_seed ? "warn" : "ok"}">${
-            g.is_seed ? "Seed / demo" : "Your data"
-          }</span>
+          <span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span>
         </div>`;
+      };
       $("goldList").innerHTML =
         (seedItems.length
           ? `<div class="banner warn" style="margin-bottom:12px"><strong>Seed / demo data</strong> — not created by your latest mining run (${seedItems.length}).</div>`
@@ -844,6 +969,7 @@ async function loadLibrary() {
         )
         .join("") + `<p class="hint">Showing ${synth.items.length} of ${synth.total}</p>`;
     }
+    await loadCorpus();
   } catch (e) {
     $("libraryProgress").innerHTML = `<p class="status-line error">${escapeHtml(e.message)}</p>`;
   }
@@ -1723,6 +1849,76 @@ $("pipelineBtn").onclick = runPipeline;
 if ($("goldTarget")) $("goldTarget").addEventListener("input", updateSynthHint);
 if ($("varPerGold")) $("varPerGold").addEventListener("input", updateSynthHint);
 if ($("saveScopeBtn")) $("saveScopeBtn").onclick = saveScope;
+if ($("corpusPasteBtn")) {
+  $("corpusPasteBtn").onclick = async () => {
+    if (!$("corpusStatus")) return;
+    $("corpusStatus").textContent = "Saving paste…";
+    $("corpusStatus").className = "status-line";
+    try {
+      await api(`/api/t/${state.tenantSlug}/library/corpus/paste`, {
+        method: "POST",
+        body: JSON.stringify({
+          title: $("corpusTitle")?.value || "Pasted document",
+          content: $("corpusPaste")?.value || "",
+          category: $("corpusCategory")?.value || "general",
+        }),
+      });
+      $("corpusStatus").textContent = "Document added to your corpus.";
+      $("corpusStatus").className = "status-line ok";
+      if ($("corpusPaste")) $("corpusPaste").value = "";
+      await loadCorpus();
+      toast("Corpus document saved");
+    } catch (e) {
+      $("corpusStatus").textContent = e.message;
+      $("corpusStatus").className = "status-line error";
+    }
+  };
+}
+if ($("corpusUrlBtn")) {
+  $("corpusUrlBtn").onclick = async () => {
+    if (!$("corpusStatus")) return;
+    $("corpusStatus").textContent = "Fetching URL (may take a minute)…";
+    $("corpusStatus").className = "status-line";
+    try {
+      await api(`/api/t/${state.tenantSlug}/library/corpus/url`, {
+        method: "POST",
+        body: JSON.stringify({
+          url: $("corpusUrl")?.value || "",
+          title: $("corpusTitle")?.value || "",
+          category: $("corpusCategory")?.value || "general",
+          fetch: true,
+        }),
+      });
+      $("corpusStatus").textContent = "URL content added to your corpus.";
+      $("corpusStatus").className = "status-line ok";
+      await loadCorpus();
+      toast("Corpus URL saved");
+    } catch (e) {
+      $("corpusStatus").textContent = e.message;
+      $("corpusStatus").className = "status-line error";
+    }
+  };
+}
+if ($("qualityBackfillBtn")) {
+  $("qualityBackfillBtn").onclick = async () => {
+    if (!$("corpusStatus")) return;
+    $("corpusStatus").textContent = "Re-checking historical gold quality…";
+    $("corpusStatus").className = "status-line";
+    try {
+      const r = await api(`/api/t/${state.tenantSlug}/library/quality-backfill`, {
+        method: "POST",
+      });
+      $("corpusStatus").textContent =
+        `Scanned ${r.scanned || 0}; newly rejected ${r.newly_rejected || 0}.`;
+      $("corpusStatus").className = "status-line ok";
+      await loadLibrary();
+      toast("Quality backfill complete");
+    } catch (e) {
+      $("corpusStatus").textContent = e.message;
+      $("corpusStatus").className = "status-line error";
+    }
+  };
+}
 if ($("promoteGoldBtn")) $("promoteGoldBtn").onclick = promoteGold;
 if ($("synthesizeBtn")) $("synthesizeBtn").onclick = synthesize;
 if ($("exportGoldBtn")) $("exportGoldBtn").onclick = () => exportLibrary("gold");

@@ -93,11 +93,11 @@ def mode_llm_agents(mode: int) -> list[str]:
             "fact_verification",
             "knowledge_extraction",
             "knowledge_graph",
-            "adversarial_reviewer",
-            "campaign_strategist",  # Strategy Synthesizer — domain-agnostic role
+            "training_quality_reviewer",
+            "strategy_synthesizer",
         ]
     if mode == 3:
-        return ["fact_verification", "adversarial_reviewer"]
+        return ["fact_verification", "training_quality_reviewer"]
     return []
 
 
@@ -491,7 +491,11 @@ def run_code_pipeline_batch(
                 rationale=(pair.get("rationale") or "")[:1000],
                 difficulty=pair.get("difficulty") or "moderate",
                 is_negative=bool(pair.get("is_negative")),
-                source_kind="pipeline",
+                source_kind=(
+                    "corpus"
+                    if (meta or {}).get("from") == "user_corpus"
+                    else "pipeline"
+                ),
                 source_ref=source_ref,
                 verification_status=pair.get("verification_status") or "verified",
                 enforce_cap=True,
@@ -512,6 +516,34 @@ def run_code_pipeline_batch(
                 known_ids.add(g.id)
                 gold_made += 1
                 promoted_refs.add(source_ref)
+
+        # 0) Bring-your-own corpus first (niche domains / internal docs)
+        try:
+            from helix.services.corpus import list_corpus
+
+            corpus_docs = list_corpus(
+                db, tenant_id=tenant_id, owner_user_id=owner_user_id, limit=batch_size * 3
+            )
+            corpus_used = 0
+            for doc in corpus_docs:
+                if gold_made >= batch_size:
+                    break
+                ref = f"corpus:{doc.id}"
+                _try_add_gold(
+                    source_ref=ref,
+                    title=doc.title or "Corpus document",
+                    text=doc.content_text or "",
+                    category=doc.category or "general",
+                    url=doc.url or "",
+                    meta={"from": "user_corpus", "corpus_id": doc.id},
+                )
+                if ref in promoted_refs:
+                    corpus_used += 1
+                    # mark source_kind corpus on newest gold via metadata already
+            steps.append(f"corpus:{corpus_used}/{len(corpus_docs)}")
+        except Exception as e:  # noqa: BLE001
+            warnings.append(f"corpus: {e}")
+            steps.append("corpus:error")
 
         # 1) Direct from discovery candidates (most reliable domain-agnostic path)
         cands = (

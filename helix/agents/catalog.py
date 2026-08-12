@@ -274,8 +274,8 @@ AGENTS: dict[str, AgentDef] = {
             """
         ),
     ),
-    "campaign_strategist": AgentDef(
-        key="campaign_strategist",
+    "strategy_synthesizer": AgentDef(
+        key="strategy_synthesizer",
         name="Strategy Synthesizer",
         role="general",
         reports_to="research_director",
@@ -335,9 +335,9 @@ AGENTS: dict[str, AgentDef] = {
             """
         ),
     ),
-    "adversarial_reviewer": AgentDef(
-        key="adversarial_reviewer",
-        name="Adversarial Reviewer",
+    "training_quality_reviewer": AgentDef(
+        key="training_quality_reviewer",
+        name="Training Quality Reviewer",
         role="general",
         reports_to="dataset_curator",
         budget_tier="high",
@@ -531,17 +531,24 @@ PIPELINE_ORDER: list[str] = [
     "fact_verification",
     "knowledge_extraction",
     "knowledge_graph",
-    "campaign_strategist",
+    "strategy_synthesizer",
     "dataset_curator",
     "synthetic_generator",
-    "adversarial_reviewer",
+    "training_quality_reviewer",
     "benchmark_builder",
     "trainer",
     "operations_dashboard",
 ]
 
+# Legacy domain-coupled keys → generic names (API/jobs still accept old ids)
+AGENT_ALIASES: dict[str, str] = {
+    "campaign_strategist": "strategy_synthesizer",
+    "adversarial_reviewer": "training_quality_reviewer",
+}
+
 
 def get_agent(key: str) -> AgentDef:
+    key = AGENT_ALIASES.get(key, key)
     if key not in AGENTS:
         raise KeyError(f"Unknown agent: {key}. Valid: {', '.join(AGENTS)}")
     return AGENTS[key]

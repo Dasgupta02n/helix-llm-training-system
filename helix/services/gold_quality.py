@@ -1,8 +1,7 @@
-"""Gold answer synthesis + hard quality gates (reject echo/refuse patterns)."""
+"""Gold answer synthesis + hard quality gates + self-correction loop."""
 
 from __future__ import annotations
 
-import json
 import re
 from typing import Any
 
@@ -14,7 +13,8 @@ _REFUSE_INTERNAL_DOCS = re.compile(
     r"(policy page|internal doc|docs section|ticket field|"
     r"sources provided to answer confidently|"
     r"don.?t have enough verified evidence|"
-    r"share the specific policy)",
+    r"share the specific policy|"
+    r"provide (a |the )?(link|url) to (our |the )?(internal|policy))",
     re.I,
 )
 _DOC_DUMP_WRAPPER = re.compile(
@@ -27,6 +27,9 @@ _RAW_ECHO_MARKERS = re.compile(
     re.I,
 )
 
+# Max self-correction attempts (generate → critique → regenerate)
+MAX_SYNTH_ATTEMPTS = 3
+
 
 def _normalize(s: str) -> str:
     return re.sub(r"\s+", " ", (s or "").strip().lower())
@@ -37,7 +40,6 @@ def _overlap_ratio(a: str, b: str) -> float:
     ea, eb = _normalize(a), _normalize(b)
     if len(ea) < 40 or len(eb) < 40:
         return 0.0
-    # sliding window of ~60 chars from evidence (catch partial dumps)
     window = 60
     hits = 0
     checks = 0
@@ -52,7 +54,6 @@ def _overlap_ratio(a: str, b: str) -> float:
 
 
 def _has_long_verbatim_chunk(evidence: str, output: str, min_len: int = 55) -> bool:
-    """True if any long contiguous evidence span is pasted into the output."""
     ea, eb = _normalize(evidence), _normalize(output)
     if len(ea) < min_len or len(eb) < min_len:
         return False
@@ -75,9 +76,7 @@ def quality_reject_reasons(
     reasons: list[str] = []
     out = output or ""
     ev = evidence or ""
-    # Prefer explicit evidence; fall back to input notes for review agents
     if len(ev.strip()) < 40 and input_text:
-        # strip common training-input prefixes so we compare against notes body
         ev = input_text
     support = _is_support_domain(brief, topic)
 
@@ -90,30 +89,25 @@ def quality_reject_reasons(
     if _DOC_DUMP_WRAPPER.search(out):
         reasons.append("documentation_dump_wrapper")
 
-    # Refuse-to-answer patterns even outside support keyword brief
-    if re.search(
+    if support and re.search(
         r"(cannot answer|can'?t answer|unable to (help|answer)|"
         r"insufficient (evidence|information) to answer|"
         r"need (more|additional) (internal )?sources)",
         out,
         re.I,
-    ) and support:
+    ):
         reasons.append("support_refuses_outright")
 
-    # Large verbatim paste of evidence
     if len(ev) >= 80 and _overlap_ratio(ev, out) >= 0.35:
         reasons.append("verbatim_evidence_echo")
 
     if _has_long_verbatim_chunk(ev, out, min_len=55):
         reasons.append("long_verbatim_chunk")
 
-    # Output mostly equals evidence
-    if len(ev) >= 60 and _normalize(ev)[:200] in _normalize(out):
-        if len(ev) > 120:
-            reasons.append("evidence_substring_dump")
+    if len(ev) >= 60 and _normalize(ev)[:200] in _normalize(out) and len(ev) > 120:
+        reasons.append("evidence_substring_dump")
 
     if support:
-        # Must offer a concrete next step for the customer
         next_step_cues = (
             "order id",
             "order number",
@@ -130,14 +124,15 @@ def quality_reject_reasons(
             "help you",
             "i can help",
             "once i have",
+            "could you",
+            "can you tell me",
+            "what you expected",
         )
         ol = out.lower()
         if not any(c in ol for c in next_step_cues):
             reasons.append("missing_concrete_customer_next_step")
-        # Should not address customer as if they have internal tools
         if re.search(r"provide (a |the )?(url|link) to (our |the )?internal", ol):
             reasons.append("asks_customer_for_internal_resources")
-        # Promo-code regurgitation from marketing scrapes is not a support reply
         if re.search(r"\b(code|promo)\s*[:=]?\s*[A-Z0-9]{4,}\b", out) and re.search(
             r"(like and share|click here|#ad|sponsored)", ev, re.I
         ):
@@ -147,6 +142,85 @@ def quality_reject_reasons(
         reasons.append("marketing_chrome_in_support_reply")
 
     return reasons
+
+
+def critique_for_reasons(reasons: list[str], last_out: str = "") -> str:
+    """Human-readable critique the regenerator must incorporate (not discarded)."""
+    tips: list[str] = []
+    for r in reasons:
+        if r in {
+            "support_refuses_or_demands_internal_docs",
+            "asks_customer_for_internal_resources",
+            "support_refuses_outright",
+        }:
+            tips.append(
+                "Do NOT refuse or ask the customer for internal docs/policy pages. "
+                "Stay in support voice and ask for order ID or account email instead."
+            )
+        elif r in {
+            "verbatim_evidence_echo",
+            "long_verbatim_chunk",
+            "evidence_substring_dump",
+            "documentation_dump_wrapper",
+        }:
+            tips.append(
+                "Do NOT paste or echo raw scraped text. Paraphrase only the useful facts "
+                "in natural conversational language."
+            )
+        elif r == "missing_concrete_customer_next_step":
+            tips.append(
+                "End with a concrete next step: ask for order ID / account email / "
+                "what they expected vs what they saw."
+            )
+        elif r == "marketing_chrome_in_support_reply":
+            tips.append("Strip marketing chrome (like-and-share, #ad, click-here).")
+        elif r == "promo_code_echo_from_marketing":
+            tips.append("Do not regurgitate promo codes from ad copy.")
+        elif r == "output_too_short":
+            tips.append("Write a fuller reply (at least a few sentences).")
+        else:
+            tips.append(f"Fix: {r}.")
+    # de-dupe preserve order
+    seen: set[str] = set()
+    uniq: list[str] = []
+    for t in tips:
+        if t not in seen:
+            seen.add(t)
+            uniq.append(t)
+    blob = " ".join(uniq)
+    if last_out:
+        blob += (
+            "\nPrevious rejected draft (do not repeat its mistakes):\n"
+            f"{last_out[:500]}"
+        )
+    return blob
+
+
+def clarifying_support_fallback(*, title: str, topic: str, evidence: str = "") -> str:
+    """Always-valid customer-facing clarifying reply — never refuses, never dumps scrape."""
+    topic_l = (topic or "this").replace("_", " ")
+    issue = (title or topic_l).strip()
+    if len(issue) > 100:
+        issue = issue[:97] + "…"
+    cue = ""
+    low = (evidence or "").lower()
+    if "refund" in low or "return" in low:
+        cue = "If this is about a refund or return, I can check eligibility once I have your order."
+    elif "deliver" in low or "late" in low or "track" in low:
+        cue = "If this is about delivery or tracking, I can pull the latest status with your order ID."
+    elif "cancel" in low:
+        cue = "If you need to cancel, I’ll check whether we can still stop preparation."
+    else:
+        cue = "I want to make sure I give you the right fix for your account."
+    return (
+        f"Hey! Happy to help with {topic_l}.\n\n"
+        f"I can see this relates to “{issue}”. {cue}\n\n"
+        f"Could you share:\n"
+        f"1) Your order ID or account email\n"
+        f"2) What you expected vs what you saw\n"
+        f"3) Any error message if you have one\n\n"
+        f"Once I have those, I’ll take the next step for you right away."
+    )
 
 
 def build_customer_input(
@@ -161,7 +235,6 @@ def build_customer_input(
     pair = domain_gold_pair(
         brief=brief, title=title, evidence=evidence, topic=topic, url=url
     )
-    # domain_gold_pair already builds a good input; reuse it
     return pair["input"]
 
 
@@ -178,6 +251,7 @@ Rules:
    - NEVER tell the customer to send you internal policy pages, ticket fields, or docs.
    - NEVER paste raw scraped web/marketing text. Paraphrase useful facts in natural language.
    - NEVER use the phrase "Based on the available documentation:" followed by a dump.
+   - NEVER refuse to help. If evidence is thin, ask a friendly clarifying question in-voice.
 3. If evidence is thin: still be helpful—ask clarifying questions a real agent would ask.
 4. Match the plan tone if provided (e.g. casual, friendly).
 5. Keep reply under ~180 words.
@@ -192,8 +266,12 @@ def synthesize_gold_with_llm(
     topic: str,
     url: str = "",
     tenant: Any | None = None,
+    max_attempts: int = MAX_SYNTH_ATTEMPTS,
 ) -> dict[str, Any] | None:
-    """LLM synthesis of a gold pair. Returns None if LLM unavailable or fails quality."""
+    """
+    LLM synthesis with self-correction loop:
+    generate → quality gates → critique → regenerate incorporating critique → re-check.
+    """
     try:
         from helix.llm.client import get_llm_client_for_tenant
 
@@ -223,60 +301,92 @@ def synthesize_gold_with_llm(
     )
 
     last_out = ""
-    for attempt in range(2):
+    last_reasons: list[str] = []
+    critiques: list[str] = []
+    attempts = max(1, min(int(max_attempts or MAX_SYNTH_ATTEMPTS), 5))
+
+    for attempt in range(attempts):
         try:
+            system = _SYNTH_SYSTEM
+            if attempt and last_reasons:
+                critique = critique_for_reasons(last_reasons, last_out)
+                critiques.append(critique)
+                system += (
+                    f"\n\nSELF-CORRECTION (attempt {attempt + 1}/{attempts}):\n"
+                    f"Your previous draft was REJECTED for: {'; '.join(last_reasons)}.\n"
+                    f"Critique you MUST incorporate:\n{critique}\n"
+                    "Rewrite a better reply that fixes every point above."
+                )
             resp = client.chat(
-                system=_SYNTH_SYSTEM
-                + (
-                    "\nPrevious attempt was REJECTED: "
-                    + ("; ".join(quality_reject_reasons(
-                        brief=brief, topic=topic, evidence=evidence, output=last_out
-                    )) if last_out else "")
-                    + "\nRewrite fixing those issues."
-                    if attempt and last_out
-                    else ""
-                ),
+                system=system,
                 messages=[{"role": "user", "content": user_msg}],
                 tools=None,
                 tool_choice=None,
             )
             last_out = (resp.choices[0].message.content or "").strip()
-            # strip accidental quotes/fences
             if last_out.startswith("```"):
                 last_out = re.sub(r"^```(?:\w+)?\s*", "", last_out)
                 last_out = re.sub(r"\s*```$", "", last_out)
-            reasons = quality_reject_reasons(
+            last_reasons = quality_reject_reasons(
                 brief=brief, topic=topic, evidence=evidence, output=last_out
             )
-            if not reasons:
+            if not last_reasons:
                 return {
                     "input": input_text[:4000],
                     "output": last_out[:2000],
                     "rationale": (
                         "LLM-synthesized reply grounded in gathered evidence; "
-                        "passed hard quality gates (no refuse-to-customer-for-docs, "
-                        "no raw scrape echo, concrete next step for support)."
+                        f"passed quality gates after {attempt + 1} attempt(s)."
                     ),
                     "difficulty": "moderate" if len(evidence) > 80 else "edge-case",
                     "is_negative": False,
                     "verification_status": "verified",
                     "synth": "llm",
                     "quality_ok": True,
+                    "synth_attempts": attempt + 1,
+                    "critiques": critiques,
                 }
         except Exception:  # noqa: BLE001
             return None
+
+    # Exhausted retries — never leave a refuse/echo; use clarifying fallback for support
+    if support:
+        fallback = clarifying_support_fallback(
+            title=title, topic=topic, evidence=evidence
+        )
+        reasons = quality_reject_reasons(
+            brief=brief, topic=topic, evidence=evidence, output=fallback
+        )
+        if not reasons:
+            return {
+                "input": input_text[:4000],
+                "output": fallback[:2000],
+                "rationale": (
+                    "Self-correction exhausted; used clarifying support fallback "
+                    "(friendly questions, never refuse-for-docs or scrape echo)."
+                ),
+                "difficulty": "edge-case",
+                "is_negative": False,
+                "verification_status": "verified",
+                "synth": "llm_fallback_clarify",
+                "quality_ok": True,
+                "synth_attempts": attempts,
+                "critiques": critiques,
+                "prior_reject_reasons": last_reasons,
+            }
+
     return {
         "input": input_text[:4000],
         "output": last_out[:2000] if last_out else "",
-        "rationale": "Failed quality gates after retry.",
+        "rationale": "Failed quality gates after self-correction loop.",
         "difficulty": "edge-case",
         "is_negative": False,
         "verification_status": "rejected",
         "synth": "llm",
         "quality_ok": False,
-        "reject_reasons": quality_reject_reasons(
-            brief=brief, topic=topic, evidence=evidence, output=last_out
-        ),
+        "reject_reasons": last_reasons,
+        "synth_attempts": attempts,
+        "critiques": critiques,
     }
 
 
@@ -317,8 +427,107 @@ def synthesize_gold_pair(
         output=pair.get("output") or "",
     )
     if reasons:
+        # Last resort for support: clarifying fallback (always gate-clean)
+        if _is_support_domain(brief, topic):
+            out = clarifying_support_fallback(
+                title=title, topic=topic, evidence=evidence
+            )
+            if not quality_reject_reasons(
+                brief=brief, topic=topic, evidence=evidence, output=out
+            ):
+                return {
+                    "input": pair["input"][:4000],
+                    "output": out[:2000],
+                    "rationale": (
+                        "Template failed gates; used clarifying support fallback."
+                    ),
+                    "difficulty": "edge-case",
+                    "is_negative": False,
+                    "verification_status": "verified",
+                    "synth": "template_clarify",
+                    "quality_ok": True,
+                }
         return None
     pair["verification_status"] = "verified"
     pair["synth"] = "template"
     pair["quality_ok"] = True
     return pair
+
+
+def backfill_quality_on_gold_rows(
+    db: Any,
+    *,
+    owner_user_id: str | None = None,
+    tenant_id: str | None = None,
+    limit: int = 5000,
+) -> dict[str, Any]:
+    """
+    Re-run hard quality gates on existing gold rows.
+    Bad patterns (refuse/echo) are demoted from verified → rejected.
+    """
+    from helix.db import models as m
+    from helix.services.brief import get_active_project, project_to_dict
+
+    q = db.query(m.GoldExample).filter_by(is_archived=False)
+    if owner_user_id:
+        q = q.filter_by(owner_user_id=owner_user_id)
+    if tenant_id:
+        q = q.filter_by(tenant_id=tenant_id)
+    rows = q.order_by(m.GoldExample.created_at.asc()).limit(limit).all()
+
+    brief_cache: dict[str, dict] = {}
+    scanned = 0
+    rejected = 0
+    already_bad = 0
+    for g in rows:
+        scanned += 1
+        tid = g.tenant_id
+        if tid not in brief_cache:
+            brief: dict = {}
+            try:
+                proj = get_active_project(db, tid)
+                if proj:
+                    brief = project_to_dict(proj)
+            except Exception:  # noqa: BLE001
+                brief = {}
+            brief_cache[tid] = brief
+        brief = brief_cache[tid]
+        reasons = quality_reject_reasons(
+            brief=brief,
+            topic=g.topic or "",
+            evidence=g.input_text or "",
+            output=g.output_text or "",
+            input_text=g.input_text or "",
+        )
+        if not reasons:
+            continue
+        if (g.verification_status or "").lower() == "rejected":
+            already_bad += 1
+            continue
+        g.verification_status = "rejected"
+        try:
+            import json
+
+            meta = json.loads(g.metadata_json or "{}")
+            if not isinstance(meta, dict):
+                meta = {}
+        except Exception:  # noqa: BLE001
+            meta = {}
+        meta["quality_backfill_reject"] = reasons
+        meta["quality_backfill"] = True
+        g.metadata_json = json.dumps(meta)
+        # Soft-tag rationale so UI can show why
+        note = f"[quality-backfill rejected: {'; '.join(reasons)}]"
+        if g.rationale:
+            if "quality-backfill" not in (g.rationale or ""):
+                g.rationale = f"{g.rationale}\n{note}"[:1000]
+        else:
+            g.rationale = note[:1000]
+        rejected += 1
+    if rejected:
+        db.commit()
+    return {
+        "scanned": scanned,
+        "newly_rejected": rejected,
+        "already_rejected": already_bad,
+    }

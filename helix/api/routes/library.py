@@ -14,6 +14,14 @@ from sqlalchemy.orm import Session
 from helix.api.deps import get_current_user
 from helix.db import models as m
 from helix.db.session import get_db
+from helix.services.corpus import (
+    add_paste,
+    add_url,
+    archive_document,
+    document_to_dict,
+    list_corpus,
+)
+from helix.services.gold_quality import backfill_quality_on_gold_rows
 from helix.services.library import (
     add_gold_example,
     backfill_seed_marks,
@@ -73,6 +81,19 @@ class SynthesizeRequest(BaseModel):
     gold_ids: list[str] | None = None
     max_golds: int | None = Field(default=None, ge=1, le=200)
     use_llm: bool = True
+
+
+class CorpusPasteRequest(BaseModel):
+    title: str = "Pasted document"
+    content: str = Field(..., min_length=20)
+    category: str = "general"
+
+
+class CorpusUrlRequest(BaseModel):
+    url: str = Field(..., min_length=8)
+    title: str = ""
+    category: str = "general"
+    fetch: bool = True
 
 
 @router.get("/settings")
@@ -139,9 +160,93 @@ def list_gold(
     )
     return {
         "total": total,
-        "items": [gold_to_dict(r) for r in rows],
+        "items": [gold_to_dict(r, tenant_slug=tenant.slug) for r in rows],
         "retention": "indefinite",
     }
+
+
+@router.get("/corpus")
+def get_corpus(
+    slug: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    tenant = _tenant_for(user, slug, db)
+    rows = list_corpus(db, tenant_id=tenant.id, owner_user_id=user.id)
+    return {"items": [document_to_dict(r) for r in rows], "total": len(rows)}
+
+
+@router.post("/corpus/paste")
+def corpus_paste(
+    slug: str,
+    body: CorpusPasteRequest,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    tenant = _tenant_for(user, slug, db)
+    out = add_paste(
+        db,
+        tenant_id=tenant.id,
+        owner_user_id=user.id,
+        title=body.title,
+        content=body.content,
+        category=body.category,
+    )
+    if not out.get("ok"):
+        raise HTTPException(400, out.get("error") or "Failed to add document")
+    return out
+
+
+@router.post("/corpus/url")
+def corpus_url(
+    slug: str,
+    body: CorpusUrlRequest,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    tenant = _tenant_for(user, slug, db)
+    out = add_url(
+        db,
+        tenant_id=tenant.id,
+        owner_user_id=user.id,
+        url=body.url,
+        title=body.title,
+        category=body.category,
+        fetch=body.fetch,
+    )
+    if not out.get("ok"):
+        raise HTTPException(400, out.get("error") or "Failed to fetch URL")
+    return out
+
+
+@router.delete("/corpus/{doc_id}")
+def corpus_delete(
+    slug: str,
+    doc_id: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    tenant = _tenant_for(user, slug, db)
+    out = archive_document(
+        db, tenant_id=tenant.id, doc_id=doc_id, owner_user_id=user.id
+    )
+    if not out.get("ok"):
+        raise HTTPException(400, out.get("error") or "Failed")
+    return out
+
+
+@router.post("/quality-backfill")
+def quality_backfill(
+    slug: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Re-run quality gates on all historical gold for this user/workspace."""
+    tenant = _tenant_for(user, slug, db)
+    result = backfill_quality_on_gold_rows(
+        db, owner_user_id=user.id, tenant_id=tenant.id
+    )
+    return {"ok": True, **result}
 
 
 @router.post("/gold")

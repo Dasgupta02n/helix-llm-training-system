@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Helix — Training Data Studio</title>
-  <link rel="stylesheet" href="/static/app.css" />
+  <link rel="stylesheet" href="/static/app.css?v={{ static_v }}" />
 </head>
 <body>
   <!-- AUTH (full page) -->
@@ -512,6 +512,34 @@
 
         <div id="libraryProgress" class="stat-row"></div>
 
+        <div class="pane pad" style="margin-bottom:1rem">
+          <h3 class="mt-0">Your corpus (bring your own docs)</h3>
+          <p class="hint">
+            For niche domains, paste help-center text or add a public URL. Mining will use this as primary evidence
+            instead of relying only on generic web search.
+          </p>
+          <div class="form-row">
+            <div style="flex:1">
+              <label for="corpusTitle">Title</label>
+              <input id="corpusTitle" type="text" placeholder="Refund policy excerpt" />
+            </div>
+            <div style="flex:1">
+              <label for="corpusCategory">Category</label>
+              <input id="corpusCategory" type="text" placeholder="refunds" />
+            </div>
+          </div>
+          <label for="corpusPaste">Paste document text</label>
+          <textarea id="corpusPaste" rows="4" placeholder="Paste FAQ, help article, or internal doc excerpt…"></textarea>
+          <div class="flex" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-primary" id="corpusPasteBtn" type="button">Add paste</button>
+            <input id="corpusUrl" type="url" placeholder="https://support.example.com/faq/…" style="flex:1;min-width:200px" />
+            <button class="btn btn-secondary" id="corpusUrlBtn" type="button">Fetch URL</button>
+            <button class="btn btn-ghost btn-sm" id="qualityBackfillBtn" type="button">Re-check gold quality</button>
+          </div>
+          <p id="corpusStatus" class="status-line"></p>
+          <div id="corpusList" class="item-list" style="margin-top:10px"></div>
+        </div>
+
         <div class="split split-wide">
           <div class="pane pad">
             <h3 class="mt-0">Collection goals</h3>
@@ -628,6 +656,6 @@
   </div>
 
   <div class="toast-host" id="toastHost"></div>
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v={{ static_v }}"></script>
 </body>
 </html>

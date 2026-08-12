@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -11,6 +12,11 @@ from sqlalchemy.orm import Session
 
 from helix.config import get_settings
 from helix.db import models as m
+
+# Deterministic cutoff for bootstrap/demo seed rows (one-time migration marker).
+# Rows created before this on the demo/bootstrap tenant with demo topics → seed.
+SEED_CUTOFF_UTC = datetime(2026, 8, 10, 0, 0, 0, tzinfo=timezone.utc)
+SEED_MIGRATION_VERSION = "seed_v1_2026_08_10"
 
 # Parameters users can choose to vary when synthesizing from gold
 AVAILABLE_VARY_PARAMETERS: list[dict[str, str]] = [
@@ -166,14 +172,22 @@ def _is_seed_kind(
     input_text: str | None = None,
     metadata_json: str | None = None,
     source_ref: str | None = None,
+    created_at: datetime | None = None,
+    tenant_slug: str | None = None,
 ) -> bool:
     if (kind or "").lower() in {"seed", "demo", "bootstrap", "sample"}:
         return True
     meta = _meta_dict(metadata_json)
     if meta.get("is_seed") or meta.get("seed") or meta.get("demo"):
         return True
+    if meta.get("seed_migration") == SEED_MIGRATION_VERSION:
+        return True
     t = (topic or "").lower().strip()
-    if t in _DEMO_TOPICS:
+    # Deterministic legacy rule: pre-cutoff demo-topic rows (bootstrap era)
+    created = created_at
+    if created and created.tzinfo is None:
+        created = created.replace(tzinfo=timezone.utc)
+    if created and created < SEED_CUTOFF_UTC and t in _DEMO_TOPICS:
         return True
     # Old lean pipeline format used for bootstrap influencer demos
     inp = input_text or ""
@@ -181,12 +195,28 @@ def _is_seed_kind(
         return True
     # Bootstrap campaigns were never prefixed cand:
     if source_ref and not str(source_ref).startswith("cand:") and t in _DEMO_TOPICS:
-        return True
+        if created is None or (created and created < SEED_CUTOFF_UTC):
+            return True
+    # demo tenant bootstrap only when pre-cutoff
+    if tenant_slug in {"demo", "helix-demo"} and t in _DEMO_TOPICS:
+        if created is None or (created and created < SEED_CUTOFF_UTC):
+            return True
     return False
 
 
 def backfill_seed_marks(db: Session, user_id: str, tenant_id: str) -> int:
-    """Ensure legacy demo/bootstrap gold rows are consistently tagged source_kind=seed."""
+    """
+    Deterministic one-time-ish seed migration.
+
+    Marks rows as seed when:
+    - already tagged seed/demo, OR
+    - created before SEED_CUTOFF_UTC with demo topics / campaign-brief format, OR
+    - metadata already carries seed_migration version.
+
+    Idempotent: re-running only updates rows not yet source_kind=seed.
+    """
+    tenant = db.query(m.Tenant).filter_by(id=tenant_id).first()
+    slug = tenant.slug if tenant else None
     rows = (
         db.query(m.GoldExample)
         .filter_by(owner_user_id=user_id, tenant_id=tenant_id, is_archived=False)
@@ -200,17 +230,71 @@ def backfill_seed_marks(db: Session, user_id: str, tenant_id: str) -> int:
             input_text=g.input_text,
             metadata_json=g.metadata_json,
             source_ref=g.source_ref,
+            created_at=g.created_at,
+            tenant_slug=slug,
         ):
-            if (g.source_kind or "").lower() != "seed":
+            meta = _meta_dict(g.metadata_json)
+            needs = (g.source_kind or "").lower() != "seed" or not meta.get("is_seed")
+            if needs:
                 g.source_kind = "seed"
-                meta = _meta_dict(g.metadata_json)
                 meta["is_seed"] = True
-                meta["seed_backfill"] = True
+                meta["seed_migration"] = SEED_MIGRATION_VERSION
+                meta["seed_cutoff"] = SEED_CUTOFF_UTC.isoformat()
                 g.metadata_json = json.dumps(meta)
                 n += 1
     if n:
         db.commit()
     return n
+
+
+def _token_set(text: str) -> set[str]:
+    return {w for w in re.findall(r"[a-z0-9]{3,}", (text or "").lower()) if w}
+
+
+def _jaccard(a: set[str], b: set[str]) -> float:
+    if not a or not b:
+        return 0.0
+    inter = len(a & b)
+    union = len(a | b)
+    return inter / union if union else 0.0
+
+
+def find_near_duplicate_gold(
+    db: Session,
+    *,
+    owner_user_id: str,
+    tenant_id: str,
+    input_text: str,
+    output_text: str,
+    threshold: float = 0.82,
+    limit_scan: int = 400,
+) -> m.GoldExample | None:
+    """
+    Semantic-ish near-duplicate detection against the existing gold set.
+    Uses token Jaccard on input+output (fast, no embedding service required).
+    """
+    target = _token_set(f"{input_text}\n{output_text}")
+    if len(target) < 8:
+        return None
+    rows = (
+        db.query(m.GoldExample)
+        .filter_by(
+            owner_user_id=owner_user_id,
+            tenant_id=tenant_id,
+            is_archived=False,
+        )
+        .order_by(m.GoldExample.created_at.desc())
+        .limit(limit_scan)
+        .all()
+    )
+    best: m.GoldExample | None = None
+    best_score = 0.0
+    for g in rows:
+        score = _jaccard(target, _token_set(f"{g.input_text}\n{g.output_text}"))
+        if score >= threshold and score > best_score:
+            best = g
+            best_score = score
+    return best
 
 
 def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
@@ -221,6 +305,8 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
         .all()
     )
     gold_count = len(gold_rows)
+    tenant = db.query(m.Tenant).filter_by(id=tenant_id).first()
+    slug = tenant.slug if tenant else None
     seed_gold = sum(
         1
         for g in gold_rows
@@ -230,6 +316,8 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
             input_text=g.input_text,
             metadata_json=g.metadata_json,
             source_ref=g.source_ref,
+            created_at=g.created_at,
+            tenant_slug=slug,
         )
     )
     user_gold = gold_count - seed_gold
@@ -260,14 +348,24 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
     }
 
 
-def gold_to_dict(g: m.GoldExample) -> dict[str, Any]:
+def gold_to_dict(g: m.GoldExample, tenant_slug: str | None = None) -> dict[str, Any]:
     seed = _is_seed_kind(
         g.source_kind,
         g.topic,
         input_text=g.input_text,
         metadata_json=g.metadata_json,
         source_ref=g.source_ref,
+        created_at=g.created_at,
+        tenant_slug=tenant_slug,
     )
+    if seed:
+        origin = "Seed / demo"
+    elif (g.source_kind or "").lower() == "corpus":
+        origin = "Your corpus"
+    elif (g.source_kind or "").lower() in {"pipeline", "mined"}:
+        origin = "Mined (pipeline)"
+    else:
+        origin = "Your generated data"
     return {
         "id": g.id,
         "owner_user_id": g.owner_user_id,
@@ -281,7 +379,7 @@ def gold_to_dict(g: m.GoldExample) -> dict[str, Any]:
         "source_kind": "seed" if seed else (g.source_kind or "pipeline"),
         "source_ref": g.source_ref,
         "is_seed": seed,
-        "origin_label": "Seed / demo" if seed else "Your generated data",
+        "origin_label": origin,
         "verification_status": g.verification_status,
         "created_at": g.created_at.isoformat() if g.created_at else None,
         "kind": "gold",
@@ -358,6 +456,17 @@ def add_gold_example(
     )
     if existing:
         return existing
+
+    # Near-duplicate against full gold set (not just exact match / per-batch)
+    near = find_near_duplicate_gold(
+        db,
+        owner_user_id=owner_user_id,
+        tenant_id=tenant_id,
+        input_text=input_text,
+        output_text=output_text,
+    )
+    if near:
+        return near
 
     g = m.GoldExample(
         id=_uid("gold_"),

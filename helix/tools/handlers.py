@@ -202,18 +202,35 @@ def apply_auto_resolution(
 def create_escalation(
     ctx: ToolContext, kind: str = "", message: str = "", payload: dict | None = None, **_: Any
 ) -> dict:
+    from helix.services.escalation_contract import build_escalation_payload
+
+    kind_s = kind or "generic"
+    try:
+        body = build_escalation_payload(kind_s, message=message or "", payload=payload)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
     eid = _uid("esc_")
     ctx.db.add(
         m.Escalation(
             id=eid,
             tenant_id=ctx.tenant_id,
             source_agent=ctx.agent_key,
-            kind=kind or "general",
-            payload_json=json.dumps({"message": message, **(payload or {})}),
+            kind=kind_s,
+            payload_json=json.dumps(body),
             status="open",
         )
     )
-    return {"ok": True, "escalation_id": eid}
+    return {
+        "ok": True,
+        "escalation_id": eid,
+        "contract": {
+            "question": body.get("question"),
+            "expected_answer_type": body.get("expected_answer_type"),
+            "options": body.get("options"),
+            "action_label": body.get("action_label"),
+            "needs_input": body.get("needs_input"),
+        },
+    }
 
 
 def write_research_journal(ctx: ToolContext, entry: str = "", **_: Any) -> dict:

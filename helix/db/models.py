@@ -637,6 +637,33 @@ class Escalation(Base):
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class CorpusDocument(Base):
+    """User-supplied evidence corpus (paste or URL) for niche domains."""
+
+    __tablename__ = "corpus_documents"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "content_hash", name="uq_tenant_corpus_hash"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id"), index=True)
+    owner_user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id"), index=True, nullable=True
+    )
+    title: Mapped[str] = mapped_column(String(500), default="")
+    url: Mapped[str | None] = mapped_column(String(1000), nullable=True)
+    content_text: Mapped[str] = mapped_column(Text, default="")
+    source_kind: Mapped[str] = mapped_column(String(40), default="paste")
+    # paste | url | upload
+    content_hash: Mapped[str] = mapped_column(String(64), index=True)
+    category: Mapped[str] = mapped_column(String(120), default="general")
+    status: Mapped[str] = mapped_column(String(40), default="active", index=True)
+    # active | archived | promoted
+    metadata_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Contract(Base):
     __tablename__ = "contracts"
 

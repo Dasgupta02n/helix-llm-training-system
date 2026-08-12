@@ -74,7 +74,23 @@ app.include_router(riu.router)
 
 static_dir = WEB_DIR / "static"
 static_dir.mkdir(parents=True, exist_ok=True)
-app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
+
+
+class _NoCacheStaticFiles(StaticFiles):
+    """Serve static assets with revalidate headers so redeploys don't stick behind cache."""
+
+    async def get_response(self, path: str, scope):  # type: ignore[no-untyped-def]
+        response = await super().get_response(path, scope)
+        # JS/CSS must revalidate; hashed query strings also used in templates
+        if path.endswith((".js", ".css", ".html")):
+            response.headers["Cache-Control"] = "no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+        else:
+            response.headers.setdefault("Cache-Control", "public, max-age=3600")
+        return response
+
+
+app.mount("/static", _NoCacheStaticFiles(directory=str(static_dir)), name="static")
 
 
 def _validate_production_secrets() -> None:
@@ -99,11 +115,26 @@ def _validate_production_secrets() -> None:
         )
 
 
+def _static_asset_version() -> str:
+    """Content-ish stamp for cache busting static URLs in templates."""
+    import hashlib
+
+    h = hashlib.sha1()
+    for name in ("app.js", "app.css", "modernist.css"):
+        p = static_dir / name
+        if p.exists():
+            h.update(p.read_bytes()[:200_000])
+            h.update(str(p.stat().st_mtime_ns).encode())
+    return h.hexdigest()[:12]
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     _validate_production_secrets()
     init_db()
     start_worker()  # multi-batch jobs keep running after logout
+    # Warm asset version for templates
+    app.state.static_v = _static_asset_version()
 
 
 @app.get("/api/health")
@@ -145,12 +176,20 @@ def health() -> dict:
     return payload
 
 
+def _template_ctx(**extra: object) -> dict:
+    return {
+        "version": __version__,
+        "static_v": getattr(app.state, "static_v", None) or _static_asset_version(),
+        **extra,
+    }
+
+
 @app.get("/", response_class=HTMLResponse)
 def home(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "index.html",
-        {"version": __version__},
+        _template_ctx(),
     )
 
 
@@ -159,7 +198,7 @@ def console(request: Request) -> HTMLResponse:
     return templates.TemplateResponse(
         request,
         "app.html",
-        {"version": __version__},
+        _template_ctx(),
     )
 
 

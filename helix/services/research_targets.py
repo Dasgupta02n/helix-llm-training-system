@@ -22,29 +22,34 @@ def research_domain_kind(brief: dict[str, Any], topic: str = "") -> str:
     def has(*keys: str) -> bool:
         return any(k in blob for k in keys)
 
+    # More specific verticals first so "shipping" doesn't force support for retail
+    if has("e-commerce", "ecommerce", "shopify", "product catalog", "checkout", "retail", "online retail"):
+        return "ecommerce"
+    if has("sales", "coach", "crm", "pipeline", "lead", "outbound", "objection"):
+        return "sales"
+    if has("hr", "human resources", "onboarding", "employee handbook", "payroll", "benefits", "pto"):
+        return "hr"
+    if has("legal", "compliance", "gdpr", "contract", "terms of service", "privacy policy", "data subject"):
+        return "legal"
     if has(
         "support",
         "ticket",
         "customer service",
         "helpdesk",
         "help center",
+        "help desk",
         "faq",
-        "refund",
         "billing",
-        "shipping",
-        "delivery",
-        "order",
         "cx ",
+        "saas",
+    ) or (
+        has("refund", "delivery", "order", "shipping")
+        and has("support", "customer", "ticket", "help")
     ):
         return "support"
-    if has("sales", "coach", "crm", "pipeline", "lead", "outbound"):
-        return "sales"
-    if has("hr", "human resources", "onboarding", "employee handbook", "payroll", "benefits"):
-        return "hr"
-    if has("legal", "compliance", "policy", "gdpr", "contract", "terms of service"):
-        return "legal"
-    if has("e-commerce", "ecommerce", "shopify", "product catalog", "checkout", "retail"):
-        return "ecommerce"
+    # Loose support cues without a stronger vertical
+    if has("refund", "delivery", "order status", "customer support"):
+        return "support"
     if has("influencer", "creator", "campaign", "instagram", "tiktok", "sponsor"):
         return "influencer"
     return "general"
