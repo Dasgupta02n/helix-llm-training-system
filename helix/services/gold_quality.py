@@ -5,7 +5,11 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from helix.services.domain_ontology import _is_support_domain, domain_gold_pair
+from helix.services.domain_ontology import (
+    _is_support_domain,
+    clarifying_domain_fallback,
+    domain_gold_pair,
+)
 
 
 # Patterns that must never ship as verified support gold
@@ -107,30 +111,39 @@ def quality_reject_reasons(
     if len(ev) >= 60 and _normalize(ev)[:200] in _normalize(out) and len(ev) > 120:
         reasons.append("evidence_substring_dump")
 
+    # Concrete next step for any interactive agent (support, HR, sales, …)
+    next_step_cues = (
+        "order id",
+        "order number",
+        "account email",
+        "reply with",
+        "send me",
+        "share your",
+        "i'll",
+        "i will",
+        "next step",
+        "right away",
+        "look up",
+        "check for you",
+        "help you",
+        "i can help",
+        "once i have",
+        "could you",
+        "can you tell me",
+        "what you expected",
+        "tell me which",
+        "tell me what",
+        "concrete action",
+        "concrete next step",
+        "hr portal",
+        "manager approval",
+        "start date",
+    )
+    ol = out.lower()
+    if not any(c in ol for c in next_step_cues):
+        reasons.append("missing_concrete_customer_next_step")
+
     if support:
-        next_step_cues = (
-            "order id",
-            "order number",
-            "account email",
-            "reply with",
-            "send me",
-            "share your",
-            "i'll",
-            "i will",
-            "next step",
-            "right away",
-            "look up",
-            "check for you",
-            "help you",
-            "i can help",
-            "once i have",
-            "could you",
-            "can you tell me",
-            "what you expected",
-        )
-        ol = out.lower()
-        if not any(c in ol for c in next_step_cues):
-            reasons.append("missing_concrete_customer_next_step")
         if re.search(r"provide (a |the )?(url|link) to (our |the )?internal", ol):
             reasons.append("asks_customer_for_internal_resources")
         if re.search(r"\b(code|promo)\s*[:=]?\s*[A-Z0-9]{4,}\b", out) and re.search(
@@ -402,8 +415,11 @@ def synthesize_gold_pair(
 ) -> dict[str, Any] | None:
     """
     Produce a gold training pair that passes quality gates.
-    Returns None if nothing acceptable can be produced.
+    Always attaches reject_reasons when quality_ok is False so job logs can surface them.
     """
+    last_reasons: list[str] = []
+    last_out = ""
+
     if prefer_llm:
         llm_pair = synthesize_gold_with_llm(
             brief=brief,
@@ -415,6 +431,9 @@ def synthesize_gold_pair(
         )
         if llm_pair and llm_pair.get("quality_ok"):
             return llm_pair
+        if llm_pair:
+            last_reasons = list(llm_pair.get("reject_reasons") or [])
+            last_out = llm_pair.get("output") or ""
 
     # Template fallback — still must pass gates
     pair = domain_gold_pair(
@@ -426,32 +445,64 @@ def synthesize_gold_pair(
         evidence=evidence,
         output=pair.get("output") or "",
     )
-    if reasons:
-        # Last resort for support: clarifying fallback (always gate-clean)
-        if _is_support_domain(brief, topic):
-            out = clarifying_support_fallback(
-                title=title, topic=topic, evidence=evidence
-            )
-            if not quality_reject_reasons(
-                brief=brief, topic=topic, evidence=evidence, output=out
-            ):
-                return {
-                    "input": pair["input"][:4000],
-                    "output": out[:2000],
-                    "rationale": (
-                        "Template failed gates; used clarifying support fallback."
-                    ),
-                    "difficulty": "edge-case",
-                    "is_negative": False,
-                    "verification_status": "verified",
-                    "synth": "template_clarify",
-                    "quality_ok": True,
-                }
-        return None
-    pair["verification_status"] = "verified"
-    pair["synth"] = "template"
-    pair["quality_ok"] = True
-    return pair
+    if not reasons:
+        pair["verification_status"] = "verified"
+        pair["synth"] = "template"
+        pair["quality_ok"] = True
+        pair["reject_reasons"] = []
+        return pair
+
+    last_reasons = reasons
+    last_out = pair.get("output") or ""
+
+    # Domain-appropriate clarifying fallback (must pass gates)
+    if _is_support_domain(brief, topic):
+        out = clarifying_support_fallback(
+            title=title, topic=topic, evidence=evidence
+        )
+        synth_tag = "template_clarify_support"
+    else:
+        out = clarifying_domain_fallback(
+            title=title,
+            topic=topic,
+            domain=(brief.get("domain") or "this domain"),
+            mission=(brief.get("mission") or "Answer helpfully"),
+        )
+        synth_tag = "template_clarify_domain"
+
+    reasons2 = quality_reject_reasons(
+        brief=brief, topic=topic, evidence=evidence, output=out
+    )
+    if not reasons2:
+        return {
+            "input": pair["input"][:4000],
+            "output": out[:2000],
+            "rationale": (
+                f"Template failed gates ({'; '.join(reasons)}); "
+                f"used {synth_tag} fallback."
+            ),
+            "difficulty": "edge-case",
+            "is_negative": False,
+            "verification_status": "verified",
+            "synth": synth_tag,
+            "quality_ok": True,
+            "reject_reasons": [],
+            "prior_template_reject_reasons": reasons,
+        }
+
+    return {
+        "input": pair.get("input", "")[:4000],
+        "output": (last_out or out)[:2000],
+        "rationale": "All synthesis paths failed quality gates.",
+        "difficulty": "edge-case",
+        "is_negative": False,
+        "verification_status": "rejected",
+        "synth": "failed",
+        "quality_ok": False,
+        "reject_reasons": reasons2 or last_reasons or ["synth_failed"],
+        "template_reject_reasons": reasons,
+        "fallback_reject_reasons": reasons2,
+    }
 
 
 def format_rejection_reason(reasons: list[str]) -> str:

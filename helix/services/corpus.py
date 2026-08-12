@@ -278,18 +278,40 @@ def write_corpus_units_as_gold(
             continue
         topic = re.sub(r"[^a-z0-9]+", "_", category.lower()).strip("_") or "general"
 
-        # Template-only for corpus hand-off reliability: production LLM refuse/echo
-        # paths were completing campaigns while gold_new stayed 0. Prefer_llm is
-        # intentionally False so user-supplied FAQ always lands as verified gold.
-        pair = synthesize_gold_pair(
-            brief=brief,
-            title=title,
-            evidence=evidence,
-            topic=topic,
-            url=unit.get("url") or "",
-            tenant=tenant,
-            prefer_llm=False,
-        )
+        # Template-first corpus synth with one retry (content gates are deterministic;
+        # retry re-runs after a short backoff in case of transient import/state glitches).
+        pair = None
+        last_reasons: list[str] = ["synth_failed"]
+        for attempt in range(2):
+            try:
+                pair = synthesize_gold_pair(
+                    brief=brief,
+                    title=title,
+                    evidence=evidence,
+                    topic=topic,
+                    url=unit.get("url") or "",
+                    tenant=tenant,
+                    prefer_llm=False,
+                )
+            except Exception as e:  # noqa: BLE001
+                last_reasons = [f"synth_exception:{type(e).__name__}:{e}"]
+                pair = None
+                if attempt == 0:
+                    import time
+
+                    time.sleep(0.15)
+                continue
+            if pair and pair.get("quality_ok"):
+                break
+            last_reasons = list(
+                (pair or {}).get("reject_reasons")
+                or (pair or {}).get("template_reject_reasons")
+                or ["synth_failed"]
+            )
+            if attempt == 0:
+                import time
+
+                time.sleep(0.15)
 
         if not pair or not pair.get("quality_ok"):
             rejected += 1
@@ -297,7 +319,15 @@ def write_corpus_units_as_gold(
                 {
                     "source_ref": ref,
                     "status": "rejected",
-                    "reasons": (pair or {}).get("reject_reasons") or ["synth_failed"],
+                    "reasons": last_reasons,
+                    "synth_status": "synth_failed",
+                    "title": title[:80],
+                    "topic": topic,
+                    "evidence_len": len(evidence),
+                    "note": (
+                        "Synthesis failed quality gates (not a timeout unless "
+                        "synth_exception:*). Reasons list the gate(s)."
+                    ),
                 }
             )
             continue
