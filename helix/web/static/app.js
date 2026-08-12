@@ -914,12 +914,17 @@ async function loadLibrary() {
         const seed = !!g.is_seed;
         const rejected = (g.verification_status || "").toLowerCase() === "rejected";
         const origin = g.origin_label || (seed ? "Seed / demo" : "Your generated data");
+        const rejReason =
+          g.rejection_reason ||
+          (Array.isArray(g.rejection_reasons) && g.rejection_reasons.length
+            ? g.rejection_reasons.join("; ")
+            : "");
         const badgeClass = rejected ? "err" : seed ? "warn" : "ok";
         const badgeText = rejected
           ? "Rejected"
           : seed
             ? "Seed / demo"
-            : origin.includes("corpus")
+            : origin.toLowerCase().includes("corpus")
               ? "Corpus"
               : "Your data";
         return `<div class="item ${seed ? "item-seed" : "item-user"}${rejected ? " item-rejected" : ""}">
@@ -930,7 +935,7 @@ async function loadLibrary() {
                 : `<span class="badge ok" title="${escapeHtml(origin)}">${escapeHtml(badgeText)}</span>`
             }${
               rejected
-                ? ` <span class="badge err" title="Failed quality gates">Quality reject</span>`
+                ? ` <span class="badge err" title="${escapeHtml(rejReason || "Failed quality gates")}">Quality reject</span>`
                 : ""
             }</h4>
             <p><strong>Q:</strong> ${escapeHtml((g.input || "").slice(0, 120))}</p>
@@ -938,6 +943,11 @@ async function loadLibrary() {
             <p class="hint mb-0 origin-label">${escapeHtml(origin)}${
               g.verification_status ? ` · ${escapeHtml(g.verification_status)}` : ""
             }</p>
+            ${
+              rejected && rejReason
+                ? `<p class="hint mb-0" style="color:var(--color-danger, #b91c1c)"><strong>Rejection reason:</strong> ${escapeHtml(rejReason)}</p>`
+                : ""
+            }
           </div>
           <span class="badge ${badgeClass}">${escapeHtml(badgeText)}</span>
         </div>`;
@@ -1909,7 +1919,10 @@ if ($("qualityBackfillBtn")) {
         method: "POST",
       });
       $("corpusStatus").textContent =
-        `Scanned ${r.scanned || 0}; newly rejected ${r.newly_rejected || 0}.`;
+        `Scanned ${r.scanned || 0}; newly rejected ${r.newly_rejected || 0}` +
+        (r.skipped_seed != null ? `; skipped seed ${r.skipped_seed}` : "") +
+        (r.restored_seed ? `; restored seed ${r.restored_seed}` : "") +
+        ".";
       $("corpusStatus").className = "status-line ok";
       await loadLibrary();
       toast("Quality backfill complete");

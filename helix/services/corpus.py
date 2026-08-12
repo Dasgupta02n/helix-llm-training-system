@@ -197,3 +197,270 @@ def corpus_count(db: Session, tenant_id: str) -> int:
         .filter_by(tenant_id=tenant_id, status="active")
         .count()
     )
+
+
+def extract_training_units(
+    *,
+    title: str,
+    content: str,
+    category: str = "general",
+) -> list[dict[str, str]]:
+    """
+    Split a pasted FAQ / policy doc into training units (title + evidence body).
+    Handles Q1/Q2, 'Question N', numbered lists, or falls back to whole doc.
+    """
+    text = (content or "").strip()
+    if not text:
+        return []
+    # Prefer splitting on explicit Q markers
+    chunks = re.split(
+        r"(?=(?:^|\n)\s*(?:Q(?:uestion)?\s*\d*\s*[:.)\-]|#{1,3}\s+|\d{1,2}[\.)]\s+))",
+        text,
+        flags=re.I,
+    )
+    units: list[dict[str, str]] = []
+    for raw in chunks:
+        part = re.sub(r"\s+", " ", (raw or "").strip())
+        if len(part) < 40:
+            continue
+        # first sentence / line as local title
+        m = re.match(
+            r"^(?:Q(?:uestion)?\s*\d*\s*[:.)\-]?\s*)?(.+?)(?:\?|\.|$)",
+            part,
+            re.I,
+        )
+        local_title = (m.group(1) if m else part[:80]).strip()
+        if not local_title.endswith("?") and "?" in part[:120]:
+            local_title = part[: part.index("?") + 1]
+        units.append(
+            {
+                "title": (local_title or title or "Corpus Q&A")[:200],
+                "evidence": part[:4000],
+                "category": category or "general",
+            }
+        )
+    if not units:
+        units.append(
+            {
+                "title": (title or "Corpus document")[:200],
+                "evidence": text[:4000],
+                "category": category or "general",
+            }
+        )
+    # Cap units per document to avoid explosion
+    return units[:12]
+
+
+def infer_category_from_text(text: str, brief_categories: list[str]) -> str:
+    """Map corpus content to the closest active plan category."""
+    low = (text or "").lower()
+    cats = [str(c) for c in (brief_categories or []) if str(c).strip()]
+    if not cats:
+        return "general"
+    best = cats[0]
+    best_score = -1
+    for c in cats:
+        tokens = re.findall(r"[a-z0-9]{3,}", c.lower())
+        score = sum(1 for t in tokens if t in low)
+        # synonym boosts for common support categories
+        if "late" in c.lower() and any(x in low for x in ("late", "delay", "eta")):
+            score += 2
+        if "missing" in c.lower() and "missing" in low:
+            score += 2
+        if "wrong" in c.lower() and any(x in low for x in ("wrong", "incorrect")):
+            score += 2
+        if "refund" in c.lower() and "refund" in low:
+            score += 2
+        if "driver" in c.lower() and "driver" in low:
+            score += 2
+        if "account" in c.lower() and "account" in low:
+            score += 2
+        if "damag" in low and "damag" in c.lower():
+            score += 2
+        if score > best_score:
+            best_score = score
+            best = c
+    return best
+
+
+def promote_corpus_into_pipeline(
+    db: Session,
+    *,
+    tenant_id: str,
+    owner_user_id: str | None,
+    brief: dict[str, Any] | None = None,
+    batch_size: int = 5,
+) -> dict[str, Any]:
+    """
+    Turn active corpus docs into DiscoveryCandidate + EvidenceStaging rows
+    so judge agents and gold promotion both see full user-supplied text
+    (not title/snippet web scraps).
+    """
+    brief = brief or {}
+    cats = [str(c) for c in (brief.get("categories") or []) if str(c).strip()]
+    docs = list_corpus(
+        db, tenant_id=tenant_id, owner_user_id=owner_user_id, limit=max(batch_size * 3, 10)
+    )
+    candidates_created = 0
+    evidence_written = 0
+    units_out: list[dict[str, Any]] = []
+
+    for doc in docs:
+        units = extract_training_units(
+            title=doc.title or "Corpus document",
+            content=doc.content_text or "",
+            category=doc.category or "general",
+        )
+        for i, unit in enumerate(units):
+            cat = infer_category_from_text(
+                unit["evidence"], cats
+            ) if cats else (unit.get("category") or "general")
+            # Stable synthetic URL so write_discovery_candidate path can dedupe
+            pseudo_url = f"corpus://{doc.id}/u{i}"
+            existing = (
+                db.query(m.DiscoveryCandidate)
+                .filter_by(tenant_id=tenant_id, url=pseudo_url)
+                .first()
+            )
+            if existing:
+                cand_id = existing.id
+            else:
+                cand_id = _uid("cand_")
+                db.add(
+                    m.DiscoveryCandidate(
+                        id=cand_id,
+                        tenant_id=tenant_id,
+                        category=cat,
+                        source="corpus",
+                        title=unit["title"][:500],
+                        url=pseudo_url,
+                        brand=(brief.get("domain") or "")[:200] or None,
+                        creator=None,
+                        relevance_score=0.95,
+                        status="pending",
+                    )
+                )
+                candidates_created += 1
+            # Always refresh staging with full corpus body (agents + gold read this)
+            staging = (
+                db.query(m.EvidenceStaging)
+                .filter_by(tenant_id=tenant_id, candidate_id=cand_id)
+                .order_by(m.EvidenceStaging.created_at.desc())
+                .first()
+            )
+            body = unit["evidence"]
+            signals = json.dumps(
+                {
+                    "domain": brief.get("domain"),
+                    "corpus_id": doc.id,
+                    "source": "corpus",
+                    "title": unit["title"],
+                    "url": pseudo_url,
+                }
+            )
+            stg_id: str | None = staging.id if staging else None
+            if staging:
+                staging.content_text = body
+                staging.preliminary_confidence = 0.92
+                staging.identity_signals_json = signals
+                staging.brand = (brief.get("domain") or "")[:200] or None
+            else:
+                stg_id = _uid("stg_")
+                db.add(
+                    m.EvidenceStaging(
+                        id=stg_id,
+                        tenant_id=tenant_id,
+                        candidate_id=cand_id,
+                        content_text=body,
+                        preliminary_confidence=0.92,
+                        identity_signals_json=signals,
+                        brand=(brief.get("domain") or "")[:200] or None,
+                        status="pending_dedup",
+                    )
+                )
+                evidence_written += 1
+            # Mark candidate staged so collection agents don't re-fetch empty scrapes
+            cand_row = (
+                db.query(m.DiscoveryCandidate)
+                .filter_by(id=cand_id, tenant_id=tenant_id)
+                .first()
+            )
+            if cand_row:
+                cand_row.status = "staged"
+                cand_row.category = cat
+                cand_row.title = unit["title"][:500]
+            # Verified campaign stub so knowledge_extraction/graph see full corpus text
+            # (not title-only web scrapes). Idempotent via title prefix.
+            camp_title = f"[corpus] {unit['title']}"[:500]
+            camp = (
+                db.query(m.Campaign)
+                .filter_by(tenant_id=tenant_id, title=camp_title)
+                .first()
+            )
+            if not camp:
+                camp_id = _uid("camp_")
+                db.add(
+                    m.Campaign(
+                        id=camp_id,
+                        tenant_id=tenant_id,
+                        brand=(brief.get("domain") or "")[:200] or None,
+                        creator=None,
+                        category=cat,
+                        title=camp_title,
+                        verification_status="verified",
+                        confidence=0.92,
+                        verification_reasoning=(
+                            "User-supplied corpus document — treated as verified "
+                            "evidence for domain mining (full text staged)."
+                        ),
+                    )
+                )
+                db.add(
+                    m.CampaignEvidence(
+                        id=_uid("ce_"),
+                        tenant_id=tenant_id,
+                        campaign_id=camp_id,
+                        staging_id=stg_id,
+                        source="corpus",
+                        content_text=body,
+                        confidence=0.92,
+                    )
+                )
+            else:
+                camp.verification_status = "verified"
+                camp.category = cat
+                camp.confidence = max(float(camp.confidence or 0), 0.92)
+                # Refresh evidence text on re-run
+                ce = (
+                    db.query(m.CampaignEvidence)
+                    .filter_by(tenant_id=tenant_id, campaign_id=camp.id)
+                    .first()
+                )
+                if ce:
+                    ce.content_text = body
+                    ce.confidence = 0.92
+
+            units_out.append(
+                {
+                    "corpus_id": doc.id,
+                    "candidate_id": cand_id,
+                    "title": unit["title"],
+                    "category": cat,
+                    "evidence": body,
+                    "url": pseudo_url,
+                    "source_ref": f"corpus:{doc.id}:u{i}",
+                }
+            )
+            if len(units_out) >= batch_size * 3:
+                break
+        if len(units_out) >= batch_size * 3:
+            break
+
+    db.flush()
+    return {
+        "ok": True,
+        "docs": len(docs),
+        "candidates_created": candidates_created,
+        "evidence_written": evidence_written,
+        "units": units_out,
+    }

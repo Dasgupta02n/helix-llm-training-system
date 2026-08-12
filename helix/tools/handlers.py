@@ -1986,23 +1986,57 @@ def register_model(
 
 
 def get_success_metrics(ctx: ToolContext, **_: Any) -> dict:
+    from helix.services.brief import get_active_project, project_to_dict
+
     camps = ctx.db.query(m.Campaign).filter_by(tenant_id=ctx.tenant_id).all()
     by_status: dict[str, int] = {}
     for c in camps:
         by_status[c.verification_status] = by_status.get(c.verification_status, 0) + 1
     cats = ctx.db.query(m.CategoryState).filter_by(tenant_id=ctx.tenant_id).all()
-    tenant = ctx.db.query(m.Tenant).filter_by(id=ctx.tenant_id).first()
-    return {
-        "campaigns_by_status": by_status,
-        "categories": [
+    # Isolate metrics to the active research plan — hide legacy demo categories
+    # (gaming/fashion/…) once the user has set a real brief domain.
+    brief_cats: set[str] | None = None
+    domain = ""
+    try:
+        proj = get_active_project(ctx.db, ctx.tenant_id)
+        if proj:
+            d = project_to_dict(proj)
+            domain = (d.get("domain") or "").strip()
+            raw = [str(c).strip() for c in (d.get("categories") or []) if str(c).strip()]
+            if raw:
+                brief_cats = set(raw)
+    except Exception:  # noqa: BLE001
+        brief_cats = None
+
+    cat_rows = []
+    legacy_hidden = 0
+    for c in cats:
+        in_brief = brief_cats is None or c.name in brief_cats
+        # Also keep any category with an active target (phase_target > 0)
+        active = int(c.phase_target or 0) > 0
+        if brief_cats is not None and not in_brief and not active:
+            legacy_hidden += 1
+            continue
+        if brief_cats is not None and not in_brief and active:
+            # Off-plan but still targeted — still hide if domain looks non-demo
+            if domain and "influencer" not in domain.lower():
+                legacy_hidden += 1
+                continue
+        cat_rows.append(
             {
                 "name": c.name,
                 "verified": c.verified_count,
                 "target": c.phase_target,
-                "weeks_missed": c.weeks_missed_target,
+                "weeks_missed": c.weeks_missed_target if in_brief else 0,
+                "in_active_plan": bool(in_brief),
             }
-            for c in cats
-        ],
+        )
+    tenant = ctx.db.query(m.Tenant).filter_by(id=ctx.tenant_id).first()
+    return {
+        "campaigns_by_status": by_status,
+        "categories": cat_rows,
+        "legacy_categories_hidden": legacy_hidden,
+        "active_domain": domain or None,
         "open_escalations": ctx.db.query(m.Escalation)
         .filter_by(tenant_id=ctx.tenant_id, status="open")
         .count(),

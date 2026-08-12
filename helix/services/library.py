@@ -290,6 +290,9 @@ def find_near_duplicate_gold(
     best: m.GoldExample | None = None
     best_score = 0.0
     for g in rows:
+        # Skip rejected rows so they don't suppress new verified writes
+        if (g.verification_status or "").lower() == "rejected":
+            continue
         score = _jaccard(target, _token_set(f"{g.input_text}\n{g.output_text}"))
         if score >= threshold and score > best_score:
             best = g
@@ -349,6 +352,8 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
 
 
 def gold_to_dict(g: m.GoldExample, tenant_slug: str | None = None) -> dict[str, Any]:
+    from helix.services.gold_quality import rejection_fields_from_meta
+
     seed = _is_seed_kind(
         g.source_kind,
         g.topic,
@@ -366,6 +371,8 @@ def gold_to_dict(g: m.GoldExample, tenant_slug: str | None = None) -> dict[str, 
         origin = "Mined (pipeline)"
     else:
         origin = "Your generated data"
+    rej = rejection_fields_from_meta(g.metadata_json, g.rationale)
+    status = (g.verification_status or "verified").lower()
     return {
         "id": g.id,
         "owner_user_id": g.owner_user_id,
@@ -381,6 +388,9 @@ def gold_to_dict(g: m.GoldExample, tenant_slug: str | None = None) -> dict[str, 
         "is_seed": seed,
         "origin_label": origin,
         "verification_status": g.verification_status,
+        # Always present so clients can show why a row was rejected
+        "rejection_reason": rej["rejection_reason"] if status == "rejected" else None,
+        "rejection_reasons": rej["rejection_reasons"] if status == "rejected" else [],
         "created_at": g.created_at.isoformat() if g.created_at else None,
         "kind": "gold",
     }
@@ -457,7 +467,9 @@ def add_gold_example(
     if existing:
         return existing
 
-    # Near-duplicate against full gold set (not just exact match / per-batch)
+    # Near-duplicate against full gold set (not just exact match / per-batch).
+    # Never treat a rejected row as a successful write — that silently blocked
+    # new good corpus gold from landing after quality backfill.
     near = find_near_duplicate_gold(
         db,
         owner_user_id=owner_user_id,
@@ -465,7 +477,7 @@ def add_gold_example(
         input_text=input_text,
         output_text=output_text,
     )
-    if near:
+    if near and (near.verification_status or "").lower() != "rejected":
         return near
 
     g = m.GoldExample(

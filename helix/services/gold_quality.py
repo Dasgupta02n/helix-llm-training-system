@@ -454,19 +454,85 @@ def synthesize_gold_pair(
     return pair
 
 
+def format_rejection_reason(reasons: list[str]) -> str:
+    """Human-readable single-string reason for API/UI."""
+    if not reasons:
+        return ""
+    labels = {
+        "support_refuses_or_demands_internal_docs": (
+            "Support reply refuses to help or demands internal docs from the customer"
+        ),
+        "support_refuses_outright": "Support reply refuses to answer",
+        "documentation_dump_wrapper": "Output dumps evidence under a documentation wrapper",
+        "verbatim_evidence_echo": "Output is mostly a verbatim paste of evidence",
+        "long_verbatim_chunk": "Output contains a long contiguous copy of source text",
+        "evidence_substring_dump": "Output embeds a large evidence substring",
+        "missing_concrete_customer_next_step": (
+            "Support reply lacks a concrete next step (order ID / account email / etc.)"
+        ),
+        "asks_customer_for_internal_resources": (
+            "Asks the customer for internal policy/doc links"
+        ),
+        "promo_code_echo_from_marketing": "Regurgitates promo codes from marketing scrapes",
+        "marketing_chrome_in_support_reply": "Contains marketing chrome (like-and-share, #ad)",
+        "output_too_short": "Output is too short to be useful training gold",
+    }
+    parts = [labels.get(r, r.replace("_", " ")) for r in reasons]
+    return "; ".join(parts)
+
+
+def rejection_fields_from_meta(metadata_json: str | None, rationale: str | None = None) -> dict:
+    """Extract structured rejection fields for gold API payloads."""
+    import json
+
+    reasons: list[str] = []
+    try:
+        meta = json.loads(metadata_json or "{}")
+        if not isinstance(meta, dict):
+            meta = {}
+    except Exception:  # noqa: BLE001
+        meta = {}
+    raw = meta.get("rejection_reasons") or meta.get("quality_backfill_reject") or []
+    if isinstance(raw, list):
+        reasons = [str(x) for x in raw]
+    elif isinstance(raw, str) and raw:
+        reasons = [raw]
+    reason = meta.get("rejection_reason") or format_rejection_reason(reasons)
+    if not reason and rationale and "quality-backfill rejected:" in (rationale or ""):
+        # legacy parse from rationale note
+        try:
+            reason = rationale.split("quality-backfill rejected:", 1)[1].strip()
+            if not reasons:
+                reasons = [r.strip() for r in reason.split(";") if r.strip()]
+        except Exception:  # noqa: BLE001
+            pass
+    return {
+        "rejection_reasons": reasons,
+        "rejection_reason": reason or None,
+    }
+
+
 def backfill_quality_on_gold_rows(
     db: Any,
     *,
     owner_user_id: str | None = None,
     tenant_id: str | None = None,
     limit: int = 5000,
+    skip_seeds: bool = True,
+    restore_seeds: bool = True,
 ) -> dict[str, Any]:
     """
     Re-run hard quality gates on existing gold rows.
     Bad patterns (refuse/echo) are demoted from verified → rejected.
+
+    Seed/demo rows are skipped by default (and optionally restored if a prior
+    over-eager backfill rejected them under the wrong domain brief).
     """
+    import json
+
     from helix.db import models as m
     from helix.services.brief import get_active_project, project_to_dict
+    from helix.services.library import _is_seed_kind
 
     q = db.query(m.GoldExample).filter_by(is_archived=False)
     if owner_user_id:
@@ -476,12 +542,67 @@ def backfill_quality_on_gold_rows(
     rows = q.order_by(m.GoldExample.created_at.asc()).limit(limit).all()
 
     brief_cache: dict[str, dict] = {}
+    tenant_slug_cache: dict[str, str | None] = {}
     scanned = 0
     rejected = 0
     already_bad = 0
+    skipped_seed = 0
+    restored_seed = 0
+    details: list[dict[str, Any]] = []
+
     for g in rows:
         scanned += 1
         tid = g.tenant_id
+        if tid not in tenant_slug_cache:
+            trow = db.query(m.Tenant).filter_by(id=tid).first()
+            tenant_slug_cache[tid] = trow.slug if trow else None
+        slug = tenant_slug_cache[tid]
+        is_seed = _is_seed_kind(
+            g.source_kind,
+            g.topic,
+            input_text=g.input_text,
+            metadata_json=g.metadata_json,
+            source_ref=g.source_ref,
+            created_at=g.created_at,
+            tenant_slug=slug,
+        )
+
+        try:
+            meta = json.loads(g.metadata_json or "{}")
+            if not isinstance(meta, dict):
+                meta = {}
+        except Exception:  # noqa: BLE001
+            meta = {}
+
+        # Seed rows: never auto-reject under an unrelated support brief
+        if skip_seeds and is_seed:
+            skipped_seed += 1
+            if restore_seeds and (g.verification_status or "").lower() == "rejected":
+                # Only restore if rejection was from quality backfill
+                if meta.get("quality_backfill") or meta.get("quality_backfill_reject"):
+                    g.verification_status = "verified"
+                    meta.pop("quality_backfill_reject", None)
+                    meta.pop("rejection_reasons", None)
+                    meta.pop("rejection_reason", None)
+                    meta["seed_restored_from_backfill"] = True
+                    g.metadata_json = json.dumps(meta)
+                    if g.rationale and "quality-backfill rejected:" in g.rationale:
+                        g.rationale = re.sub(
+                            r"\n?\[quality-backfill rejected:[^\]]*\]",
+                            "",
+                            g.rationale,
+                        ).strip() or g.rationale
+                    restored_seed += 1
+                    details.append(
+                        {
+                            "id": g.id,
+                            "topic": g.topic,
+                            "action": "restored_seed",
+                            "is_seed": True,
+                        }
+                    )
+            continue
+
         if tid not in brief_cache:
             brief: dict = {}
             try:
@@ -500,34 +621,62 @@ def backfill_quality_on_gold_rows(
             input_text=g.input_text or "",
         )
         if not reasons:
+            # Clear stale rejection metadata if now clean
+            if meta.get("rejection_reasons") or meta.get("quality_backfill_reject"):
+                meta.pop("rejection_reasons", None)
+                meta.pop("rejection_reason", None)
+                meta.pop("quality_backfill_reject", None)
+                g.metadata_json = json.dumps(meta)
             continue
+        reason_str = format_rejection_reason(reasons)
         if (g.verification_status or "").lower() == "rejected":
+            # Ensure reasons are persisted even for already-rejected rows
+            meta["rejection_reasons"] = reasons
+            meta["rejection_reason"] = reason_str
+            meta["quality_backfill_reject"] = reasons
+            meta["quality_backfill"] = True
+            g.metadata_json = json.dumps(meta)
             already_bad += 1
+            details.append(
+                {
+                    "id": g.id,
+                    "topic": g.topic,
+                    "action": "already_rejected",
+                    "rejection_reasons": reasons,
+                    "rejection_reason": reason_str,
+                }
+            )
             continue
         g.verification_status = "rejected"
-        try:
-            import json
-
-            meta = json.loads(g.metadata_json or "{}")
-            if not isinstance(meta, dict):
-                meta = {}
-        except Exception:  # noqa: BLE001
-            meta = {}
+        meta["rejection_reasons"] = reasons
+        meta["rejection_reason"] = reason_str
         meta["quality_backfill_reject"] = reasons
         meta["quality_backfill"] = True
         g.metadata_json = json.dumps(meta)
-        # Soft-tag rationale so UI can show why
-        note = f"[quality-backfill rejected: {'; '.join(reasons)}]"
+        note = f"[quality-backfill rejected: {reason_str}]"
         if g.rationale:
             if "quality-backfill" not in (g.rationale or ""):
                 g.rationale = f"{g.rationale}\n{note}"[:1000]
         else:
             g.rationale = note[:1000]
         rejected += 1
-    if rejected:
-        db.commit()
+        details.append(
+            {
+                "id": g.id,
+                "topic": g.topic,
+                "action": "newly_rejected",
+                "rejection_reasons": reasons,
+                "rejection_reason": reason_str,
+                "is_seed": is_seed,
+            }
+        )
+    db.commit()
     return {
         "scanned": scanned,
         "newly_rejected": rejected,
         "already_rejected": already_bad,
+        "skipped_seed": skipped_seed,
+        "restored_seed": restored_seed,
+        "skip_seeds": skip_seeds,
+        "items": details[:100],
     }

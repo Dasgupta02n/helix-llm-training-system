@@ -94,10 +94,11 @@ def sync_workspace_from_brief(
                 )
             )
 
-    # Soft-deprecate categories not in brief (keep history but zero target)
+    # Soft-deprecate categories not in brief (keep history but zero target + clear miss counters)
     for name, row in existing.items():
         if name not in brief_set:
             row.phase_target = 0
+            row.weeks_missed_target = 0
 
     open_q = (
         db.query(m.WorkQueueItem)

@@ -179,6 +179,29 @@ def run_code_pipeline_batch(
 
     from helix.tools import handlers as h
 
+    # Promote BYO corpus into candidates + full evidence + verified campaign stubs
+    # *before* web discovery / agent judges, so they see real FAQ text not title scraps.
+    try:
+        from helix.services.corpus import promote_corpus_into_pipeline
+
+        early_corpus = promote_corpus_into_pipeline(
+            db,
+            tenant_id=tenant_id,
+            owner_user_id=owner_user_id,
+            brief=brief,
+            batch_size=batch_size,
+        )
+        steps.append(
+            f"corpus_early:docs={early_corpus.get('docs', 0)}/"
+            f"cands+={early_corpus.get('candidates_created', 0)}/"
+            f"units={len(early_corpus.get('units') or [])}"
+        )
+        if early_corpus.get("docs"):
+            zero_evidence = False
+    except Exception as e:  # noqa: BLE001
+        warnings.append(f"corpus_early: {e}")
+        steps.append("corpus_early:error")
+
     assign = h.get_current_assignment(ctx)
     if not assign.get("assignment"):
         # force queue from brief once more
@@ -436,6 +459,7 @@ def run_code_pipeline_batch(
     gold_made = 0
     gold_skipped_dup = 0
     gold_rejected = 0
+    reject_log: list[dict] = []
     if owner_user_id:
         scope = get_or_create_scope(db, owner_user_id, tenant_id)
         promoted_refs = _already_promoted_refs(db, owner_user_id, tenant_id)
@@ -449,6 +473,18 @@ def run_code_pipeline_batch(
 
         tenant_row = db.query(m.Tenant).filter_by(id=tenant_id).first()
 
+        def _bump_category_verified(category: str) -> None:
+            """Keep dashboard verified counts aligned with gold we actually write."""
+            if not category:
+                return
+            row = (
+                db.query(m.CategoryState)
+                .filter_by(tenant_id=tenant_id, name=category)
+                .first()
+            )
+            if row:
+                row.verified_count = int(row.verified_count or 0) + 1
+
         def _try_add_gold(
             *,
             source_ref: str,
@@ -457,6 +493,7 @@ def run_code_pipeline_batch(
             category: str,
             url: str = "",
             meta: dict | None = None,
+            topic_override: str | None = None,
         ) -> None:
             nonlocal gold_made, gold_skipped_dup, gold_rejected
             if gold_made >= batch_size or not source_ref:
@@ -467,7 +504,10 @@ def run_code_pipeline_batch(
             body = (text or title or "").strip()
             if len(body) < 15:
                 return
-            topic = _primary_topic(brief, category or "general")
+            topic = topic_override or _primary_topic(brief, category or "general")
+            # Prefer plan category slug as topic when it looks like a real category
+            if category and category not in {"general", "web", "blog"}:
+                topic = re.sub(r"[^a-z0-9]+", "_", category.lower()).strip("_") or topic
             # LLM synthesis when available; hard quality gates reject echo/refuse patterns
             pair = synthesize_gold_pair(
                 brief=brief,
@@ -480,6 +520,14 @@ def run_code_pipeline_batch(
             )
             if not pair or not pair.get("quality_ok"):
                 gold_rejected += 1
+                reject_log.append(
+                    {
+                        "source_ref": source_ref,
+                        "title": (title or "")[:80],
+                        "reasons": (pair or {}).get("reject_reasons")
+                        or ["quality_gate_or_synth_failed"],
+                    }
+                )
                 return
             g = add_gold_example(
                 db,
@@ -516,31 +564,51 @@ def run_code_pipeline_batch(
                 known_ids.add(g.id)
                 gold_made += 1
                 promoted_refs.add(source_ref)
+                _bump_category_verified(category)
 
-        # 0) Bring-your-own corpus first (niche domains / internal docs)
+        # 0) Bring-your-own corpus first — promote into candidates/evidence THEN gold
         try:
-            from helix.services.corpus import list_corpus
+            from helix.services.corpus import promote_corpus_into_pipeline
 
-            corpus_docs = list_corpus(
-                db, tenant_id=tenant_id, owner_user_id=owner_user_id, limit=batch_size * 3
+            promo = promote_corpus_into_pipeline(
+                db,
+                tenant_id=tenant_id,
+                owner_user_id=owner_user_id,
+                brief=brief,
+                batch_size=batch_size,
             )
+            corpus_units = promo.get("units") or []
             corpus_used = 0
-            for doc in corpus_docs:
+            for unit in corpus_units:
                 if gold_made >= batch_size:
                     break
-                ref = f"corpus:{doc.id}"
+                ref = unit["source_ref"]
+                before = gold_made
                 _try_add_gold(
                     source_ref=ref,
-                    title=doc.title or "Corpus document",
-                    text=doc.content_text or "",
-                    category=doc.category or "general",
-                    url=doc.url or "",
-                    meta={"from": "user_corpus", "corpus_id": doc.id},
+                    title=unit.get("title") or "Corpus document",
+                    text=unit.get("evidence") or "",
+                    category=unit.get("category") or "general",
+                    url=unit.get("url") or "",
+                    meta={
+                        "from": "user_corpus",
+                        "corpus_id": unit.get("corpus_id"),
+                        "candidate_id": unit.get("candidate_id"),
+                    },
                 )
-                if ref in promoted_refs:
+                if gold_made > before:
                     corpus_used += 1
-                    # mark source_kind corpus on newest gold via metadata already
-            steps.append(f"corpus:{corpus_used}/{len(corpus_docs)}")
+            steps.append(
+                f"corpus:docs={promo.get('docs', 0)}/"
+                f"cands+={promo.get('candidates_created', 0)}/"
+                f"units={len(corpus_units)}/gold={corpus_used}"
+            )
+            if promo.get("docs") and corpus_used == 0 and corpus_units:
+                warnings.append(
+                    f"Corpus present ({promo.get('docs')} docs, {len(corpus_units)} units) "
+                    f"but 0 gold passed quality gates "
+                    f"(rejected={gold_rejected}, dups={gold_skipped_dup})."
+                )
         except Exception as e:  # noqa: BLE001
             warnings.append(f"corpus: {e}")
             steps.append("corpus:error")
@@ -614,6 +682,14 @@ def run_code_pipeline_batch(
             f"gold_new:{gold_made}/skipped_dup:{gold_skipped_dup}/"
             f"quality_rejected:{gold_rejected}/target:{scope.gold_target_count}"
         )
+        if reject_log:
+            steps.append(
+                "reject_sample:"
+                + ";".join(
+                    f"{r['source_ref']}:{','.join(r['reasons'][:3])}"
+                    for r in reject_log[:5]
+                )
+            )
 
     if gold_made == 0 and (zero_evidence or gather_results == 0):
         zero_evidence = True
@@ -631,6 +707,7 @@ def run_code_pipeline_batch(
         "items_processed": staged + verified + gold_made,
         "gold_new": gold_made,
         "gold_rejected": gold_rejected,
+        "gold_reject_sample": reject_log[:8] if owner_user_id else [],
         "candidates_new": created_candidates,
         "gather_results": gather_results,
         "zero_evidence": zero_evidence,
