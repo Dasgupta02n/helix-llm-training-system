@@ -1,0 +1,39 @@
+{% extends "public_base.html" %}
+{% block title %}Security{% endblock %}
+{% block meta_description %}Security practices for Helix at c7xai.in — authentication, isolation, and responsible disclosure (early beta).{% endblock %}
+{% block content %}
+<article class="legal-doc">
+  <p class="page-kicker">Security · Early beta</p>
+  <h1>Security overview</h1>
+  <p class="lead">
+    Honest status: Helix is an early product. We apply practical safeguards appropriate to a multi-tenant
+    SaaS beta. We do <strong>not</strong> currently claim SOC 2 / ISO certifications on this page.
+  </p>
+
+  <h2>What we do today</h2>
+  <ul>
+    <li><strong>Transport</strong> — HTTPS at the public edge when TLS is configured for c7xai.in.</li>
+    <li><strong>Auth</strong> — password hashing, session/JWT-style access tokens, optional email verification and admin approval gates.</li>
+    <li><strong>Isolation</strong> — workspace/tenant scoping on library, jobs, and mining state.</li>
+    <li><strong>Abuse controls</strong> — request size limits and rate limiting on sensitive routes.</li>
+    <li><strong>Secrets</strong> — production requires a strong app secret; provider API keys via environment configuration, not client-side code.</li>
+    <li><strong>Gather vs invent</strong> — scrapes come from configured gather tools or your corpus; the LLM is instructed not to invent source content.</li>
+  </ul>
+
+  <h2>What you should assume</h2>
+  <ul>
+    <li>Beta software may contain bugs; do not store highly regulated personal data until we publish a formal compliance program.</li>
+    <li>Content sent to LLM/gather providers is processed under those providers’ security models.</li>
+    <li>You control what you paste into corpus and plans—treat that as production data for your risk profile.</li>
+  </ul>
+
+  <h2>Roadmap (tell us what you need)</h2>
+  <p>SSO/SAML, private networking, and formal audits are on the conversation list for enterprise customers—not yet product claims.</p>
+
+  <h2>Report a vulnerability</h2>
+  <p>
+    Email <a href="mailto:dasgupta.02n@gmail.com">dasgupta.02n@gmail.com</a> with subject
+    <strong>Security</strong>. Please include steps to reproduce and avoid public disclosure until we can respond.
+  </p>
+</article>
+{% endblock %}

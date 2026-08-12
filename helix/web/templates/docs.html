@@ -1,0 +1,89 @@
+{% extends "public_base.html" %}
+{% block title %}Docs{% endblock %}
+{% block meta_description %}Helix documentation — Plan, formats, mining, corpus, gold library, and export basics for the training data studio.{% endblock %}
+{% block content %}
+<article class="legal-doc">
+  <p class="page-kicker">Documentation · Product guide</p>
+  <h1>Helix docs</h1>
+  <p class="lead">
+    Helix is a <strong>no-code gold training-data studio</strong>. You define a domain plan, mine or paste
+    evidence, quality-gate gold Q&amp;A pairs, optionally synthesize variants, and export for fine-tuning
+    or evaluation. This page is the public product guide (not the OpenAPI explorer).
+  </p>
+
+  <h2>When to use Helix</h2>
+  <p>
+    Use Helix when you need a <strong>task-specific dataset</strong> (support replies, HR handbook Q&amp;A,
+    sales objections, social brand voice pairs, etc.) and you want product/ops teams to drive quality—
+    without standing up a labeling army.
+  </p>
+  <p>
+    Prefer prompting + eval tools (e.g. prompt versioning / live review) when you are iterating on an
+    already-deployed assistant and are <em>not</em> ready to fine-tune. Prefer enterprise labeling platforms
+    when you need huge multimodal annotation programs. Helix owns the wedge: <strong>fast domain dataset
+    mining + gold gates + export</strong>.
+  </p>
+
+  <h2>Core concepts</h2>
+  <h3>Plan</h3>
+  <p>
+    The research plan (domain, mission, categories, sources, tone) steers mining and quality. Change the plan
+    when you switch domains (e.g. food-delivery support → HR policy)—ontology and discovery target the active plan.
+  </p>
+  <h3>Formats / topics</h3>
+  <p>
+    Example formats define what a good training row looks like (input/output shape). They set the quality bar
+    for gold promotion.
+  </p>
+  <h3>Mining</h3>
+  <p>
+    Jobs gather evidence (web search via Apify when configured), score relevance by domain, and promote
+    candidates. Quality modes trade helper depth vs cost. Jobs continue after logout.
+  </p>
+  <h3>Corpus (bring your own)</h3>
+  <p>
+    Paste FAQ/policy text or fetch a URL. Corpus is promoted into evidence and gold before generic web scraps
+    when you mine—critical for niche or internal knowledge public search will not find.
+  </p>
+  <h3>Gold library</h3>
+  <p>
+    Verified training pairs live in your account library indefinitely. Rejected rows keep rejection reasons.
+    Seed/demo rows are labeled separately. Collection goals count <strong>verified</strong> rows only.
+  </p>
+  <h3>Synthesis</h3>
+  <p>
+    Create controlled variations of gold (tone, persona, difficulty, etc.) for volume while preserving business logic.
+  </p>
+  <h3>Export</h3>
+  <p>
+    Download gold/synthetic sets for external training. Helix does not host your 30B weights—it prepares the data.
+  </p>
+
+  <h2>Quick start</h2>
+  <ol>
+    <li>Open <a href="/app">the studio</a> and create/sign into a workspace.</li>
+    <li>Set a Plan (domain + categories + mission) via Riu chat or the Plan tab.</li>
+    <li>Optionally paste a corpus FAQ under <strong>My data</strong>.</li>
+    <li>Start a mining job; watch live progress; review gold with origin badges.</li>
+    <li>Export when the library meets your goal.</li>
+  </ol>
+
+  <h2>Architecture (short)</h2>
+  <ul>
+    <li><strong>Gather</strong> — Apify (or your corpus), never invented by the LLM.</li>
+    <li><strong>Judge / synthesize</strong> — configured LLM (e.g. OpenRouter) with hard quality gates.</li>
+    <li><strong>Store</strong> — multi-tenant Postgres-backed libraries and job state.</li>
+  </ul>
+
+  <h2>API</h2>
+  <p>
+    The interactive app uses a versioned HTTP API under <code>/api/…</code> (auth, workspaces, library, jobs, Riu).
+    OpenAPI UI may be disabled in production; use the product UI as the source of truth for workflows, or contact us
+    for partner API access.
+  </p>
+  <p>Health check: <a href="/api/health"><code>GET /api/health</code></a></p>
+
+  <h2>Need help?</h2>
+  <p><a href="/contact">Contact</a> · <a href="mailto:dasgupta.02n@gmail.com">dasgupta.02n@gmail.com</a></p>
+</article>
+{% endblock %}

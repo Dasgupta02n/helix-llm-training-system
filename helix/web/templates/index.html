@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Helix — Training Data Studio</title>
-  <link rel="stylesheet" href="/static/app.css" />
+  <title>Helix — Gold training-data studio for domain LLMs</title>
+  <meta name="description" content="Helix mines domain-specific gold training data from the web and your docs, quality-gates it, synthesizes variants, and exports fine-tune-ready datasets—without a labeling team." />
+  <link rel="stylesheet" href="/static/app.css?v={{ static_v }}" />
 </head>
 <body>
   <div class="landing-shell">
@@ -16,53 +17,106 @@
           <span>Training data studio</span>
         </div>
       </a>
-      <div class="flex">
-        <a class="btn btn-secondary" href="/docs">For developers</a>
-        <a class="btn btn-primary" href="/app">Open studio</a>
-      </div>
+      <nav class="flex" style="gap:10px;flex-wrap:wrap;align-items:center">
+        <a class="btn btn-ghost btn-sm" href="/docs">Docs</a>
+        <a class="btn btn-ghost btn-sm" href="/pricing">Pricing</a>
+        <a class="btn btn-ghost btn-sm" href="/about">About</a>
+        <a class="btn btn-secondary" href="/app">Open studio</a>
+      </nav>
     </header>
 
     <section class="landing-hero">
-      <div class="page-kicker">Built for product &amp; ops teams</div>
-      <h1>Collect excellent training data — without writing code.</h1>
+      <div class="page-kicker">Built for product &amp; ops teams · Early beta</div>
+      <h1>Gold training data for your domain—not another chat box.</h1>
       <p class="lead">
-        Describe what your AI should learn. Helix’s helpers find, check, and package
-        high-quality examples you can download and use for training.
+        Helix is a <strong>no-code dataset studio</strong>: plain-English plans, evidence mining,
+        quality-gated gold examples, synthesis, and export for fine-tuning or eval sets.
+        Built for small teams who need task-specific data fast—not enterprise labeling factories
+        and not prompt/eval consoles.
       </p>
-      <div class="flex" style="margin-top:20px">
+      <div class="flex" style="margin-top:20px;flex-wrap:wrap;gap:10px">
         <a class="btn btn-primary btn-lg" href="/app">Get started</a>
-        <a class="btn btn-secondary btn-lg" href="/app">Sign in to your workspace</a>
+        <a class="btn btn-secondary btn-lg" href="/docs">How it works</a>
+        <a class="btn btn-ghost btn-lg" href="/pricing">Pricing</a>
       </div>
       <div class="pill-row">
-        <span class="badge accent">Plain English plans</span>
-        <span class="badge">AI helpers</span>
-        <span class="badge">One-click download</span>
-        <span class="badge">Separate projects</span>
+        <span class="badge accent">Domain-agnostic mining</span>
+        <span class="badge">BYO corpus</span>
+        <span class="badge">Quality gates</span>
+        <span class="badge">Export for fine-tunes</span>
+      </div>
+    </section>
+
+    <section class="landing-decision">
+      <h2>When Helix is the right tool</h2>
+      <div class="landing-decision-grid">
+        <div class="card">
+          <h3>Choose Helix when…</h3>
+          <ul class="hint">
+            <li>You need a <strong>custom dataset</strong> for SFT / fine-tuning or offline eval</li>
+            <li>Ops/product owns quality and cannot wait on a labeling vendor</li>
+            <li>You have FAQs/policies (or public sources) to turn into gold Q&amp;A pairs</li>
+            <li>You want mining + gates + synthesis + export in one studio</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h3>Choose something else when…</h3>
+          <ul class="hint">
+            <li><strong>Prompting / evals / observability</strong> for an already-live agent (prompt platforms)</li>
+            <li><strong>Huge multimodal annotation</strong> programs (enterprise data engines)</li>
+            <li>You only need a chatbot UI and have no plan to train or eval offline</li>
+          </ul>
+          <p class="hint mb-0">
+            Many stacks use Helix for the dataset, then train and evaluate elsewhere.
+          </p>
+        </div>
       </div>
     </section>
 
     <div class="landing-features">
       <div class="card">
         <div class="feature-icon">1</div>
-        <h3>Say what you need</h3>
-        <p class="hint mb-0">Write a short plan: the topic, goals, and where to look. No technical forms required.</p>
+        <h3>Plan in plain English</h3>
+        <p class="hint mb-0">Domain, mission, categories, tone—Riu or Plan tab. Any vertical, not locked to one demo.</p>
       </div>
       <div class="card">
         <div class="feature-icon">2</div>
-        <h3>Show a perfect example</h3>
-        <p class="hint mb-0">Add a sample question and ideal answer so Helix knows the quality bar.</p>
+        <h3>Mine + quality-gate gold</h3>
+        <p class="hint mb-0">Web gather and/or your corpus. Helpers judge; hard gates reject refuse/echo junk.</p>
       </div>
       <div class="card">
         <div class="feature-icon">3</div>
-        <h3>Run &amp; download</h3>
-        <p class="hint mb-0">Start the helpers, review anything unsure, then download a clean training file.</p>
+        <h3>Synthesize &amp; export</h3>
+        <p class="hint mb-0">Controlled variants, library that keeps forever, download training files for your trainer.</p>
       </div>
     </div>
 
     <div class="poster-banner">
-      <h2>Ink console. Red rules. Zero fluff.</h2>
-      <p>A modular studio for gold-data mining — structured steps, hard edges, and helpers that never invent scrapes.</p>
+      <h2>Not Scale. Not a prompt IDE. Dataset mining.</h2>
+      <p>
+        Fast path for task-specific gold data—lighter than enterprise labeling platforms,
+        focused where prompt tools stop: offline training sets you can own and version.
+      </p>
+      <div class="flex" style="margin-top:16px;gap:10px;flex-wrap:wrap">
+        <a class="btn btn-secondary" href="/docs" style="background:var(--paper);color:var(--ink)">Read docs</a>
+        <a class="btn btn-secondary" href="/about" style="background:transparent;color:var(--paper);border-color:var(--paper)">Who we are</a>
+      </div>
     </div>
+
+    <footer class="public-footer">
+      <div class="public-footer-inner">
+        <div><strong>Helix</strong> by c7x AI · Early beta · {{ version }}</div>
+        <div class="public-footer-links">
+          <a href="/privacy">Privacy</a>
+          <a href="/terms">Terms</a>
+          <a href="/security">Security</a>
+          <a href="/pricing">Pricing</a>
+          <a href="/docs">Docs</a>
+          <a href="/about">About</a>
+          <a href="/contact">Contact</a>
+        </div>
+      </div>
+    </footer>
   </div>
 </body>
 </html>

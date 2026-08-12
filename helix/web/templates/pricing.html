@@ -1,0 +1,61 @@
+{% extends "public_base.html" %}
+{% block title %}Pricing{% endblock %}
+{% block meta_description %}Helix pricing — free during public beta; contact us for enterprise and high-volume mining.{% endblock %}
+{% block content %}
+<article class="legal-doc">
+  <p class="page-kicker">Pricing · Early beta</p>
+  <h1>Simple pricing while we build in public</h1>
+  <p class="lead">
+    Helix is in <strong>open beta</strong>. We are optimizing for product quality and honest feedback—not
+    complex enterprise packaging yet.
+  </p>
+
+  <div class="pricing-grid">
+    <div class="pricing-card">
+      <h2>Beta</h2>
+      <p class="price">Free</p>
+      <p class="hint">During testing for approved accounts</p>
+      <ul>
+        <li>Workspace + research plan (any domain)</li>
+        <li>Mining jobs (Apify gather + quality gates)</li>
+        <li>Gold library &amp; synthesis controls</li>
+        <li>Bring-your-own corpus</li>
+        <li>Export training files</li>
+        <li>Jobs that keep running after sign-out</li>
+      </ul>
+      <p class="hint">
+        Usage may be rate-limited. LLM and gather costs are subject to our provider quotas;
+        heavy use may be throttled to keep the beta stable for everyone.
+      </p>
+      <a class="btn btn-primary" href="/app">Open studio</a>
+    </div>
+    <div class="pricing-card featured">
+      <h2>Enterprise / high volume</h2>
+      <p class="price">Contact us</p>
+      <p class="hint">When you outgrow beta limits</p>
+      <ul>
+        <li>Higher mining throughput &amp; dedicated support</li>
+        <li>Custom retention and data residency discussions</li>
+        <li>SSO / private networking (roadmap — tell us what you need)</li>
+        <li>Piloted quality review &amp; dataset SLAs</li>
+      </ul>
+      <a class="btn btn-secondary" href="mailto:dasgupta.02n@gmail.com?subject=Helix%20enterprise">Email us</a>
+      <a class="btn btn-ghost" href="/contact">Contact page</a>
+    </div>
+  </div>
+
+  <h2>What you’re paying for (when paid plans land)</h2>
+  <p>
+    Helix is a <strong>training-data studio</strong>: plain-English plans, evidence mining, gold quality gates,
+    synthesis, and export—not a hosted 30B model and not a prompt/eval console. When paid tiers launch, we will
+    publish clear limits (gold targets, batch volume, seats) here before charging.
+  </p>
+
+  <h2>Fair use during beta</h2>
+  <ul>
+    <li>No scraping for illegal content or clear ToS abuse of third-party sites.</li>
+    <li>No multi-account abuse to bypass rate limits.</li>
+    <li>We may reset demo data or adjust free quotas as the product stabilizes.</li>
+  </ul>
+</article>
+{% endblock %}

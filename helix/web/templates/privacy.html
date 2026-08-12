@@ -1,0 +1,89 @@
+{% extends "public_base.html" %}
+{% block title %}Privacy{% endblock %}
+{% block meta_description %}Privacy policy for Helix (c7xai.in) — what we collect, how we use it, and how we handle your data during early beta.{% endblock %}
+{% block content %}
+<article class="legal-doc">
+  <p class="page-kicker">Legal · Last updated 12 August 2026</p>
+  <h1>Privacy Policy</h1>
+  <p class="lead">
+    Helix is an early-stage product operated at <strong>c7xai.in</strong>. This policy is written for a
+    <strong>beta SaaS</strong>: honest about what we collect, how we use it, and where we still rely on
+    third-party processors. It is not legal advice for every jurisdiction.
+  </p>
+
+  <h2>1. Who we are</h2>
+  <p>
+    Helix (“we”, “us”) is a training-data studio for building gold datasets for LLM fine-tuning and evaluation.
+    Operator contact for privacy questions: <a href="mailto:dasgupta.02n@gmail.com">dasgupta.02n@gmail.com</a>
+    (see also <a href="/about">About</a> and <a href="/contact">Contact</a>).
+  </p>
+
+  <h2>2. What data we collect</h2>
+  <ul>
+    <li><strong>Account data</strong> — email address, name (if provided), password hash, workspace membership, and admin/verification flags.</li>
+    <li><strong>Workspace content you create</strong> — research plans, topic formats, corpus documents (pasted text or fetched page content), gold and synthetic examples, job settings, and related metadata.</li>
+    <li><strong>Operational logs</strong> — job progress, agent run summaries, error messages, and similar product telemetry needed to run mining and show status.</li>
+    <li><strong>Technical data</strong> — IP address (for rate limiting and security), browser user-agent, cookies/session tokens for authentication, and basic request metadata.</li>
+    <li><strong>Email delivery metadata</strong> — if transactional email is enabled (verification, admin approval), we process recipient address and delivery status via our email provider.</li>
+  </ul>
+
+  <h2>3. How we use data</h2>
+  <ul>
+    <li>Provide and secure the Helix service (accounts, workspaces, jobs, libraries, export).</li>
+    <li>Run mining and synthesis workflows you start (including calls to configured gather and LLM providers).</li>
+    <li>Send essential product emails (e.g. verification or admin approval) when those features are enabled.</li>
+    <li>Improve reliability and safety (rate limits, abuse prevention, debugging failures).</li>
+    <li>We do <strong>not</strong> sell personal data. We do not use your private corpus or gold library for advertising.</li>
+  </ul>
+
+  <h2>4. Processors and third parties</h2>
+  <p>Depending on configuration, Helix may send data to:</p>
+  <ul>
+    <li><strong>Hosting / database</strong> — the VPS and database where the application and your workspace data run.</li>
+    <li><strong>LLM provider</strong> (e.g. OpenRouter) — prompts and evidence snippets needed to judge relevance, synthesize training pairs, or run conversational setup.</li>
+    <li><strong>Gather provider</strong> (e.g. Apify) — search queries and URLs you authorize the product to fetch for discovery/evidence.</li>
+    <li><strong>Email provider</strong> (e.g. Resend) — transactional messages when email is configured.</li>
+  </ul>
+  <p>
+    Public web gathering uses sources available on the open web. Bring-your-own corpus content stays under your account
+    and is used to produce training examples for <em>your</em> workspace.
+  </p>
+
+  <h2>5. Retention</h2>
+  <p>
+    Gold and synthetic library rows are designed for <strong>indefinite retention</strong> in your account until you
+    archive or delete them, or your account is removed. Job logs and operational records are kept as long as needed to
+    operate the product and investigate issues. Beta: we may refine retention schedules as the product matures.
+  </p>
+
+  <h2>6. Your choices</h2>
+  <ul>
+    <li>Access and export your library data from the product (export tools in My data).</li>
+    <li>Request account or data deletion by emailing <a href="mailto:dasgupta.02n@gmail.com">dasgupta.02n@gmail.com</a>.</li>
+    <li>Do not paste secrets (API keys, passwords, personal data of others) into corpus or plans unless you intend that content to be processed by Helix and its configured providers.</li>
+  </ul>
+
+  <h2>7. Security</h2>
+  <p>
+    We use industry-standard measures appropriate for an early product (hashed passwords, session tokens, rate limits,
+    HTTPS at the edge when configured). See <a href="/security">Security</a>. No method of transmission or storage is
+    100% secure; beta users should avoid highly regulated or sensitive personal data until a formal compliance program
+    is published.
+  </p>
+
+  <h2>8. Children</h2>
+  <p>Helix is not directed at children under 16. We do not knowingly collect data from children.</p>
+
+  <h2>9. Changes</h2>
+  <p>
+    We may update this policy as Helix evolves. Material changes will be reflected by updating the date above and,
+    when practical, a notice in the app.
+  </p>
+
+  <h2>10. Contact</h2>
+  <p>
+    Privacy questions: <a href="mailto:dasgupta.02n@gmail.com">dasgupta.02n@gmail.com</a> ·
+    <a href="/contact">Contact</a>
+  </p>
+</article>
+{% endblock %}

@@ -7,7 +7,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -30,6 +30,7 @@ templates = Jinja2Templates(directory=str(WEB_DIR / "templates"))
 
 _settings = get_settings()
 
+# Product docs live at /docs (public HTML). OpenAPI UI is separate when enabled.
 app = FastAPI(
     title="Helix",
     description=(
@@ -37,8 +38,8 @@ app = FastAPI(
         "user-owned gold/synthetic libraries, synthesis, Resend auth, OpenRouter."
     ),
     version=__version__,
-    docs_url="/docs" if _settings.docs_enabled else None,
-    redoc_url="/redoc" if _settings.docs_enabled else None,
+    docs_url="/api/docs" if _settings.docs_enabled else None,
+    redoc_url="/api/redoc" if _settings.docs_enabled else None,
     openapi_url="/openapi.json" if _settings.docs_enabled else None,
 )
 
@@ -202,11 +203,87 @@ def console(request: Request) -> HTMLResponse:
     )
 
 
+def _public_page(request: Request, name: str) -> HTMLResponse:
+    return templates.TemplateResponse(request, name, _template_ctx())
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "privacy.html")
+
+
+@app.get("/terms", response_class=HTMLResponse)
+def terms_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "terms.html")
+
+
+@app.get("/pricing", response_class=HTMLResponse)
+def pricing_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "pricing.html")
+
+
+@app.get("/docs", response_class=HTMLResponse)
+def product_docs_page(request: Request) -> HTMLResponse:
+    """Product documentation (always public). OpenAPI stays behind enable_api_docs."""
+    return _public_page(request, "docs.html")
+
+
+@app.get("/about", response_class=HTMLResponse)
+def about_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "about.html")
+
+
+@app.get("/contact", response_class=HTMLResponse)
+def contact_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "contact.html")
+
+
+@app.get("/security", response_class=HTMLResponse)
+def security_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "security.html")
+
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+def robots_txt() -> str:
+    return (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /api/\n"
+        "\n"
+        "Sitemap: https://c7xai.in/sitemap.xml\n"
+    )
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml() -> Response:
+    paths = [
+        "/",
+        "/app",
+        "/docs",
+        "/pricing",
+        "/about",
+        "/contact",
+        "/privacy",
+        "/terms",
+        "/security",
+    ]
+    urls = "\n".join(
+        f"  <url><loc>https://c7xai.in{p}</loc><changefreq>weekly</changefreq></url>"
+        for p in paths
+    )
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"{urls}\n"
+        "</urlset>\n"
+    )
+    return Response(content=body, media_type="application/xml")
+
+
 @app.get("/docs-redirect")
 def docs_redirect() -> RedirectResponse:
-    if not get_settings().docs_enabled:
-        return RedirectResponse("/app")
-    return RedirectResponse("/docs")
+    # Always land on product docs; OpenAPI is separate when enabled
+    return RedirectResponse("/docs", status_code=307)
 
 
 @app.exception_handler(Exception)
