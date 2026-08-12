@@ -14,6 +14,7 @@ from helix.db import models as m
 from helix.db.session import get_db
 from helix.services.auth_tokens import create_auth_token, invalidate_tokens
 from helix.services.email import send_invite_email, send_set_password_email
+from helix.services.gold_quality import backfill_reject_cross_domain_gold
 from helix.services.users import create_user, user_public
 
 router = APIRouter(prefix="/api/users", tags=["users"])
@@ -46,6 +47,20 @@ def list_users(
 ) -> list[dict]:
     rows = db.query(m.User).order_by(m.User.created_at.desc()).all()
     return [user_public(u) for u in rows]
+
+
+@router.post("/cross-domain-backfill-all")
+def cross_domain_backfill_all(
+    admin: m.User = Depends(require_superadmin),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Superadmin one-shot: scan every non-archived gold row across all tenants
+    and reject cross-plan / cross-domain contamination (e.g. food FAQ under HR).
+    Mirrors the startup backfill so it can be re-run without a redeploy.
+    """
+    result = backfill_reject_cross_domain_gold(db)
+    return {"ok": True, **result}
 
 
 @router.get("/{user_id}")

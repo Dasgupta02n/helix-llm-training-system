@@ -256,11 +256,13 @@ def quality_backfill(
 ) -> dict:
     """Re-run quality gates on all historical gold for this user/workspace."""
     tenant = _tenant_for(user, slug, db)
+    # Superadmin cleans whole workspace; members clean only their own library.
+    owner_id = None if user.is_superadmin else user.id
     result = backfill_quality_on_gold_rows(
-        db, owner_user_id=user.id, tenant_id=tenant.id
+        db, owner_user_id=owner_id or user.id, tenant_id=tenant.id
     )
     cross = backfill_reject_cross_domain_gold(
-        db, owner_user_id=user.id, tenant_id=tenant.id
+        db, owner_user_id=owner_id, tenant_id=tenant.id
     )
     return {"ok": True, **result, "cross_domain": cross}
 
@@ -274,10 +276,14 @@ def cross_domain_backfill(
     """
     One-shot: reject gold poisoned by another plan's corpus
     (e.g. food-delivery FAQ labeled as HR/PTO).
+
+    Members: own gold only. Superadmin: all gold in the workspace
+    (so contaminated rows owned by other users still get cleaned).
     """
     tenant = _tenant_for(user, slug, db)
+    owner_id = None if user.is_superadmin else user.id
     result = backfill_reject_cross_domain_gold(
-        db, owner_user_id=user.id, tenant_id=tenant.id
+        db, owner_user_id=owner_id, tenant_id=tenant.id
     )
     return {"ok": True, **result}
 
