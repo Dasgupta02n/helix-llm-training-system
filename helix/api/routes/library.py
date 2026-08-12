@@ -21,7 +21,10 @@ from helix.services.corpus import (
     document_to_dict,
     list_corpus,
 )
-from helix.services.gold_quality import backfill_quality_on_gold_rows
+from helix.services.gold_quality import (
+    backfill_quality_on_gold_rows,
+    backfill_reject_cross_domain_gold,
+)
 from helix.services.library import (
     add_gold_example,
     backfill_seed_marks,
@@ -254,6 +257,26 @@ def quality_backfill(
     """Re-run quality gates on all historical gold for this user/workspace."""
     tenant = _tenant_for(user, slug, db)
     result = backfill_quality_on_gold_rows(
+        db, owner_user_id=user.id, tenant_id=tenant.id
+    )
+    cross = backfill_reject_cross_domain_gold(
+        db, owner_user_id=user.id, tenant_id=tenant.id
+    )
+    return {"ok": True, **result, "cross_domain": cross}
+
+
+@router.post("/cross-domain-backfill")
+def cross_domain_backfill(
+    slug: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    One-shot: reject gold poisoned by another plan's corpus
+    (e.g. food-delivery FAQ labeled as HR/PTO).
+    """
+    tenant = _tenant_for(user, slug, db)
+    result = backfill_reject_cross_domain_gold(
         db, owner_user_id=user.id, tenant_id=tenant.id
     )
     return {"ok": True, **result}

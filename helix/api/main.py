@@ -136,6 +136,25 @@ def on_startup() -> None:
     start_worker()  # multi-batch jobs keep running after logout
     # Warm asset version for templates
     app.state.static_v = _static_asset_version()
+    # One-shot: reject gold poisoned by cross-plan corpus contamination
+    try:
+        from helix.db.session import SessionLocal
+        from helix.services.gold_quality import backfill_reject_cross_domain_gold
+
+        db = SessionLocal()
+        try:
+            result = backfill_reject_cross_domain_gold(db)
+            if result.get("newly_rejected") or result.get("already_rejected_annotated"):
+                logger.info(
+                    "cross_domain_gold_backfill scanned=%s newly_rejected=%s annotated=%s",
+                    result.get("scanned"),
+                    result.get("newly_rejected"),
+                    result.get("already_rejected_annotated"),
+                )
+        finally:
+            db.close()
+    except Exception:  # noqa: BLE001
+        logger.exception("cross_domain_gold_backfill failed (non-fatal)")
 
 
 @app.get("/api/health")
