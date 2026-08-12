@@ -86,12 +86,31 @@ def list_topic_schemas(ctx: ToolContext, **_: Any) -> dict:
 
 
 def score_all_active(ctx: ToolContext, **_: Any) -> dict:
+    from helix.services.brief import get_active_project, project_to_dict
+
     cats = ctx.db.query(m.CategoryState).filter_by(tenant_id=ctx.tenant_id).all()
+    brief_cats: set[str] | None = None
+    try:
+        proj = get_active_project(ctx.db, ctx.tenant_id)
+        if proj:
+            raw = [
+                str(c).strip()
+                for c in (project_to_dict(proj).get("categories") or [])
+                if str(c).strip()
+            ]
+            if raw:
+                brief_cats = set(raw)
+    except Exception:  # noqa: BLE001
+        brief_cats = None
     sources = (
         ctx.db.query(m.SourceReliability).filter_by(tenant_id=ctx.tenant_id).all()
     )
     scores = []
     for cat in cats:
+        if brief_cats is not None and cat.name not in brief_cats:
+            continue
+        if int(cat.phase_target or 0) <= 0:
+            continue
         gap = max(0, cat.phase_target - cat.verified_count) / max(cat.phase_target, 1)
         for src in sources:
             if src.source == "phyllo":
