@@ -28,6 +28,46 @@ def _uid(prefix: str = "jbe_") -> str:
     return f"{prefix}{uuid.uuid4().hex[:12]}"
 
 
+def _offer_riu_synthesis(db, job: m.BatchJob) -> None:
+    """After gold mining, ask Riu to offer variations — never auto-start synth."""
+    from helix.services.riu import _load_json, _now as riu_now, _uid as riu_uid
+
+    row = (
+        db.query(m.RiuSession)
+        .filter_by(
+            owner_user_id=job.owner_user_id,
+            tenant_id=job.tenant_id,
+            status="active",
+        )
+        .order_by(m.RiuSession.updated_at.desc())
+        .first()
+    )
+    if not row:
+        return
+    state = _load_json(row.state_json, {})
+    state["run_synthesis"] = False
+    state["mining_job_id"] = job.id
+    row.state_json = json.dumps(state)
+    row.phase = "offer_synth"
+    msgs = _load_json(row.messages_json, [])
+    msgs.append(
+        {
+            "id": riu_uid("msg_"),
+            "role": "assistant",
+            "name": "Riu",
+            "content": (
+                "Mining finished. I did **not** start variations. "
+                "If you want extra rows, say **yes** in this chat and I’ll quote "
+                "the $35/1k cost first."
+            ),
+            "phase": "offer_synth",
+            "ts": riu_now().isoformat(),
+        }
+    )
+    row.messages_json = json.dumps(msgs)
+    row.updated_at = riu_now()
+
+
 def _now() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -322,6 +362,11 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             summ["cost_usd"] = job.cost_usd
             job.result_summary_json = json.dumps(summ, default=str)
             _log(db, job, job.progress_message, level="info")
+            if job.job_type == "pipeline":
+                try:
+                    _offer_riu_synthesis(db, job)
+                except Exception:  # noqa: BLE001
+                    logger.exception("riu offer_synth hook failed")
         else:
             try:
                 summ = json.loads(job.result_summary_json or "{}")

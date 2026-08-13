@@ -143,6 +143,22 @@ def quality_reject_reasons(
     if not any(c in ol for c in next_step_cues):
         reasons.append("missing_concrete_customer_next_step")
 
+    instr = str(brief.get("agent_instructions") or "")
+    if "RISK:high" in instr.replace(" ", "") or "RISK: high" in instr:
+        role_text = brief.get("domain") or brief.get("mission") or ""
+        if "ROLE:" in instr:
+            role_text = instr.split("ROLE:", 1)[1].split("\n", 1)[0].strip() or role_text
+        from helix.services.role_risk import role_relevance_reject_reasons
+
+        reasons.extend(
+            role_relevance_reject_reasons(
+                role_text=role_text,
+                input_text=input_text or "",
+                output=out,
+                risk_level="high",
+            )
+        )
+
     if support:
         if re.search(r"provide (a |the )?(url|link) to (our |the )?internal", ol):
             reasons.append("asks_customer_for_internal_resources")
@@ -1089,3 +1105,64 @@ def backfill_quality_on_gold_rows(
         "skip_seeds": skip_seeds,
         "items": details[:100],
     }
+
+
+def reverify_gold_for_role(
+    db: Any,
+    *,
+    tenant_id: str,
+    owner_user_id: str,
+    role_text: str,
+    risk_level: str = "medium",
+    limit: int = 200,
+) -> dict[str, Any]:
+    """Post-generation: reject verified gold that drifted off the stated role."""
+    import json
+
+    from helix.db import models as m
+    from helix.services.role_risk import role_relevance_reject_reasons
+
+    rows = (
+        db.query(m.GoldExample)
+        .filter_by(
+            tenant_id=tenant_id,
+            owner_user_id=owner_user_id,
+            is_archived=False,
+            verification_status="verified",
+        )
+        .order_by(m.GoldExample.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    scanned = 0
+    rejected = 0
+    items: list[dict[str, Any]] = []
+    for g in rows:
+        scanned += 1
+        reasons = role_relevance_reject_reasons(
+            role_text=role_text,
+            input_text=g.input_text or "",
+            output=g.output_text or "",
+            risk_level=risk_level,
+        )
+        if not reasons:
+            continue
+        try:
+            meta = json.loads(g.metadata_json or "{}")
+        except Exception:  # noqa: BLE001
+            meta = {}
+        if not isinstance(meta, dict):
+            meta = {}
+        if meta.get("role_reverify_v1"):
+            continue
+        g.verification_status = "rejected"
+        meta["rejection_reasons"] = reasons
+        meta["rejection_reason"] = "; ".join(reasons)
+        meta["role_reverify_v1"] = "rejected"
+        g.metadata_json = json.dumps(meta)
+        note = f"[role-reverify rejected: {', '.join(reasons)}]"
+        g.rationale = f"{(g.rationale or '').strip()}\n{note}".strip()[:1000]
+        rejected += 1
+        items.append({"id": g.id, "reasons": reasons})
+    db.commit()
+    return {"scanned": scanned, "newly_rejected": rejected, "items": items[:50]}

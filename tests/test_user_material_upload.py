@@ -145,7 +145,7 @@ def test_heuristic_own_data_to_materials_to_confirm():
 
     # Skip materials → pricing/confirm
     t2 = _heuristic_turn("skip", {"gold_target": 1000, "batch_size": 5, "total_batches": 1}, "materials")
-    assert t2["phase"] == "confirm"
+    assert t2["phase"] in {"confirm", "model_estimate"}
     assert "pricing" in t2["reply"].lower() or "$" in t2["reply"]
     assert t2["state_patch"].get("pricing_estimate")
 

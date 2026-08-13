@@ -45,35 +45,34 @@ SYSTEM_PROMPT = """You are Riu, a warm, clear conversational guide inside Helix 
 
 Your job:
 1) Ask plain-English questions (one or two at a time).
-2) Understand the user's answers about what AI they want to train.
-3) Fill Helix configuration: research plan, example formats, library goals.
-4) When enough is known, prepare the system and start mining (and optionally synthesis).
-5) Never invent scraped web/data — Helix uses Apify for gathering and OpenRouter only to judge.
+2) Understand the ROLE / TASK the AI will perform.
+3) Collect one perfect example, then the required number of edge cases.
+4) Save Helix configuration. Never invent scraped web/data.
 
 Tone: friendly, non-technical, short paragraphs. Avoid jargon (say "training examples" not "SFT dataset").
 
-Conversation phases:
-- greet → discover → plan → formats → goals → own_data → materials → pricing → confirm → running → done
+Conversation phases (strict order):
+greet → role → discover → example → edge_cases → own_data → materials → model_estimate → confirm → running → offer_synth → done
 
-After goals:
-1) ALWAYS ask if they have labeled data (zip of Q&A) for gold format / Double Helix.
-   - yes → own_data_awaiting_upload; show gold zip upload
-   - no/skip → materials phase
-2) ALWAYS ask if they have unlabeled materials (sales scripts, rulebooks, formulas,
-   teacher notes, etc.) that should be converted into trainable gold-format pairs.
-   - yes → materials_awaiting_upload; show materials zip upload
-   - no/skip → pricing phase
-3) Pricing / confirm: DO NOT invent dollar amounts, hourly ETAs, or gold yields.
-   The server attaches the official Helix estimate ($35 per 1,000 gold, corpus
-   gate). You may introduce it, but never quote a different per-1k price or say
-   5000 examples will finish in hours. With zero corpus, 5000 gold cannot start.
-   Web-only exploratory is 10 examples. Only emit start_pipeline after confirm
-   AND only for a job the official estimate says can start.
+1) role: What job will this AI do? (e.g. screen CVs, write captions, handle refunds)
+2) discover: Understand the product/domain in depth.
+3) example: Collect ONE perfect input + ideal output.
+4) edge_cases: Ask for the required number of TRICKY/outlier scenarios
+   (high-risk roles: 3; medium: 2; low: 1). Do not skip this.
+5) own_data / materials: labeled zip then unlabeled materials (or skip).
+6) model_estimate: Recommend Llama 3.1 8B + QLoRA for later training.
+   DO NOT invent dollar amounts — the server attaches the official $35/1k estimate.
+7) confirm → start_pipeline only after confirm (or start 10 if no corpus).
+8) offer_synth: ONLY after mining finishes. Ask if they want variations.
+   Never emit start_synthesis during confirm. User must opt in later.
+
+Risk: hiring/credit/medical/legal = high (stricter fairness, more edge cases).
+Captions/copy = low. Support/sales/HR = medium.
 
 You MUST reply with ONLY a JSON object (no markdown fences) of this shape:
 {
   "reply": "What you say to the user in plain English",
-  "phase": "greet|discover|plan|formats|goals|own_data|materials|pricing|confirm|running|done",
+  "phase": "greet|role|discover|example|edge_cases|own_data|materials|model_estimate|confirm|running|offer_synth|done",
   "state_patch": {
     "project_name": "...",
     "domain": "...",
@@ -94,6 +93,12 @@ You MUST reply with ONLY a JSON object (no markdown fences) of this shape:
     "batch_size": 5,
     "total_batches": 2,
     "run_synthesis": false,
+    "role_text": "...",
+    "risk_level": "low|medium|high",
+    "role_type": "...",
+    "edge_cases": [],
+    "edge_cases_required": 2,
+    "recommended_base_model": "meta-llama/Llama-3.1-8B-Instruct",
     "has_own_data": false,
     "own_data_awaiting_upload": false,
     "has_materials": false,
@@ -448,7 +453,7 @@ def apply_official_riu_estimate(
         pricing, project=str(state.get("project_name") or state.get("domain") or "")
     )
     ph = (phase or "").lower()
-    if ph in {"pricing", "confirm"} or _looks_like_cost_quote(reply):
+    if ph in {"pricing", "confirm", "model_estimate"} or _looks_like_cost_quote(reply):
         lead = (reply or "").strip()
         # Drop leftover invented dollar/hour sentences from the model.
         cleaned: list[str] = []
@@ -481,48 +486,74 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
 
     wants_run = _wants_run(t)
     refuse = _refuses_run(t)
+    phase = {
+        "plan": "discover",
+        "formats": "example",
+        "goals": "edge_cases",
+        "pricing": "model_estimate",
+    }.get(phase, phase)
 
-    if phase in {"greet", "discover"}:
-        patch["project_name"] = t[:120] if t else "My AI project"
-        patch["domain"] = t
+    if phase in {"greet", "role"} and not state.get("role_text"):
+        from helix.services.role_risk import classify_role
+
+        role_text = t or "general assistant"
+        risk = classify_role(role_text)
+        patch["role_text"] = role_text
+        patch["role_type"] = risk["role_type"]
+        patch["risk_level"] = risk["risk_level"]
+        patch["edge_cases_required"] = risk["edge_cases_required"]
+        patch["quality_mode"] = risk["quality_mode"]
+        patch["recommended_base_model"] = risk["recommended_base_model"]
+        patch["project_name"] = role_text[:120]
+        patch["domain"] = role_text
         reply = (
-            f"Got it — you're working on **{patch['project_name']}**.\n\n"
-            "In one or two sentences: **what should this AI get better at?** "
-            "(e.g. answering shipping questions politely and accurately)"
+            f"Role noted: **{role_text[:160]}** — {risk['summary']}\n\n"
+            "In one or two sentences: **what should this AI get better at**, "
+            "and what’s the product or domain?"
         )
-        next_phase = "plan"
-        progress = 20
-    elif phase == "plan" and not state.get("mission"):
+        next_phase = "discover"
+        progress = 18
+    elif phase in {"greet", "discover"} and not state.get("mission"):
         patch["mission"] = (
             f"Collect high-quality training examples so the AI can: {t}"
             if t
             else "Collect high-quality training examples"
         )
+        if not state.get("role_text"):
+            from helix.services.role_risk import classify_role
+
+            risk = classify_role(t or state.get("domain") or "")
+            patch["role_text"] = t or state.get("domain") or "general"
+            patch.update(
+                {
+                    "role_type": risk["role_type"],
+                    "risk_level": risk["risk_level"],
+                    "edge_cases_required": risk["edge_cases_required"],
+                    "quality_mode": risk["quality_mode"],
+                    "recommended_base_model": risk["recommended_base_model"],
+                }
+            )
         reply = (
-            "Nice. **Which topics or categories should we cover?** "
-            "List a few, comma-separated "
+            "Which **topics** should we cover? Comma-separated "
             "(e.g. billing, shipping, returns)."
         )
-        next_phase = "plan"
-        progress = 35
-    elif phase in {"plan", "plan_topics"} and not state.get("categories"):
+        next_phase = "discover"
+        progress = 32
+    elif phase == "discover" and not state.get("categories"):
         cats = [c.strip() for c in re.split(r"[,;\n]+", t) if c.strip()]
         patch["categories"] = cats or ["general"]
-        targets = {c: 40 for c in patch["categories"][:8]}
-        patch["phase_targets"] = targets
+        patch["phase_targets"] = {c: 40 for c in patch["categories"][:8]}
         patch["sources"] = state.get("sources") or ["docs", "web"]
         reply = (
-            f"Topics noted: **{', '.join(patch['categories'])}**.\n\n"
-            "Show me a **perfect example** of what a training row should look like.\n"
-            "Reply with:\n"
-            "1) a sample question/input\n"
-            "2) the ideal answer/output\n\n"
-            "(You can write them as two lines or paragraphs.)"
+            f"Topics: **{', '.join(patch['categories'])}**.\n\n"
+            "Give me **one perfect example**:\n"
+            "1) the input / user message\n"
+            "2) the ideal output / answer"
         )
-        next_phase = "formats"
-        progress = 50
+        next_phase = "example"
+        progress = 45
         actions.append({"type": "save_plan"})
-    elif phase == "formats":
+    elif phase in {"example", "formats"}:
         # parse sample Q/A
         parts = re.split(r"\n\s*\n|\n(?=answer|output|a:|ideal)", t, maxsplit=1, flags=re.I)
         if len(parts) >= 2:
@@ -545,23 +576,40 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         )
         patch["format_description"] = f"Ideal Q&A style examples for {domain}"
         patch["sample_rationale"] = "Clear, helpful, and matches the product tone."
-        try:
-            g0 = int(state.get("gold_target") or 5000)
-            v0 = int(state.get("variations_per_gold") or 4)
-        except (TypeError, ValueError):
-            g0, v0 = 5000, 4
+        need = int(state.get("edge_cases_required") or 2)
         reply = (
-            "Great sample — I'll use that as the quality bar.\n\n"
-            f"Default goals are **{g0:,} gold examples** "
-            f"and **{v0} variations** each "
-            f"(~{g0 * v0:,} synthesized).\n\n"
-            "Reply **ok** to keep defaults, or type e.g. `gold 1000, variations 3`. "
-            "Also pick quality: **best / high / balanced / cheap** (default high)."
+            "That’s the clean example — I’ll use it as the quality bar.\n\n"
+            f"This role is **{state.get('risk_level') or 'medium'}** risk, so I need "
+            f"**{need} tricky / edge-case scenario(s)** (outliers, not the happy path).\n"
+            "Send the first one: a hard input and what the AI should do."
         )
-        next_phase = "goals"
-        progress = 70
+        next_phase = "edge_cases"
+        progress = 58
         actions.append({"type": "save_format"})
         actions.append({"type": "save_plan"})
+    elif phase == "edge_cases":
+        edges = list(state.get("edge_cases") or [])
+        if t and lower not in {"skip", "done", "next"}:
+            edges.append(t[:2000])
+        patch["edge_cases"] = edges
+        need = int(state.get("edge_cases_required") or 2)
+        if len(edges) < need and lower not in {"skip"}:
+            reply = (
+                f"Logged edge case **{len(edges)}/{need}**.\n\n"
+                "Give me another tricky one — bias, missing info, conflict, or abuse."
+            )
+            next_phase = "edge_cases"
+            progress = 58 + min(12, 4 * len(edges))
+        else:
+            reply = (
+                f"I have **{len(edges)}** edge case(s). "
+                "Do you already have **labeled** Q&A (zip) to save in gold format?\n\n"
+                "Reply **yes** (upload) or **no** / **skip**."
+            )
+            next_phase = "own_data"
+            progress = 78
+            actions.append({"type": "save_goals"})
+            actions.append({"type": "save_plan"})
     elif phase == "goals":
         # parse goals + quality
         gm = re.search(r"gold\s*[:=]?\s*(\d+)", lower)
@@ -738,11 +786,11 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
                 f"{data_line}"
                 f"{format_official_estimate(pricing)}\n"
             )
-            next_phase = "confirm"
-            progress = 94
+            next_phase = "model_estimate"
+            progress = 90
             actions.append({"type": "save_goals"})
             actions.append({"type": "save_plan"})
-    elif phase == "pricing":
+    elif phase in {"pricing", "model_estimate"}:
         # Alias: same as materials→confirm path if LLM lands here
         from helix.services.user_material_upload import estimate_setup_pricing
 
@@ -750,7 +798,10 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         patch["pricing_estimate"] = pricing
         from helix.services.user_material_upload import format_official_estimate
 
+        model = state.get("recommended_base_model") or "meta-llama/Llama-3.1-8B-Instruct"
         reply = (
+            f"Recommended later training stack: **{model}** with **QLoRA** "
+            "(Double Helix v1 — not billed now).\n\n"
             "Official pricing (same meters as jobs):\n\n"
             f"{format_official_estimate(pricing)}\n"
         )
@@ -767,7 +818,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         else:
             reply = (
                 "I'm still here. Your mining job keeps running even if you leave. "
-                "Open **AI helpers → Your jobs** for status, or say **restart** "
+                "Open **Home** for job status, or say **restart** "
                 "to configure a new project with me."
             )
         next_phase = "running"
@@ -784,13 +835,11 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
                 {"type": "save_goals"},
                 {"type": "start_pipeline"},
             ]
-            if state.get("run_synthesis"):
-                actions.append({"type": "start_synthesis"})
             reply = (
-                "Starting now. I'm saving your plan, formats, and goals, "
+                "Starting now. I'm saving your plan and quality bar, "
                 "then queueing a mining job that keeps running even if you leave.\n\n"
-                "You can watch progress under **AI helpers → Your jobs**, "
-                "or ask me for a status update anytime."
+                "Watch progress on **Home**. I will **not** start variations yet — "
+                "I'll ask after gold is ready."
             )
             next_phase = "running"
             progress = 100
@@ -813,6 +862,41 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             progress = 90
             if patch:
                 actions.append({"type": "save_goals"})
+    elif phase == "offer_synth":
+        from helix.services.cost_tracking import GOLD_COST_CAP_USD_PER_1000
+
+        try:
+            g = int(state.get("gold_target") or 10)
+            v = int(state.get("variations_per_gold") or 4)
+        except (TypeError, ValueError):
+            g, v = 10, 4
+        extra = max(1, g) * max(1, v)
+        extra_usd = round((extra / 1000.0) * GOLD_COST_CAP_USD_PER_1000, 2)
+        yes = any(w in lower for w in ("yes", "yeah", "yep", "variations", "synth"))
+        no = any(w in lower for w in ("no", "skip", "later", "not now"))
+        if yes and not no:
+            actions.append({"type": "start_synthesis"})
+            reply = (
+                f"Starting variations: about **{extra:,}** extra rows, "
+                f"budgeted at **${extra_usd:.2f}** on the $35/1k meter "
+                f"({v} per gold). This is a separate job."
+            )
+            next_phase = "done"
+            progress = 100
+        else:
+            reply = (
+                "Gold mining finished. Want **variations** of that gold?\n\n"
+                f"That would add about **{extra:,}** rows "
+                f"(**{v}** per gold) and is billed on the same "
+                f"**${GOLD_COST_CAP_USD_PER_1000:.0f}/1k** meter ≈ **${extra_usd:.2f}**.\n\n"
+                "Reply **yes** to start synthesis, or **no** / **skip** to stop here."
+            )
+            next_phase = "offer_synth"
+            progress = 96
+            if no:
+                next_phase = "done"
+                reply = "All set — no variations. Download gold anytime from **My data**."
+                progress = 100
     else:
         reply = (
             "I'm here. Tell me what you want to train, or say **restart** "
@@ -898,13 +982,22 @@ def _llm_turn(
     phase_raw = str(data.get("phase") or phase).strip().lower()
     allowed = {
         "greet",
+        "role",
         "discover",
+        "example",
+        "edge_cases",
+        "own_data",
+        "materials",
+        "model_estimate",
+        "confirm",
+        "running",
+        "offer_synth",
+        "done",
+        # aliases from older sessions
         "plan",
         "formats",
         "goals",
-        "confirm",
-        "running",
-        "done",
+        "pricing",
     }
     if phase_raw not in allowed:
         phase_raw = phase if phase in allowed else "discover"
@@ -954,6 +1047,13 @@ def _apply_save_plan(
     instructions = state.get("notes") or (
         "Prefer quality over volume. Do not invent scrape data. Escalate when unsure."
     )
+    if state.get("role_text"):
+        instructions = (
+            f"ROLE:{state.get('role_text')}\n"
+            f"RISK:{state.get('risk_level') or 'medium'}\n"
+            f"ROLE_TYPE:{state.get('role_type') or ''}\n"
+            + instructions
+        )
 
     existing = (
         db.query(m.ResearchProject)

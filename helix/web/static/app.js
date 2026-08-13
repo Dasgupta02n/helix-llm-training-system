@@ -289,6 +289,7 @@ function showApp(show) {
 }
 
 function goTab(name) {
+  if (name === "plan" || name === "formats" || name === "helpers") name = "riu";
   document.querySelectorAll(".nav-pill").forEach((b) => {
     b.classList.toggle("active", b.dataset.tab === name);
   });
@@ -297,6 +298,9 @@ function goTab(name) {
   if (panel) panel.classList.remove("hidden");
   if (name === "riu") {
     loadRiuSession().catch((e) => toast(e.message, "err"));
+  }
+  if (name === "home") {
+    loadJobs().catch(() => {});
   }
 }
 
@@ -867,6 +871,10 @@ function startJobPolling() {
 }
 
 async function startPipelineJob() {
+  if (!$("pipeBatchSize")) {
+    toast("Start mining from Riu — setup pages were removed.", "err");
+    return;
+  }
   $("runStatus").textContent = "Queueing mining job…";
   $("runStatus").className = "status-line";
   try {
@@ -1416,27 +1424,27 @@ async function refreshDashboard() {
 
 function fillBriefForm(b) {
   if (!b) {
-    $("briefSlug").value = "default";
-    $("briefName").value = "";
-    $("briefDomain").value = "";
-    $("briefMission").value = "";
-    $("briefQuestions").value = "";
-    $("briefCategories").value = "";
-    $("briefSources").value = "";
-    $("briefTargets").value = "";
-    $("briefMetrics").value = "";
-    $("briefTopics").value = "";
-    $("briefInstructions").value = "";
-    $("briefOutput").value = "";
-    $("briefSummary").innerHTML = `
-      <div class="project-badge">No plan yet</div>
-      <h2>Create your first plan</h2>
-      <p class="hint">Open the <strong>Plan</strong> tab and describe what you want to collect. Takes about two minutes.</p>
-      <button class="btn btn-primary" type="button" data-goto="plan">Start planning</button>`;
-    $("briefSummary").querySelector("[data-goto]")?.addEventListener("click", () => goTab("plan"));
+    if ($("briefSummary")) {
+      $("briefSummary").innerHTML = `
+      <div class="project-badge">No setup yet</div>
+      <h2>Talk to Riu</h2>
+      <p class="hint">Riu is the only setup path. She collects role, examples, edge cases, and cost — then starts mining.</p>
+      <button class="btn btn-primary" type="button" data-goto="riu">Open Riu</button>`;
+      $("briefSummary").querySelector("[data-goto]")?.addEventListener("click", () => goTab("riu"));
+    }
     return;
   }
-
+  if (!$("briefName")) {
+    if ($("briefSummary")) {
+      $("briefSummary").innerHTML = `
+      <div class="project-badge">${escapeHtml(b.name || "Active setup")}</div>
+      <h2>${escapeHtml(b.domain || b.name || "Your project")}</h2>
+      <p class="hint">${escapeHtml(b.mission || "Set up through Riu.")}</p>
+      <button class="btn btn-secondary" type="button" data-goto="riu">Continue with Riu</button>`;
+      $("briefSummary").querySelector("[data-goto]")?.addEventListener("click", () => goTab("riu"));
+    }
+    return;
+  }
   $("briefSlug").value = b.slug || "default";
   $("briefName").value = b.name || "";
   $("briefDomain").value = b.domain || "";
@@ -2040,14 +2048,14 @@ $("refreshBtn").onclick = () =>
     .catch((e) => toast(e.message, "err"));
 $("tenantSelect").onchange = () =>
   refreshAll().catch((e) => toast(e.message, "err"));
-$("saveBriefBtn").onclick = saveBrief;
-$("saveSchemaBtn").onclick = saveSchema;
-$("newSchemaBtn").onclick = clearSchemaForm;
+if ($("saveBriefBtn")) $("saveBriefBtn").onclick = saveBrief;
+if ($("saveSchemaBtn")) $("saveSchemaBtn").onclick = saveSchema;
+if ($("newSchemaBtn")) $("newSchemaBtn").onclick = clearSchemaForm;
 if ($("newSchemaBtn2")) $("newSchemaBtn2").onclick = clearSchemaForm;
-$("snapshotBtn").onclick = snapshotPool;
-$("exportPoolBtn").onclick = () => downloadExport("approved-pool", "jsonl");
-$("runBtn").onclick = runAgent;
-$("pipelineBtn").onclick = runPipeline;
+if ($("snapshotBtn")) $("snapshotBtn").onclick = snapshotPool;
+if ($("exportPoolBtn")) $("exportPoolBtn").onclick = () => downloadExport("approved-pool", "jsonl");
+if ($("runBtn")) $("runBtn").onclick = runAgent;
+if ($("pipelineBtn")) $("pipelineBtn").onclick = runPipeline;
 if ($("goldTarget")) $("goldTarget").addEventListener("input", updateSynthHint);
 if ($("varPerGold")) $("varPerGold").addEventListener("input", updateSynthHint);
 if ($("saveScopeBtn")) $("saveScopeBtn").onclick = saveScope;

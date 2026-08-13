@@ -111,11 +111,8 @@
         <button class="nav-pill nav-pill-riu" data-tab="riu" type="button">
           <span class="nav-num">◆</span>Riu
         </button>
-        <button class="nav-pill" data-tab="plan" type="button"><span class="nav-num">1</span>Plan</button>
-        <button class="nav-pill" data-tab="formats" type="button"><span class="nav-num">2</span>Formats</button>
-        <button class="nav-pill" data-tab="helpers" type="button"><span class="nav-num">3</span>AI helpers</button>
-        <button class="nav-pill" data-tab="library" type="button"><span class="nav-num">4</span>My data</button>
-        <button class="nav-pill" data-tab="download" type="button"><span class="nav-num">5</span>Download</button>
+        <button class="nav-pill" data-tab="library" type="button">My data</button>
+        <button class="nav-pill" data-tab="download" type="button">Download</button>
       </nav>
 
       <div class="sidebar-foot">
@@ -186,11 +183,11 @@
             <div class="side-rail-block">
               <div class="side-rail-title">How Riu works</div>
               <ol class="riu-steps-list">
-                <li>Asks what you’re training</li>
-                <li>Learns topics &amp; quality bar</li>
-                <li>Offers bring-your-own gold zip</li>
-                <li>Saves plan, formats &amp; goals</li>
-                <li>Starts mining (survives logout)</li>
+                <li>Role / task</li>
+                <li>Perfect example</li>
+                <li>Edge cases (risk-based)</li>
+                <li>Official $35/1k estimate</li>
+                <li>Confirm → mine (survives logout)</li>
               </ol>
             </div>
             <div class="side-rail-block">
@@ -204,7 +201,7 @@
               <div class="flex" style="flex-direction:column;align-items:stretch;gap:8px">
                 <button class="btn btn-secondary btn-block" type="button" data-riu-quick="Customer support AI for shipping and billing">Support AI</button>
                 <button class="btn btn-secondary btn-block" type="button" data-riu-quick="start">Say “start” to run</button>
-                <button class="btn btn-ghost btn-block" type="button" data-goto="helpers">View jobs</button>
+                <button class="btn btn-ghost btn-block" type="button" data-goto="home">View jobs</button>
               </div>
             </div>
           </aside>
@@ -217,7 +214,7 @@
           <div>
             <span class="page-kicker">Home</span>
             <h2>How Helix works</h2>
-            <p class="hint">You don’t need to know programming. Helix is <strong>domain-agnostic</strong>: set any product in Plan (support, sales, education, …). Mining follows that brief — not a fixed influencer demo. Helix’s AI helpers do the heavy lifting.</p>
+            <p class="hint">Setup is <strong>Riu only</strong> — she interviews you, sets the quality bar, estimates cost, and starts mining. Home, My data, and Download stay for jobs and files.</p>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" type="button" data-goto="riu">Talk to Riu</button>
@@ -231,30 +228,15 @@
             <strong>Chat with Riu</strong>
             <span>Let Riu interview you and run everything automatically.</span>
           </button>
-          <button class="step" data-goto="plan" type="button">
-            <div class="step-num">1</div>
-            <strong>Describe your goal</strong>
-            <span>What AI are you training, and what should it get better at?</span>
-          </button>
-          <button class="step" data-goto="formats" type="button">
-            <div class="step-num">2</div>
-            <strong>Set example formats</strong>
-            <span>Show Helix what a “perfect answer” looks like.</span>
-          </button>
-          <button class="step" data-goto="helpers" type="button">
-            <div class="step-num">3</div>
-            <strong>Run AI helpers</strong>
-            <span>They find, check, and polish training examples for you.</span>
-          </button>
           <button class="step" data-goto="library" type="button">
-            <div class="step-num">4</div>
-            <strong>Grow &amp; synthesize</strong>
-            <span>Save gold in your account, then create controlled variations.</span>
+            <div class="step-num">2</div>
+            <strong>My data</strong>
+            <span>Corpus, uploads, and the gold library Riu grows.</span>
           </button>
           <button class="step" data-goto="download" type="button">
-            <div class="step-num">5</div>
-            <strong>Download the data</strong>
-            <span>Export gold and synthesized files from your account.</span>
+            <div class="step-num">3</div>
+            <strong>Download</strong>
+            <span>Export gold and (if you opted in) synthesized files.</span>
           </button>
         </div>
 
@@ -276,261 +258,13 @@
         </div>
 
         <div class="page-body">
-          <div class="section-label">Activity</div>
+          <div class="section-label">Jobs</div>
+          <h3 class="mt-0">Mining &amp; synthesis</h3>
+          <p class="hint" id="jobsLiveHint">Jobs Riu starts keep running after logout.</p>
+          <div id="jobsList"></div>
+          <div class="section-label" style="margin-top:28px">Activity</div>
           <h3 class="mt-0">Recent helper runs</h3>
           <div id="runs"></div>
-        </div>
-      </section>
-
-      <!-- PLAN -->
-      <section id="tab-plan" class="tab-panel hidden">
-        <div class="page-head">
-          <div>
-            <span class="page-kicker">Step 1</span>
-            <h2>Describe what you’re collecting</h2>
-            <p class="hint">Write this like you’re briefing a research assistant. Plain English is perfect.</p>
-          </div>
-          <div class="page-actions">
-            <span class="saved-chip" id="briefSavedChip">Draft</span>
-            <button class="btn btn-primary" id="saveBriefBtn" type="button">Save plan</button>
-          </div>
-        </div>
-
-        <div class="split">
-          <div class="pane pad stack">
-            <input type="hidden" id="briefSlug" value="default" />
-
-            <div>
-              <label for="briefName">Project name</label>
-              <span class="field-help">A friendly name, e.g. “Customer support AI” or “Sales coach”.</span>
-              <input id="briefName" placeholder="e.g. Customer support AI" />
-            </div>
-
-            <div>
-              <label for="briefDomain">What is this AI about?</label>
-              <span class="field-help">The topic or business area.</span>
-              <textarea id="briefDomain" rows="2" placeholder="e.g. Helping customers with shipping, billing, and product questions"></textarea>
-            </div>
-
-            <div>
-              <label for="briefMission">What should Helix collect?</label>
-              <span class="field-help">Your goal for the training data.</span>
-              <textarea id="briefMission" rows="3" placeholder="e.g. Collect high-quality question-and-answer examples that teach the AI to reply helpfully and accurately"></textarea>
-            </div>
-
-            <div>
-              <label for="briefQuestions">Key questions to answer</label>
-              <span class="field-help">One per line. Optional.</span>
-              <textarea id="briefQuestions" rows="4" placeholder="How should we handle refunds?&#10;What makes a great first reply?"></textarea>
-            </div>
-
-            <div class="form-row">
-              <div>
-                <label for="briefCategories">Topics / categories</label>
-                <span class="field-help">Comma-separated</span>
-                <input id="briefCategories" placeholder="billing, shipping, product" />
-              </div>
-              <div>
-                <label for="briefSources">Where to look</label>
-                <span class="field-help">Comma-separated</span>
-                <input id="briefSources" placeholder="tickets, docs, website" />
-              </div>
-            </div>
-
-            <div>
-              <label for="briefTargets">How many good examples per topic?</label>
-              <span class="field-help">One topic per line: topic, then a number. Example: billing 40</span>
-              <textarea id="briefTargets" rows="4" placeholder="billing 40&#10;shipping 30&#10;product 30"></textarea>
-            </div>
-
-            <div>
-              <label for="briefTopics">Example formats to use</label>
-              <span class="field-help">Names of formats from step 2, comma-separated.</span>
-              <input id="briefTopics" placeholder="support_reply, refund_policy" />
-            </div>
-
-            <div>
-              <label for="briefInstructions">Extra instructions for the AI helpers</label>
-              <span class="field-help">Optional. Tone, rules, things to avoid.</span>
-              <textarea id="briefInstructions" rows="3" placeholder="e.g. Prefer polite, short answers. Never invent policies."></textarea>
-            </div>
-
-            <div>
-              <label for="briefOutput">How the final file should look</label>
-              <span class="field-help">Optional note for downloads.</span>
-              <textarea id="briefOutput" rows="2" placeholder="e.g. Each row is a question and a perfect answer"></textarea>
-            </div>
-
-            <details class="advanced">
-              <summary>Advanced options (optional)</summary>
-              <p class="hint">Success goals, output shape</p>
-              <label for="briefMetrics">Success goals (one per line)</label>
-              <textarea id="briefMetrics" rows="3" placeholder="100 approved examples&#10;Balanced hard and easy cases"></textarea>
-            </details>
-
-            <p id="briefStatus" class="status-line"></p>
-          </div>
-
-          <div class="pane">
-            <div class="side-rail-block">
-              <div class="side-rail-title">Formats in this plan</div>
-              <div id="planFormatRail" class="item-list">
-                <p class="hint mb-0">Save formats in step 2, then list their IDs above.</p>
-              </div>
-              <button class="btn btn-secondary btn-block" type="button" data-goto="formats" style="margin-top:12px">Manage formats</button>
-            </div>
-            <div class="side-rail-block">
-              <div class="side-rail-title">What the plan drives</div>
-              <p class="hint mb-0">Targets set here become the per-topic progress on Home, and tell the helpers which topics to weight next.</p>
-            </div>
-            <div class="side-rail-block">
-              <div class="side-rail-title" style="color:var(--ac)">Tip</div>
-              <p class="hint mb-0">Plain English is enough. You can refine later without losing saved data.</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- FORMATS -->
-      <section id="tab-formats" class="tab-panel hidden">
-        <div class="page-head">
-          <div>
-            <span class="page-kicker">Step 2</span>
-            <h2>Your example formats</h2>
-            <p class="hint">Each format is a type of training example — “question + answer”, “situation + recommendation”.</p>
-          </div>
-          <div class="page-actions">
-            <button class="btn btn-primary" id="newSchemaBtn" type="button">New format</button>
-          </div>
-        </div>
-
-        <div class="split split-wide">
-          <div class="pane">
-            <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 24px;border-bottom:2px solid var(--color-divider)">
-              <span class="side-rail-title" style="margin:0" id="schemaCountLabel">Formats</span>
-              <span class="hint mb-0" style="margin:0">Select a row to edit</span>
-            </div>
-            <div style="padding:0 24px 24px">
-              <div id="schemaList" class="item-list"></div>
-            </div>
-          </div>
-          <div class="pane pad">
-            <div class="section-label">Create or edit</div>
-            <h3 class="mt-0" id="schemaFormTitle">New format</h3>
-
-            <label for="schemaDisplay">Friendly name</label>
-            <input id="schemaDisplay" placeholder="e.g. Support reply" />
-
-            <label for="schemaTopic">Short ID</label>
-            <span class="field-help">Letters, numbers, underscores. e.g. support_reply</span>
-            <input id="schemaTopic" placeholder="support_reply" />
-
-            <label for="schemaDesc">What is this format for?</label>
-            <textarea id="schemaDesc" rows="2" placeholder="e.g. A customer question and the ideal helpful reply"></textarea>
-
-            <label for="schemaSampleInput">Sample question / input</label>
-            <textarea id="schemaSampleInput" rows="2" placeholder="Where is my order?"></textarea>
-
-            <label for="schemaSampleOutput">Sample perfect answer / output</label>
-            <textarea id="schemaSampleOutput" rows="3" placeholder="I’d be happy to help track that. Could you share your order number?"></textarea>
-
-            <label for="schemaSampleRationale">Why this answer is good (optional)</label>
-            <textarea id="schemaSampleRationale" rows="2" placeholder="Friendly, asks for the one detail needed next"></textarea>
-
-            <label for="schemaFormat">File style when downloading</label>
-            <select id="schemaFormat">
-              <option value="jsonl">Standard training file</option>
-              <option value="chat">Chat-style</option>
-              <option value="preference">Preference pairs</option>
-            </select>
-
-            <details class="advanced">
-              <summary>Advanced: technical template (optional)</summary>
-              <label for="schemaJson">Structure template</label>
-              <textarea id="schemaJson" rows="8"></textarea>
-            </details>
-
-            <div class="flex">
-              <button class="btn btn-primary" id="saveSchemaBtn" type="button">Save format</button>
-              <button class="btn btn-secondary" id="newSchemaBtn2" type="button">Start new</button>
-            </div>
-            <p id="schemaStatus" class="status-line"></p>
-          </div>
-        </div>
-      </section>
-
-      <!-- HELPERS -->
-      <section id="tab-helpers" class="tab-panel hidden">
-        <div class="page-head">
-          <div>
-            <span class="page-kicker">Step 3 · Mining batches</span>
-            <h2>Run collection batches</h2>
-            <p class="hint">Jobs keep running <strong>even if you sign out</strong>. Mining follows <strong>your Plan</strong> (any domain) — not a fixed vertical. Come back later — data is saved to your account.</p>
-          </div>
-          <div class="page-actions">
-            <button class="btn btn-primary btn-lg" id="startPipeJobBtn" type="button">Start mining job</button>
-          </div>
-        </div>
-
-        <div class="page-body">
-          <div class="banner" id="pipelineScopeBanner" style="margin-bottom:16px;border:1px solid var(--line);padding:12px 14px;background:var(--paper-2)">
-            <strong>Domain-agnostic mining.</strong>
-            Queries and gold promotion use your active Plan / categories. If a run finds no sources, you’ll see an explicit “0 new gold” message — existing library rows are not treated as results of that run.
-          </div>
-          <p class="hint" id="jobsLiveHint" style="margin-bottom:8px">Job status loads here</p>
-          <div class="quality-slider-wrap">
-            <div class="flex" style="justify-content:space-between;align-items:baseline">
-              <label for="pipeQuality" class="mb-0">Quality ↔ Cost</label>
-              <span class="badge accent" id="pipeQualityLabel">Mode 2 — High quality</span>
-            </div>
-            <input id="pipeQuality" type="range" min="1" max="4" step="1" value="2" class="quality-range" />
-            <div class="slider-ends">
-              <span>1 · Best quality<br/><small>All 15 agents</small></span>
-              <span style="text-align:right">4 · Lowest cost<br/><small>Ultra lean</small></span>
-            </div>
-            <p class="hint" id="pipeQualityDesc" style="margin-bottom:0">Core AI helpers + code for mechanical steps.</p>
-          </div>
-
-          <div class="form-row">
-            <div>
-              <label for="pipeBatchSize">Batch size (max 10)</label>
-              <span class="field-help">How many items each batch processes</span>
-              <input id="pipeBatchSize" type="number" min="1" max="10" value="5" />
-            </div>
-            <div>
-              <label for="pipeBatches">Number of batches</label>
-              <span class="field-help">Auto-runs one after another. More than 10 units (size × batches) needs an attached corpus.</span>
-              <input id="pipeBatches" type="number" min="1" max="500" value="2" />
-            </div>
-          </div>
-          <label class="flex" style="align-items:center;gap:.5rem;font-weight:500;margin-bottom:10px">
-            <input id="pipeAuto" type="checkbox" checked style="width:auto;min-height:auto;margin:0" />
-            Auto-run next batch after each finishes
-          </label>
-          <p class="hint" id="pipeEtaHint">Estimated total time: calculating…</p>
-
-          <div class="flex" style="margin:8px 0 16px">
-            <button class="btn btn-secondary" id="runBtn" type="button">Run one helper only</button>
-          </div>
-          <button class="hidden" id="pipelineBtn" type="button"></button>
-
-          <label for="runMessage">Optional note</label>
-          <textarea id="runMessage" rows="2" placeholder="e.g. Focus on billing this week"></textarea>
-          <p id="runStatus" class="status-line"></p>
-          <div id="runOutput" class="result-box hidden"></div>
-
-          <div style="margin-top:28px;border-top:2px solid var(--color-divider);padding-top:20px">
-            <h3 class="mt-0">Your jobs</h3>
-            <p class="hint">Active and recent mining / synthesis jobs. Counters refresh every 2s while you stay signed in. Safe to leave this page.</p>
-            <div id="jobsList"></div>
-          </div>
-
-          <div style="margin-top:28px;border-top:2px solid var(--color-divider);padding-top:20px">
-            <h3 class="mt-0">Single helper (optional)</h3>
-            <p class="hint">Click a card, then “Run one helper only”.</p>
-            <input type="hidden" id="runAgent" value="research_director" />
-            <div id="agentList" class="agent-grid"></div>
-          </div>
         </div>
       </section>
 

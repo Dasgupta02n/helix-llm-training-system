@@ -889,6 +889,33 @@ def run_code_pipeline_batch(
                 "or all candidates already in your library."
             )
 
+    role_blob = f"{brief.get('mission') or ''} {brief.get('domain') or ''} {brief.get('agent_instructions') or ''}"
+    role_text = brief.get("domain") or brief.get("mission") or ""
+    risk = "medium"
+    instr = str(brief.get("agent_instructions") or "")
+    if "ROLE:" in instr:
+        role_text = instr.split("ROLE:", 1)[1].split("\n", 1)[0].strip() or role_text
+    if "RISK:" in instr:
+        risk = instr.split("RISK:", 1)[1].split("\n", 1)[0].strip() or risk
+    try:
+        from helix.services.gold_quality import reverify_gold_for_role
+
+        rv = reverify_gold_for_role(
+            db,
+            tenant_id=tenant_id,
+            owner_user_id=owner_user_id,
+            role_text=role_text or role_blob,
+            risk_level=risk,
+        )
+        if rv.get("newly_rejected"):
+            gold_made = max(0, gold_made - int(rv["newly_rejected"]))
+            gold_rejected += int(rv["newly_rejected"])
+            steps.append(
+                f"role_reverify:rejected={rv['newly_rejected']}/scanned={rv['scanned']}"
+            )
+    except Exception as e:  # noqa: BLE001
+        warnings.append(f"role_reverify: {e}")
+
     db.commit()
     return {
         "mode": "code",
