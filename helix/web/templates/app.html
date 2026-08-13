@@ -145,6 +145,19 @@
                 <button class="btn btn-primary" id="riuSendBtn" type="submit">Send</button>
               </div>
             </form>
+            <div id="riuUploadPanel" class="pane pad hidden" style="margin-top:10px">
+              <h3 class="mt-0" style="font-size:1rem">Upload my gold zip</h3>
+              <p class="hint">
+                Zip of <code>.jsonl</code> / <code>.json</code> / <code>.csv</code> with
+                <strong>input + output</strong> pairs (or question/answer). Saved as gold format —
+                downloadable in My data and ready for Double Helix later.
+              </p>
+              <input id="riuGoldZip" type="file" accept=".zip,application/zip" />
+              <div class="flex" style="margin-top:8px;gap:8px;flex-wrap:wrap">
+                <button class="btn btn-primary btn-sm" id="riuGoldZipBtn" type="button">Upload zip</button>
+                <span id="riuUploadStatus" class="status-line"></span>
+              </div>
+            </div>
           </div>
           <aside class="riu-rail">
             <div class="side-rail-block">
@@ -152,6 +165,7 @@
               <ol class="riu-steps-list">
                 <li>Asks what you’re training</li>
                 <li>Learns topics &amp; quality bar</li>
+                <li>Offers bring-your-own gold zip</li>
                 <li>Saves plan, formats &amp; goals</li>
                 <li>Starts mining (survives logout)</li>
               </ol>
@@ -511,6 +525,21 @@
         </div>
 
         <div id="libraryProgress" class="stat-row"></div>
+
+        <div class="pane pad" style="margin-bottom:1rem">
+          <h3 class="mt-0">Your labeled data (gold format)</h3>
+          <p class="hint">
+            Upload a <strong>zip</strong> of labeled Q&amp;A (jsonl/json/csv). We store it in the same gold format
+            as curated examples — downloadable anytime and ready for <strong>Double Helix</strong> training later.
+          </p>
+          <div class="flex" style="gap:8px;flex-wrap:wrap;align-items:center">
+            <input id="libraryGoldZip" type="file" accept=".zip,application/zip" />
+            <button class="btn btn-primary btn-sm" id="libraryGoldZipBtn" type="button">Upload gold zip</button>
+            <button class="btn btn-ghost btn-sm" id="exportUserUploadBtn" type="button">Export my uploads</button>
+          </div>
+          <p id="libraryUploadStatus" class="status-line"></p>
+          <p class="hint" id="userUploadCountHint"></p>
+        </div>
 
         <div class="pane pad" style="margin-bottom:1rem">
           <h3 class="mt-0">Your corpus (bring your own docs)</h3>

@@ -982,6 +982,7 @@ async function loadLibrary() {
     const seedN = stats.gold_seed_count || 0;
     const userN =
       stats.gold_user_count != null ? stats.gold_user_count : stats.gold_count;
+    const uploadN = stats.gold_user_upload_count || 0;
     $("libraryProgress").innerHTML = `
       <div class="stat-card tone-accent">
         <div class="label">Your generated gold</div>
@@ -990,6 +991,10 @@ async function loadLibrary() {
           seedN
             ? ` · ${seedN} seed/demo row(s) listed separately`
             : ""
+        }${
+          uploadN
+            ? ` · ${uploadN} from your zip upload(s)`
+            : ""
         }</div>
       </div>
       <div class="stat-card tone-ok">
@@ -997,6 +1002,11 @@ async function loadLibrary() {
         <div class="value">${stats.synthetic_count.toLocaleString()}</div>
         <div class="sub">of ${stats.synthetic_target.toLocaleString()} goal · ${stats.synthetic_progress_pct}% · kept forever</div>
       </div>`;
+    if ($("userUploadCountHint")) {
+      $("userUploadCountHint").textContent = uploadN
+        ? `${uploadN} gold-format row(s) from your uploads (Double Helix ready). Use Export my uploads to download.`
+        : "No zip uploads yet. Upload labeled data above or via Riu during setup.";
+    }
 
     if (!gold.items.length) {
       $("goldList").innerHTML = `<div class="empty"><div class="icon">🥇</div>No gold yet. Run helpers, then “Save vetted data as gold”.</div>`;
@@ -1177,6 +1187,54 @@ async function exportLibrary(kind) {
   } catch (e) {
     toast(e.message, "err");
   }
+}
+
+async function uploadGoldZip(fileInput, statusEl, { viaRiu = false } = {}) {
+  if (!state.tenantSlug) throw new Error("Pick a workspace first");
+  const file = fileInput?.files?.[0];
+  if (!file) throw new Error("Choose a .zip file first");
+  if (!/\.zip$/i.test(file.name)) throw new Error("File must be a .zip");
+  if (statusEl) {
+    statusEl.textContent = "Uploading & converting to gold format…";
+    statusEl.className = "status-line";
+  }
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("topic", "user_upload");
+  const path = viaRiu
+    ? `/api/t/${state.tenantSlug}/riu/upload-gold-zip`
+    : `/api/t/${state.tenantSlug}/library/gold/upload-zip`;
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${state.token}` },
+    body: fd,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || data.error || "Upload failed");
+  if (statusEl) {
+    statusEl.textContent = data.message || `Saved ${data.created || 0} gold rows.`;
+    statusEl.className = "status-line ok";
+  }
+  toast(`Saved ${data.created || 0} gold-format example(s)`);
+  if (fileInput) fileInput.value = "";
+  if (viaRiu && data.session) {
+    renderRiuMessages(data.session.messages || []);
+    renderRiuState(data.session.state || {});
+    updateRiuUploadPanel(data.session);
+  }
+  loadLibrary().catch(() => {});
+  return data;
+}
+
+function updateRiuUploadPanel(session) {
+  const panel = $("riuUploadPanel");
+  if (!panel) return;
+  const show =
+    !!session?.show_gold_zip_upload ||
+    session?.phase === "own_data" ||
+    !!session?.state?.own_data_awaiting_upload ||
+    !!session?.state?.has_own_data;
+  panel.classList.toggle("hidden", !show);
 }
 
 // ── Home ────────────────────────────────────────────────────────────
@@ -1786,6 +1844,14 @@ function renderRiuState(state) {
     ["Gold goal", s.gold_target],
     ["Variations", s.variations_per_gold],
     ["Quality mode", s.quality_mode],
+    [
+      "Your uploads",
+      s.own_data_uploaded
+        ? `${s.own_data_count || 0} gold row(s)`
+        : s.has_own_data
+          ? "awaiting zip"
+          : null,
+    ],
   ].filter(([, v]) => v !== undefined && v !== null && String(v).trim() !== "");
   if (!rows.length) {
     el.innerHTML = `<p class="hint mb-0">Nothing yet — start the chat.</p>`;
@@ -1829,6 +1895,7 @@ async function loadRiuSession() {
   const data = await api(`/api/t/${state.tenantSlug}/riu/session`);
   renderRiuMessages(data.messages || []);
   renderRiuState(data.state || {});
+  updateRiuUploadPanel(data);
   const last = (data.messages || []).filter((m) => m.role === "assistant").slice(-1)[0];
   const prog = last?.progress ?? 0;
   if ($("riuProgressBadge")) $("riuProgressBadge").textContent = `Setup ${prog}%`;
@@ -1867,6 +1934,7 @@ async function sendRiuMessage(text) {
     $("riuTyping")?.remove();
     renderRiuMessages(data.messages || []);
     renderRiuState(data.state || {});
+    updateRiuUploadPanel(data);
     if ($("riuProgressBadge")) {
       $("riuProgressBadge").textContent = `Setup ${data.progress ?? 0}%`;
     }
@@ -2032,6 +2100,30 @@ if ($("synthesizeBtn")) $("synthesizeBtn").onclick = synthesize;
 if ($("exportGoldBtn")) $("exportGoldBtn").onclick = () => exportLibrary("gold");
 if ($("exportSynthBtn")) $("exportSynthBtn").onclick = () => exportLibrary("synthetic");
 if ($("exportAllLibraryBtn")) $("exportAllLibraryBtn").onclick = () => exportLibrary("all");
+if ($("exportUserUploadBtn"))
+  $("exportUserUploadBtn").onclick = () => exportLibrary("user_upload");
+if ($("libraryGoldZipBtn")) {
+  $("libraryGoldZipBtn").onclick = () =>
+    uploadGoldZip($("libraryGoldZip"), $("libraryUploadStatus"), { viaRiu: false }).catch(
+      (e) => {
+        if ($("libraryUploadStatus")) {
+          $("libraryUploadStatus").textContent = e.message;
+          $("libraryUploadStatus").className = "status-line error";
+        }
+        toast(e.message, "err");
+      }
+    );
+}
+if ($("riuGoldZipBtn")) {
+  $("riuGoldZipBtn").onclick = () =>
+    uploadGoldZip($("riuGoldZip"), $("riuUploadStatus"), { viaRiu: true }).catch((e) => {
+      if ($("riuUploadStatus")) {
+        $("riuUploadStatus").textContent = e.message;
+        $("riuUploadStatus").className = "status-line error";
+      }
+      toast(e.message, "err");
+    });
+}
 if ($("pipeQuality")) $("pipeQuality").addEventListener("input", updatePipeQualityUI);
 if ($("pipeBatches")) $("pipeBatches").addEventListener("input", updatePipeEta);
 if ($("pipeBatchSize")) $("pipeBatchSize").addEventListener("input", updatePipeEta);

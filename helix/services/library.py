@@ -352,6 +352,11 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
             tenant_slug=slug,
         )
     )
+    user_upload_gold = sum(
+        1
+        for g in verified_rows
+        if (g.source_kind or "").lower() in {"user_upload", "byo", "upload"}
+    )
     user_gold = verified_count - seed_gold
     synth_count = (
         db.query(m.SyntheticExample)
@@ -365,6 +370,7 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
         "gold_verified_count": verified_count,
         "gold_rejected_count": rejected_count,
         "gold_seed_count": seed_gold,
+        "gold_user_upload_count": user_upload_gold,
         "gold_user_count": user_gold,
         "gold_target": scope.gold_target_count,
         "gold_remaining": max(0, scope.gold_target_count - verified_count),
@@ -395,11 +401,14 @@ def gold_to_dict(g: m.GoldExample, tenant_slug: str | None = None) -> dict[str, 
         created_at=g.created_at,
         tenant_slug=tenant_slug,
     )
+    sk = (g.source_kind or "").lower()
     if seed:
         origin = "Seed / demo"
-    elif (g.source_kind or "").lower() == "corpus":
+    elif sk in {"user_upload", "byo", "upload"}:
+        origin = "Your upload (gold format)"
+    elif sk == "corpus":
         origin = "Your corpus"
-    elif (g.source_kind or "").lower() in {"pipeline", "mined"}:
+    elif sk in {"pipeline", "mined"}:
         origin = "Mined (pipeline)"
     else:
         origin = "Your generated data"

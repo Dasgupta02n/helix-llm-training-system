@@ -6,7 +6,7 @@ import json
 import re
 from typing import Any
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
 from fastapi.responses import PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -38,6 +38,11 @@ from helix.services.library import (
     update_scope,
 )
 from helix.services.synthesis import run_synthesis
+from helix.services.user_gold_upload import (
+    MAX_ZIP_BYTES,
+    USER_UPLOAD_SOURCE_KIND,
+    import_zip_as_gold,
+)
 
 router = APIRouter(prefix="/api/t/{slug}/library", tags=["library"])
 
@@ -147,6 +152,10 @@ def list_gold(
     limit: int = Query(50, ge=1, le=500),
     offset: int = Query(0, ge=0),
     topic: str | None = None,
+    source: str | None = Query(
+        None,
+        description="Optional filter: user_upload | seed | pipeline | corpus",
+    ),
     user: m.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -157,6 +166,16 @@ def list_gold(
     )
     if topic:
         q = q.filter_by(topic=topic)
+    if source:
+        src = source.strip().lower()
+        if src in {"user_upload", "byo", "upload"}:
+            q = q.filter(
+                m.GoldExample.source_kind.in_(
+                    [USER_UPLOAD_SOURCE_KIND, "byo", "upload"]
+                )
+            )
+        else:
+            q = q.filter_by(source_kind=src)
     total = q.count()
     rows = (
         q.order_by(m.GoldExample.created_at.desc()).offset(offset).limit(limit).all()
@@ -165,7 +184,48 @@ def list_gold(
         "total": total,
         "items": [gold_to_dict(r, tenant_slug=tenant.slug) for r in rows],
         "retention": "indefinite",
+        "source_filter": source,
     }
+
+
+@router.post("/gold/upload-zip")
+async def upload_gold_zip(
+    slug: str,
+    file: UploadFile = File(...),
+    topic: str = Form("user_upload"),
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Upload a zip of labeled examples → saved as gold-format rows
+    (source_kind=user_upload) for download + future Double Helix.
+    """
+    tenant = _tenant_for(user, slug, db)
+    name = (file.filename or "upload.zip").lower()
+    if not name.endswith(".zip"):
+        raise HTTPException(400, "Please upload a .zip file")
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Empty file")
+    if len(raw) > MAX_ZIP_BYTES:
+        raise HTTPException(
+            400, f"Zip too large (max {MAX_ZIP_BYTES // (1024 * 1024)} MB)"
+        )
+    import io
+
+    out = import_zip_as_gold(
+        db,
+        owner_user_id=user.id,
+        tenant_id=tenant.id,
+        fileobj=io.BytesIO(raw),
+        filename=file.filename or "upload.zip",
+        default_topic=(topic or "user_upload").strip()[:80] or "user_upload",
+        enforce_cap=True,
+    )
+    if not out.get("ok"):
+        raise HTTPException(400, out.get("error") or "Import failed")
+    out["stats"] = library_stats(db, user.id, tenant.id)
+    return out
 
 
 @router.get("/corpus")
@@ -437,21 +497,32 @@ def list_runs(
 @router.get("/export")
 def export_library(
     slug: str,
-    kind: str = Query("all", pattern="^(all|gold|synthetic)$"),
+    kind: str = Query(
+        "all",
+        pattern="^(all|gold|synthetic|user_upload)$",
+    ),
     format: str = Query("jsonl", pattern="^(jsonl|json)$"),
     user: m.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Export the signed-in user's permanent library (never expires)."""
+    """Export the signed-in user's permanent library (never expires).
+
+    kind=user_upload → only bring-your-own gold-format rows (Double Helix ready).
+    """
     tenant = _tenant_for(user, slug, db)
     items: list[dict[str, Any]] = []
-    if kind in {"all", "gold"}:
-        for g in (
-            db.query(m.GoldExample)
-            .filter_by(owner_user_id=user.id, tenant_id=tenant.id, is_archived=False)
-            .all()
-        ):
-            items.append(gold_to_dict(g))
+    if kind in {"all", "gold", "user_upload"}:
+        q = db.query(m.GoldExample).filter_by(
+            owner_user_id=user.id, tenant_id=tenant.id, is_archived=False
+        )
+        if kind == "user_upload":
+            q = q.filter(
+                m.GoldExample.source_kind.in_(
+                    [USER_UPLOAD_SOURCE_KIND, "byo", "upload"]
+                )
+            )
+        for g in q.order_by(m.GoldExample.created_at.asc()).all():
+            items.append(gold_to_dict(g, tenant_slug=tenant.slug))
     if kind in {"all", "synthetic"}:
         for s in (
             db.query(m.SyntheticExample)
@@ -473,7 +544,26 @@ def export_library(
 
     def gen():
         for row in items:
-            yield json.dumps(row, ensure_ascii=False) + "\n"
+            # Stable training shape for Double Helix / external trainers
+            if kind == "user_upload" or row.get("source_kind") in {
+                USER_UPLOAD_SOURCE_KIND,
+                "byo",
+                "upload",
+            }:
+                slim = {
+                    "id": row.get("id"),
+                    "topic": row.get("topic"),
+                    "input": row.get("input"),
+                    "output": row.get("output"),
+                    "rationale": row.get("rationale"),
+                    "difficulty": row.get("difficulty"),
+                    "is_negative": row.get("is_negative"),
+                    "source_kind": row.get("source_kind"),
+                    "kind": "gold",
+                }
+                yield json.dumps(slim, ensure_ascii=False) + "\n"
+            else:
+                yield json.dumps(row, ensure_ascii=False) + "\n"
 
     return StreamingResponse(
         gen(),

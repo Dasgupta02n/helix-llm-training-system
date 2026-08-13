@@ -53,12 +53,18 @@ Your job:
 Tone: friendly, non-technical, short paragraphs. Avoid jargon (say "training examples" not "SFT dataset").
 
 Conversation phases:
-- greet → discover → plan → formats → goals → confirm → running → done
+- greet → discover → plan → formats → goals → own_data → confirm → running → done
+
+After goals are set, ALWAYS ask whether the user has their own labeled data
+(CSV/JSON/JSONL in a zip) they want saved in gold format for Double Helix later.
+- If yes: set has_own_data=true, own_data_awaiting_upload=true, phase=own_data,
+  and tell them to use the upload control (or My data → Upload my gold zip).
+- If no/skip: set has_own_data=false, continue to confirm.
 
 You MUST reply with ONLY a JSON object (no markdown fences) of this shape:
 {
   "reply": "What you say to the user in plain English",
-  "phase": "greet|discover|plan|formats|goals|confirm|running|done",
+  "phase": "greet|discover|plan|formats|goals|own_data|confirm|running|done",
   "state_patch": {
     "project_name": "...",
     "domain": "...",
@@ -79,6 +85,8 @@ You MUST reply with ONLY a JSON object (no markdown fences) of this shape:
     "batch_size": 5,
     "total_batches": 2,
     "run_synthesis": false,
+    "has_own_data": false,
+    "own_data_awaiting_upload": false,
     "notes": "..."
   },
   "actions": [
@@ -127,14 +135,26 @@ def _topic_key(name: str) -> str:
 
 
 def session_to_dict(row: m.RiuSession) -> dict[str, Any]:
+    state = _load_json(row.state_json, {})
+    if not isinstance(state, dict):
+        state = {}
+    phase = row.phase or "greet"
+    show_upload = bool(
+        state.get("own_data_awaiting_upload")
+        or state.get("has_own_data")
+        or phase == "own_data"
+    )
     return {
         "id": row.id,
         "status": row.status,
-        "phase": row.phase,
-        "state": _load_json(row.state_json, {}),
+        "phase": phase,
+        "state": state,
         "messages": _load_json(row.messages_json, []),
         "last_job_id": row.last_job_id,
         "last_synth_job_id": row.last_synth_job_id,
+        "show_gold_zip_upload": show_upload,
+        "own_data_uploaded": bool(state.get("own_data_uploaded")),
+        "own_data_count": int(state.get("own_data_count") or 0),
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
         "assistant_name": RIU_NAME,
@@ -434,21 +454,96 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         mission = patch.get("mission") or state.get("mission") or "Collect great training examples"
         cats = patch.get("categories") or state.get("categories") or ["general"]
         reply = (
-            "Here's the setup I'll apply:\n\n"
-            f"• Project: **{pname}**\n"
-            f"• Goal: {mission}\n"
-            f"• Topics: {', '.join(cats)}\n"
-            f"• Gold target: **{g:,}** · variations/gold: **{v}**\n"
-            f"• Quality mode: **{q}** (1 best … 4 cheapest)\n"
-            f"• First run: **{batches} batches** × "
-            f"**{bsize}** items (keeps going if you sign out)\n\n"
-            "Type **start** to save everything and begin collecting. "
-            "Or tell me what to change."
+            "Goals noted.\n\n"
+            f"• Gold target: **{g:,}** · variations/gold: **{v}** · quality mode **{q}**\n\n"
+            "Do you already have **your own labeled data** (Q&A, tickets, chats) "
+            "you want saved in the **same gold format** Helix uses — so you can "
+            "download it later and use it with **Double Helix** training?\n\n"
+            "Reply **yes** (I'll show a zip upload) or **no** / **skip** to continue."
         )
-        next_phase = "confirm"
-        progress = 90
+        next_phase = "own_data"
+        progress = 82
         actions.append({"type": "save_goals"})
         actions.append({"type": "save_plan"})
+    elif phase == "own_data":
+        yes = any(
+            w in lower
+            for w in (
+                "yes",
+                "yeah",
+                "yep",
+                "y",
+                "i have",
+                "i do",
+                "upload",
+                "zip",
+                "my data",
+                "own data",
+                "have data",
+            )
+        ) and not any(w in lower for w in ("no", "skip", "later", "not now", "don't"))
+        no = any(
+            w in lower
+            for w in ("no", "skip", "later", "not now", "don't have", "nope", "nah")
+        ) or lower.strip() in {"n", "no thanks"}
+        # "done" / "continue" after they uploaded
+        if lower.strip() in {"done", "continue", "next", "ok", "okay"} and state.get(
+            "own_data_uploaded"
+        ):
+            no = True
+            yes = False
+        if yes and not no:
+            patch["has_own_data"] = True
+            patch["own_data_awaiting_upload"] = True
+            reply = (
+                "Perfect. Use the **Upload my gold zip** control below (or under "
+                "**My data**).\n\n"
+                "Zip should include `.jsonl`, `.json`, or `.csv` files with pairs like "
+                "`input`+`output` (also accepts question/answer or prompt/completion).\n\n"
+                "I'll save them as **gold-format** rows (downloadable anytime, ready "
+                "for Double Helix later).\n\n"
+                "After uploading, reply **done** or **continue**. "
+                "Or say **skip** to move on without uploading."
+            )
+            next_phase = "own_data"
+            progress = 85
+        else:
+            patch["has_own_data"] = bool(state.get("own_data_uploaded"))
+            patch["own_data_awaiting_upload"] = False
+            try:
+                q = int(state.get("quality_mode") or 2)
+                g = int(state.get("gold_target") or 5000)
+                v = int(state.get("variations_per_gold") or 4)
+                batches = int(state.get("total_batches") or 2)
+                bsize = int(state.get("batch_size") or 5)
+            except (TypeError, ValueError):
+                q, g, v, batches, bsize = 2, 5000, 4, 2, 5
+            pname = state.get("project_name") or "My project"
+            mission = state.get("mission") or "Collect great training examples"
+            cats = state.get("categories") or ["general"]
+            own_note = ""
+            if state.get("own_data_uploaded"):
+                own_note = (
+                    f"• Your uploads: **{int(state.get('own_data_count') or 0)}** "
+                    "gold-format row(s) saved\n"
+                )
+            reply = (
+                "Here's the setup I'll apply:\n\n"
+                f"• Project: **{pname}**\n"
+                f"• Goal: {mission}\n"
+                f"• Topics: {', '.join(cats)}\n"
+                f"• Gold target: **{g:,}** · variations/gold: **{v}**\n"
+                f"• Quality mode: **{q}** (1 best … 4 cheapest)\n"
+                f"{own_note}"
+                f"• First run: **{batches} batches** × "
+                f"**{bsize}** items (keeps going if you sign out)\n\n"
+                "Type **start** to save everything and begin collecting. "
+                "Or tell me what to change."
+            )
+            next_phase = "confirm"
+            progress = 90
+            actions.append({"type": "save_goals"})
+            actions.append({"type": "save_plan"})
     elif phase == "running":
         if wants_run:
             reply = (
