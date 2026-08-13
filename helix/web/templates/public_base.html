@@ -5,9 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}Helix{% endblock %} — Training Data Studio</title>
   <meta name="description" content="{% block meta_description %}Helix is a no-code gold training-data studio for product and ops teams: plan in plain English, mine evidence, quality-gate gold examples, synthesize variants, and export fine-tune-ready datasets.{% endblock %}" />
-  <meta name="theme-color" content="#111111" />
+  <meta name="theme-color" content="#07080c" />
   <link rel="canonical" href="{% block canonical %}https://c7xai.in/{% endblock %}" />
   <link rel="stylesheet" href="/static/app.css?v={{ static_v }}" />
+  <link rel="stylesheet" href="/static/site.css?v={{ static_v }}" />
 </head>
 <body class="site-body">
   <div class="landing-shell">
@@ -82,6 +83,23 @@
         btn.setAttribute("aria-expanded", open ? "true" : "false");
         btn.textContent = open ? "Close" : "Menu";
       });
+    })();
+    (function () {
+      var els = document.querySelectorAll(".landing-decision, .landing-features, .hx-hero-inner, .poster-banner");
+      els.forEach(function (el) { el.classList.add("reveal"); });
+      if (!("IntersectionObserver" in window)) {
+        els.forEach(function (el) { el.classList.add("in"); });
+        return;
+      }
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) {
+          if (e.isIntersecting) {
+            e.target.classList.add("in");
+            io.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.12 });
+      els.forEach(function (el) { io.observe(el); });
     })();
   </script>
 </body>
