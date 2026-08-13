@@ -632,9 +632,12 @@ function _jobResultBanner(j) {
   const costLine = _jobCostLine(j);
   if (j.status === "paused_spend_cap") {
     return `<div class="banner warn" style="margin-top:8px">
-      <strong>Paused — spend cap.</strong>
+      <strong>Paused — spend cap (consent required).</strong>
       ${escapeHtml(msg || "Job trajectory would exceed $35 per 1,000 gold.")}
       ${costLine}
+      <p class="hint mb-0" style="margin-top:6px">
+        Confirm to run remaining batches past the cap, or Cancel to stop. No further spend until you choose.
+      </p>
     </div>`;
   }
   if (j.status === "completed" && Number(goldNew) === 0) {
@@ -778,11 +781,14 @@ async function loadJobs() {
               <span class="badge ${badge}">${escapeHtml(statusLabel)}</span>
               <span class="badge">Q${j.quality_mode}</span>
             </div>
-            <div class="flex">
+            <div class="flex" style="gap:6px;flex-wrap:wrap">
               ${
-                j.status === "pending" || j.status === "running"
-                  ? `<button class="btn btn-secondary btn-sm" data-cancel="${escapeHtml(j.id)}" type="button">Cancel</button>`
-                  : ""
+                j.status === "paused_spend_cap"
+                  ? `<button class="btn btn-primary btn-sm" data-continue-cap="${escapeHtml(j.id)}" type="button">Continue past cap</button>
+                     <button class="btn btn-secondary btn-sm" data-cancel="${escapeHtml(j.id)}" type="button">Cancel job</button>`
+                  : j.status === "pending" || j.status === "running"
+                    ? `<button class="btn btn-secondary btn-sm" data-cancel="${escapeHtml(j.id)}" type="button">Cancel</button>`
+                    : ""
               }
             </div>
           </div>
@@ -807,6 +813,33 @@ async function loadJobs() {
             method: "POST",
           });
           toast("Job cancel requested");
+          state._jobsRenderKey = "";
+          await loadJobs();
+        } catch (e) {
+          toast(e.message, "err");
+        }
+      };
+    });
+    $("jobsList").querySelectorAll("[data-continue-cap]").forEach((btn) => {
+      btn.onclick = async () => {
+        const ok = window.confirm(
+          "This job is over the $35-per-1,000-gold spend trajectory.\n\n" +
+            "Continue remaining batches anyway?\n" +
+            "You will be charged for further OpenRouter + Apify usage."
+        );
+        if (!ok) {
+          toast("Still paused — no further spend until you continue or cancel");
+          return;
+        }
+        try {
+          await api(
+            `/api/t/${state.tenantSlug}/jobs/${btn.dataset.continueCap}/continue-past-cap`,
+            {
+              method: "POST",
+              body: JSON.stringify({ confirm: true }),
+            }
+          );
+          toast("Spend-cap consent recorded — job resuming");
           state._jobsRenderKey = "";
           await loadJobs();
         } catch (e) {

@@ -229,7 +229,7 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             db.commit()
             return
 
-        # Hard spend-cap auto-pause (OpenRouter + Apify combined)
+        # Hard spend-cap: pause for explicit user consent (unless already overridden)
         try:
             summ_for_cap = json.loads(job.result_summary_json or "{}")
         except Exception:  # noqa: BLE001
@@ -239,6 +239,8 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             if job.job_type == "pipeline"
             else int(summ_for_cap.get("total_synth_new") or 0)
         )
+        remaining_batches = max(0, job.total_batches - job.completed_batches)
+        override = bool(getattr(job, "spend_cap_override", False))
         pause, pause_msg = should_pause_for_spend_cap(
             cost_usd=float(job.cost_usd or 0.0),
             gold_new=units_for_cap,
@@ -246,19 +248,32 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             completed_batches=job.completed_batches,
             total_batches=job.total_batches,
         )
-        if pause:
+        # Only pause when more work remains and user has not consented past the cap.
+        # If the last batch just finished, complete normally (cost already spent).
+        if (
+            pause
+            and not override
+            and remaining_batches > 0
+            and job.auto_continue
+        ):
             job.status = "paused_spend_cap"
-            job.finished_at = _now()
+            job.finished_at = None  # not terminal — awaits consent or cancel
             job.eta_seconds = 0
-            job.progress_message = pause_msg
+            consent_note = (
+                f"{pause_msg} Job is paused. "
+                "Confirm “Continue past cap” to resume remaining batches, "
+                "or Cancel to stop."
+            )
+            job.progress_message = consent_note
             summ_for_cap["spend_cap_paused"] = True
-            summ_for_cap["spend_cap_message"] = pause_msg
+            summ_for_cap["needs_spend_consent"] = True
+            summ_for_cap["spend_cap_message"] = consent_note
             summ_for_cap["openrouter_cost_usd"] = job.openrouter_cost_usd
             summ_for_cap["apify_cost_usd"] = job.apify_cost_usd
             summ_for_cap["cost_usd"] = job.cost_usd
-            summ_for_cap["job_user_message"] = pause_msg
+            summ_for_cap["job_user_message"] = consent_note
             job.result_summary_json = json.dumps(summ_for_cap, default=str)
-            _log(db, job, pause_msg, level="warn")
+            _log(db, job, consent_note, level="warn")
             db.commit()
             return
 

@@ -116,6 +116,7 @@ def apply_migrations(engine: Engine) -> None:
                 "cost_usd": "FLOAT DEFAULT 0",
                 "target_gold": "INTEGER DEFAULT 0",
                 "spend_cap_usd": "FLOAT DEFAULT 0",
+                "spend_cap_override": bool_false,
             }
             for name, typ in bj_additions.items():
                 if name not in bj_cols:

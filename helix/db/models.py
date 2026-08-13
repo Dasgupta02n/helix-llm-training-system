@@ -491,6 +491,8 @@ class BatchJob(Base):
     # Spend-cap: ~$35 per 1k gold, scaled to job target_gold
     target_gold: Mapped[int] = mapped_column(Integer, default=0)
     spend_cap_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    # User explicitly consented to continue past the hard spend cap
+    spend_cap_override: Mapped[bool] = mapped_column(Boolean, default=False)
     result_summary_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

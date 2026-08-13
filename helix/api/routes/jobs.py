@@ -11,6 +11,7 @@ from helix.db import models as m
 from helix.db.session import get_db
 from helix.services.batch_jobs import (
     cancel_job,
+    continue_past_spend_cap,
     create_batch_job,
     get_job_detail,
     job_to_dict,
@@ -166,3 +167,58 @@ def cancel(
     if not job:
         raise HTTPException(404, "Job not found")
     return {"ok": True, "job": job_to_dict(job)}
+
+
+class SpendCapContinueBody(BaseModel):
+    """Explicit consent required — prevents accidental resume past the cap."""
+
+    confirm: bool = Field(
+        False,
+        description="Must be true to continue past the $35/1k gold spend cap.",
+    )
+
+
+@router.post("/{job_id}/continue-past-cap")
+def continue_past_cap(
+    slug: str,
+    job_id: str,
+    body: SpendCapContinueBody | None = None,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Resume a job paused for spend-cap only after explicit user confirmation.
+    Without confirm=true the job stays paused.
+    """
+    _tenant_for(user, slug, db)
+    body = body or SpendCapContinueBody()
+    if not body.confirm:
+        raise HTTPException(
+            400,
+            "confirm=true is required to continue past the spend cap. "
+            "Job remains paused until you confirm or cancel.",
+        )
+    job = db.query(m.BatchJob).filter_by(id=job_id, owner_user_id=user.id).first()
+    if not job:
+        raise HTTPException(404, "Job not found")
+    if job.status != "paused_spend_cap":
+        # Idempotent: already running/done
+        return {
+            "ok": True,
+            "resumed": False,
+            "message": f"Job is {job.status} (not awaiting spend-cap consent).",
+            "job": job_to_dict(job),
+        }
+    job = continue_past_spend_cap(db, job_id, user.id)
+    if not job:
+        raise HTTPException(404, "Job not found")
+    return {
+        "ok": True,
+        "resumed": job.status in {"pending", "running", "completed"},
+        "message": (
+            "Spend-cap consent recorded. Job will continue remaining batches."
+            if job.status in {"pending", "running"}
+            else job.progress_message
+        ),
+        "job": job_to_dict(job),
+    }

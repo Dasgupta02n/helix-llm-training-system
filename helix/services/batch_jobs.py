@@ -92,6 +92,7 @@ def create_batch_job(
         eta_seconds=prior * total_batches,
         target_gold=target_gold,
         spend_cap_usd=spend_cap,
+        spend_cap_override=False,
         openrouter_cost_usd=0.0,
         apify_cost_usd=0.0,
         cost_usd=0.0,
@@ -154,12 +155,16 @@ def job_to_dict(job: m.BatchJob, events: list[m.BatchJobEvent] | None = None) ->
         "cost_usd": round(float(job.cost_usd or 0.0), 6),
         "target_gold": int(job.target_gold or 0),
         "spend_cap_usd": round(float(job.spend_cap_usd or 0.0), 6),
+        "spend_cap_override": bool(getattr(job, "spend_cap_override", False)),
+        "needs_spend_consent": (job.status == "paused_spend_cap")
+        and not bool(getattr(job, "spend_cap_override", False)),
         "cost_breakdown": {
             "openrouter_usd": round(float(job.openrouter_cost_usd or 0.0), 6),
             "apify_usd": round(float(job.apify_cost_usd or 0.0), 6),
             "total_usd": round(float(job.cost_usd or 0.0), 6),
             "spend_cap_usd": round(float(job.spend_cap_usd or 0.0), 6),
             "target_gold": int(job.target_gold or 0),
+            "spend_cap_override": bool(getattr(job, "spend_cap_override", False)),
         },
         "config": config,
         "result_summary": summary,
@@ -225,10 +230,16 @@ def cancel_job(db: Session, job_id: str, owner_user_id: str) -> m.BatchJob | Non
     job = db.query(m.BatchJob).filter_by(id=job_id, owner_user_id=owner_user_id).first()
     if not job:
         return None
-    if job.status in {"completed", "failed", "cancelled", "paused_spend_cap"}:
+    if job.status in {"completed", "failed", "cancelled"}:
         return job
+    # Allow cancel from paused_spend_cap (user declines to continue past cap)
+    was_paused = job.status == "paused_spend_cap"
     job.status = "cancelled"
-    job.progress_message = "Cancelled by user"
+    job.progress_message = (
+        "Cancelled by user (did not continue past spend cap)."
+        if was_paused
+        else "Cancelled by user"
+    )
     job.finished_at = _now()
     job.updated_at = _now()
     job.eta_seconds = 0
@@ -237,10 +248,95 @@ def cancel_job(db: Session, job_id: str, owner_user_id: str) -> m.BatchJob | Non
             id=_uid("jbe_"),
             job_id=job.id,
             batch_index=job.completed_batches,
-            message="Job cancelled by user.",
+            message=job.progress_message,
             level="warn",
         )
     )
+    db.commit()
+    db.refresh(job)
+    return job
+
+
+def continue_past_spend_cap(
+    db: Session, job_id: str, owner_user_id: str
+) -> m.BatchJob | None:
+    """
+    Explicit user consent to resume a job paused for exceeding the $35/1k
+    gold spend trajectory. Without this, the job stays paused.
+    """
+    job = db.query(m.BatchJob).filter_by(id=job_id, owner_user_id=owner_user_id).first()
+    if not job:
+        return None
+    if job.status != "paused_spend_cap":
+        # Already running / done / cancelled — return as-is (idempotent for clients)
+        return job
+
+    remaining = max(0, int(job.total_batches) - int(job.completed_batches))
+    job.spend_cap_override = True
+    job.finished_at = None
+    job.updated_at = _now()
+    job.error = None
+
+    try:
+        summary = json.loads(job.result_summary_json or "{}")
+    except json.JSONDecodeError:
+        summary = {}
+    summary["spend_cap_paused"] = False
+    summary["spend_cap_override"] = True
+    summary["spend_cap_consent_at"] = _now().isoformat()
+    summary["spend_cap_message"] = (
+        "User consented to continue past spend cap "
+        f"(${float(job.cost_usd or 0):.4f} spent / "
+        f"cap ${float(job.spend_cap_usd or 0):.4f})."
+    )
+
+    if remaining <= 0 or not job.auto_continue:
+        # All batches already finished when cap fired — mark completed with consent note
+        job.status = "completed"
+        job.eta_seconds = 0
+        job.progress_message = (
+            f"Completed with user consent after spend-cap pause. "
+            f"Cost ${float(job.cost_usd or 0):.4f} "
+            f"(cap was ${float(job.spend_cap_usd or 0):.4f})."
+        )
+        summary["job_user_message"] = job.progress_message
+        job.result_summary_json = json.dumps(summary, default=str)
+        job.finished_at = _now()
+        db.add(
+            m.BatchJobEvent(
+                id=_uid("jbe_"),
+                job_id=job.id,
+                batch_index=job.completed_batches,
+                message=(
+                    "User consented past spend cap; no remaining batches — marked completed."
+                ),
+                level="info",
+            )
+        )
+    else:
+        job.status = "pending"
+        job.progress_message = (
+            f"Resumed after spend-cap consent. "
+            f"{remaining} batch(es) remaining. Cap override active "
+            f"(${float(job.cost_usd or 0):.4f} already spent / "
+            f"original cap ${float(job.spend_cap_usd or 0):.4f})."
+        )
+        summary["job_user_message"] = job.progress_message
+        job.result_summary_json = json.dumps(summary, default=str)
+        remaining_eta = (job.avg_batch_seconds or 0) * remaining
+        job.eta_seconds = round(remaining_eta, 1) if remaining_eta else None
+        db.add(
+            m.BatchJobEvent(
+                id=_uid("jbe_"),
+                job_id=job.id,
+                batch_index=job.completed_batches,
+                message=(
+                    "User consented to continue past spend cap. "
+                    f"Re-queued {remaining} remaining batch(es) with override."
+                ),
+                level="warn",
+            )
+        )
     db.commit()
     db.refresh(job)
     return job
