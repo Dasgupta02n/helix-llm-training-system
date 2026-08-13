@@ -34,7 +34,10 @@ class Tenant(Base):
     plan: Mapped[str] = mapped_column(String(40), default="starter")
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     monthly_budget_usd: Mapped[float] = mapped_column(Float, default=50.0)
+    # Combined billed spend (OpenRouter + Apify); split counters below
     spent_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    openrouter_spent_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    apify_spent_usd: Mapped[float] = mapped_column(Float, default=0.0)
     # Optional per-tenant OpenRouter key override
     openrouter_api_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
     openrouter_model: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -474,13 +477,20 @@ class BatchJob(Base):
     completed_batches: Mapped[int] = mapped_column(Integer, default=0)
     auto_continue: Mapped[bool] = mapped_column(Boolean, default=True)
     status: Mapped[str] = mapped_column(String(40), default="pending", index=True)
-    # pending | running | completed | failed | cancelled
+    # pending | running | completed | failed | cancelled | paused_spend_cap
     config_json: Mapped[str] = mapped_column(Text, default="{}")
     progress_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     items_processed: Mapped[int] = mapped_column(Integer, default=0)
     last_batch_seconds: Mapped[float] = mapped_column(Float, default=0.0)
     avg_batch_seconds: Mapped[float] = mapped_column(Float, default=0.0)
     eta_seconds: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # Accurate cost accounting (provider-billed when available)
+    openrouter_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    apify_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    # Spend-cap: ~$35 per 1k gold, scaled to job target_gold
+    target_gold: Mapped[int] = mapped_column(Integer, default=0)
+    spend_cap_usd: Mapped[float] = mapped_column(Float, default=0.0)
     result_summary_json: Mapped[str | None] = mapped_column(Text, nullable=True)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -516,6 +526,8 @@ class GatherJob(Base):
     # pending | running | completed | cached | error
     apify_run_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
     apify_dataset_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    # Provider-billed Apify cost for this run (0 when cache hit)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     item_count: Mapped[int] = mapped_column(Integer, default=0)
     needs_judgment_count: Mapped[int] = mapped_column(Integer, default=0)
     from_cache: Mapped[bool] = mapped_column(Boolean, default=False)
@@ -809,6 +821,10 @@ class AgentRun(Base):
     provider: Mapped[str | None] = mapped_column(String(40), nullable=True)
     model: Mapped[str | None] = mapped_column(String(120), nullable=True)
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    # "provider" when OpenRouter usage.cost used; "estimate" for token fallback
+    cost_source: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    prompt_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, default=0)
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

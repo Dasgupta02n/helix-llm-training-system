@@ -336,6 +336,19 @@ def synthesize_gold_with_llm(
                 tools=None,
                 tool_choice=None,
             )
+            try:
+                from helix.llm.client import cost_from_usage
+                from helix.services.cost_tracking import record_openrouter_spend
+
+                usage = getattr(resp, "usage", None)
+                if usage and tenant is not None:
+                    amt, _src = cost_from_usage(
+                        usage, model=getattr(client, "model", None)
+                    )
+                    if amt > 0:
+                        record_openrouter_spend(tenant, amt)
+            except Exception:  # noqa: BLE001
+                pass
             last_out = (resp.choices[0].message.content or "").strip()
             if last_out.startswith("```"):
                 last_out = re.sub(r"^```(?:\w+)?\s*", "", last_out)

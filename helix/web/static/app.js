@@ -629,10 +629,19 @@ function _jobResultBanner(j) {
     "";
   const zero =
     (s.zero_evidence || last.zero_evidence) && Number(goldNew) === 0;
+  const costLine = _jobCostLine(j);
+  if (j.status === "paused_spend_cap") {
+    return `<div class="banner warn" style="margin-top:8px">
+      <strong>Paused — spend cap.</strong>
+      ${escapeHtml(msg || "Job trajectory would exceed $35 per 1,000 gold.")}
+      ${costLine}
+    </div>`;
+  }
   if (j.status === "completed" && Number(goldNew) === 0) {
     return `<div class="banner warn" style="margin-top:8px">
       <strong>No new gold this job.</strong>
       ${escapeHtml(msg || "0 new on-topic examples. Existing library items were not produced by this job.")}
+      ${costLine}
     </div>`;
   }
   if (Number(goldNew) > 0 && (j.status === "completed" || j.status === "running")) {
@@ -640,15 +649,53 @@ function _jobResultBanner(j) {
       <strong>${goldNew}</strong> new gold example(s) from this job.
       ${escapeHtml(msg)}
       Seed/demo rows stay labeled separately in My data.
+      ${costLine}
     </div>`;
   }
   if (zero) {
     return `<div class="banner warn" style="margin-top:8px">
       <strong>No verifiable sources this batch.</strong>
       ${escapeHtml(msg || "")}
+      ${costLine}
     </div>`;
   }
-  return "";
+  return costLine
+    ? `<div class="hint" style="margin-top:6px">${costLine}</div>`
+    : "";
+}
+
+function _jobCostLine(j) {
+  const s = j.result_summary || {};
+  const orC =
+    j.openrouter_cost_usd != null
+      ? j.openrouter_cost_usd
+      : s.openrouter_cost_usd != null
+        ? s.openrouter_cost_usd
+        : null;
+  const apC =
+    j.apify_cost_usd != null
+      ? j.apify_cost_usd
+      : s.apify_cost_usd != null
+        ? s.apify_cost_usd
+        : null;
+  const total =
+    j.cost_usd != null
+      ? j.cost_usd
+      : s.cost_usd != null
+        ? s.cost_usd
+        : orC != null || apC != null
+          ? Number(orC || 0) + Number(apC || 0)
+          : null;
+  if (total == null && orC == null && apC == null) return "";
+  const cap = j.spend_cap_usd != null ? j.spend_cap_usd : s.spend_cap_usd;
+  const bits = [];
+  if (orC != null) bits.push(`OpenRouter $${Number(orC).toFixed(4)}`);
+  if (apC != null) bits.push(`Apify $${Number(apC).toFixed(4)}`);
+  if (total != null) bits.push(`total $${Number(total).toFixed(4)}`);
+  if (cap != null && Number(cap) > 0) bits.push(`cap $${Number(cap).toFixed(4)}`);
+  return bits.length
+    ? `<div class="hint" style="margin-top:4px">Cost: ${bits.join(" · ")}</div>`
+    : "";
 }
 
 function _jobRenderKey(j) {
@@ -699,9 +746,13 @@ async function loadJobs() {
             ? "ok"
             : j.status === "failed" || j.status === "cancelled"
               ? "err"
-              : j.status === "running"
-                ? "accent"
-                : "warn";
+              : j.status === "paused_spend_cap"
+                ? "warn"
+                : j.status === "running"
+                  ? "accent"
+                  : "warn";
+        const statusLabel =
+          j.status === "paused_spend_cap" ? "paused (spend cap)" : j.status;
         const typeLabel = j.job_type === "synthesis" ? "Synthesis" : "Mining";
         let pct = Number(j.progress_pct) || 0;
         if (j.status === "running" && pct < 100) {
@@ -712,11 +763,19 @@ async function loadJobs() {
           pct = Math.max(pct, Math.min(99, Math.round(partial * 10) / 10));
         }
         const updated = j.updated_at ? new Date(j.updated_at).toLocaleTimeString() : "—";
+        const costBits = [];
+        if (j.openrouter_cost_usd != null)
+          costBits.push(`OR $${Number(j.openrouter_cost_usd).toFixed(3)}`);
+        if (j.apify_cost_usd != null)
+          costBits.push(`Apify $${Number(j.apify_cost_usd).toFixed(3)}`);
+        if (j.cost_usd != null) costBits.push(`Σ $${Number(j.cost_usd).toFixed(3)}`);
+        if (j.spend_cap_usd != null && Number(j.spend_cap_usd) > 0)
+          costBits.push(`cap $${Number(j.spend_cap_usd).toFixed(3)}`);
         return `<div class="job-card" data-job="${escapeHtml(j.id)}" data-updated="${escapeHtml(j.updated_at || "")}">
           <div class="job-head">
             <div>
               <strong>${typeLabel}</strong>
-              <span class="badge ${badge}">${escapeHtml(j.status)}</span>
+              <span class="badge ${badge}">${escapeHtml(statusLabel)}</span>
               <span class="badge">Q${j.quality_mode}</span>
             </div>
             <div class="flex">
@@ -734,6 +793,7 @@ async function loadJobs() {
             · items <strong class="job-items">${j.items_processed}</strong>
             · ETA ${escapeHtml(j.eta_human || "—")}
             · updated ${escapeHtml(updated)}
+            ${costBits.length ? ` · ${costBits.join(" · ")}` : ""}
           </p>
           <p class="hint mb-0 job-progress-msg"><strong>${escapeHtml(j.progress_message || "…")}</strong></p>
           ${_jobResultBanner(j)}
@@ -1093,6 +1153,8 @@ async function refreshDashboard() {
   const m = dash.metrics || {};
   const budget = m.budget || {};
   const spent = budget.spent_usd || 0;
+  const orSpent = budget.openrouter_usd != null ? budget.openrouter_usd : spent;
+  const apSpent = budget.apify_usd != null ? budget.apify_usd : 0;
   const limit = budget.monthly_usd || 0;
   const openEsc = m.open_escalations ?? 0;
   const openCon = m.open_contradictions ?? 0;
@@ -1109,9 +1171,9 @@ async function refreshDashboard() {
       <div class="sub">Conflicting facts to review later</div>
     </div>
     <div class="stat-card tone-ok">
-      <div class="label">AI usage this month</div>
-      <div class="value">$${spent.toFixed(2)}</div>
-      <div class="sub">of $${limit.toFixed(0)} budget</div>
+      <div class="label">Usage this month (all-in)</div>
+      <div class="value">$${Number(spent).toFixed(2)}</div>
+      <div class="sub">OpenRouter $${Number(orSpent).toFixed(2)} · Apify $${Number(apSpent).toFixed(2)} · budget $${Number(limit).toFixed(0)}</div>
     </div>
   `;
 
@@ -1229,7 +1291,7 @@ async function refreshDashboard() {
           return `<tr>
             <td><strong>${escapeHtml(title)}</strong></td>
             <td><span class="badge ${badge}">${escapeHtml(status)}</span></td>
-            <td>$${(r.cost_usd || 0).toFixed(3)}</td>
+            <td title="${escapeHtml(r.cost_source || "")}">$${(r.cost_usd || 0).toFixed(4)}${r.cost_source === "estimate" ? " ~" : ""}</td>
             <td>${escapeHtml(preview)}</td>
           </tr>`;
         })

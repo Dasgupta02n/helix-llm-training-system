@@ -37,6 +37,8 @@ class TenantOut(BaseModel):
     is_active: bool
     monthly_budget_usd: float
     spent_usd: float
+    openrouter_spent_usd: float | None = None
+    apify_spent_usd: float | None = None
     openrouter_model: str | None = None
 
     class Config:

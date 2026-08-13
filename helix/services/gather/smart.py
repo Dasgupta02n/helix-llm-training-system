@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from helix.config import get_settings
 from helix.db import models as m
+from helix.services.cost_tracking import record_apify_spend
 from helix.services.gather import apify_client
 
 
@@ -299,6 +300,11 @@ def gather_search(
             )
             job.apify_run_id = meta.get("run_id")
             job.apify_dataset_id = meta.get("dataset_id")
+            cost_usd = float(meta.get("cost_usd") or 0.0)
+            job.cost_usd = cost_usd
+            if cost_usd > 0:
+                tenant = db.query(m.Tenant).filter_by(id=tenant_id).first()
+                record_apify_spend(tenant, cost_usd)
         except Exception as e:  # noqa: BLE001
             job.status = "error"
             job.error = str(e)[:1000]
@@ -312,6 +318,7 @@ def gather_search(
                 "results": [],
                 "needs_judgment": [],
                 "gatherer": "apify",
+                "apify_cost_usd": 0.0,
             }
 
     results_out: list[dict[str, Any]] = []
@@ -386,6 +393,7 @@ def gather_search(
     job.finished_at = _now()
     db.commit()
 
+    apify_cost = float(job.cost_usd or 0.0)
     return {
         "job_id": job.id,
         "from_cache": bool(cached or job.from_cache),
@@ -395,13 +403,17 @@ def gather_search(
         "needs_judgment": needs_j,
         "discarded_low_relevance": discarded,
         "gatherer": "apify",
+        "apify_cost_usd": apify_cost,
         "apify": {
             "run_id": job.apify_run_id,
             "dataset_id": job.apify_dataset_id,
+            "cost_usd": apify_cost,
         },
         "message": (
             f"Gathered {len(results_out)} items via Apify; "
-            f"{len(needs_j)} need judgment; {discarded} dropped by code filter."
+            f"{len(needs_j)} need judgment; {discarded} dropped by code filter"
+            + (f"; Apify ${apify_cost:.4f}" if apify_cost else " (cache, $0 Apify)")
+            + "."
         ),
     }
 
@@ -461,6 +473,10 @@ def gather_evidence_for_url(
     page, meta = apify_client.fetch_page(url)
     text = page.get("text") or page.get("content") or page.get("markdown") or ""
     title = page.get("title") or (existing_item.title if existing_item else "") or url
+    cost_usd = float(meta.get("cost_usd") or 0.0)
+    if cost_usd > 0:
+        tenant = db.query(m.Tenant).filter_by(id=tenant_id).first()
+        record_apify_spend(tenant, cost_usd)
     content = {
         "title": title,
         "url": url,
@@ -476,11 +492,14 @@ def gather_evidence_for_url(
         existing_item.title = content["title"][:500]
         existing_item.raw_json = json.dumps(page)[:50000]
         db.commit()
+    else:
+        db.commit()
     return {
         "ok": True,
         "from_cache": False,
         "content": content,
         "gatherer": "apify",
+        "apify_cost_usd": cost_usd,
         "apify": meta,
     }
 

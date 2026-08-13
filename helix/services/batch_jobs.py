@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from helix.db import models as m
+from helix.services.cost_tracking import gold_spend_cap_usd
 from helix.services.pipeline_modes import (
     MODE_META,
     clamp_batch_size,
@@ -64,6 +65,16 @@ def create_batch_job(
     if hist:
         prior = sum(j.avg_batch_seconds for j in hist) / len(hist)
 
+    # Spend-cap target: pipeline aims for ~batch_size gold per batch.
+    # Synthesis uses synthetic rows as scale (not gold) — still cap on cost trajectory
+    # using batch_size * total_batches as the job's "unit" target.
+    target_gold = max(1, batch_size * total_batches)
+    if job_type == "pipeline":
+        spend_cap = gold_spend_cap_usd(target_gold)
+    else:
+        # Synthesis is LLM-only; use same $/1k unit budget as a safety rail
+        spend_cap = gold_spend_cap_usd(target_gold)
+
     job = m.BatchJob(
         id=_uid(),
         owner_user_id=owner_user_id,
@@ -79,6 +90,11 @@ def create_batch_job(
         progress_message="Queued — will run even if you sign out.",
         avg_batch_seconds=prior,
         eta_seconds=prior * total_batches,
+        target_gold=target_gold,
+        spend_cap_usd=spend_cap,
+        openrouter_cost_usd=0.0,
+        apify_cost_usd=0.0,
+        cost_usd=0.0,
     )
     db.add(job)
     db.add(
@@ -86,7 +102,12 @@ def create_batch_job(
             id=_uid("jbe_"),
             job_id=job.id,
             batch_index=0,
-            message=f"Job queued ({job_type}, quality mode {quality_mode}, {total_batches} batches × size {batch_size}).",
+            message=(
+                f"Job queued ({job_type}, quality mode {quality_mode}, "
+                f"{total_batches} batches × size {batch_size}). "
+                f"Spend cap ${spend_cap:.4f} for {target_gold} target units "
+                f"($35/1k gold scale)."
+            ),
             level="info",
         )
     )
@@ -128,6 +149,18 @@ def job_to_dict(job: m.BatchJob, events: list[m.BatchJobEvent] | None = None) ->
         "progress_pct": round(
             100.0 * job.completed_batches / max(job.total_batches, 1), 1
         ),
+        "openrouter_cost_usd": round(float(job.openrouter_cost_usd or 0.0), 6),
+        "apify_cost_usd": round(float(job.apify_cost_usd or 0.0), 6),
+        "cost_usd": round(float(job.cost_usd or 0.0), 6),
+        "target_gold": int(job.target_gold or 0),
+        "spend_cap_usd": round(float(job.spend_cap_usd or 0.0), 6),
+        "cost_breakdown": {
+            "openrouter_usd": round(float(job.openrouter_cost_usd or 0.0), 6),
+            "apify_usd": round(float(job.apify_cost_usd or 0.0), 6),
+            "total_usd": round(float(job.cost_usd or 0.0), 6),
+            "spend_cap_usd": round(float(job.spend_cap_usd or 0.0), 6),
+            "target_gold": int(job.target_gold or 0),
+        },
         "config": config,
         "result_summary": summary,
         "error": job.error,
@@ -192,7 +225,7 @@ def cancel_job(db: Session, job_id: str, owner_user_id: str) -> m.BatchJob | Non
     job = db.query(m.BatchJob).filter_by(id=job_id, owner_user_id=owner_user_id).first()
     if not job:
         return None
-    if job.status in {"completed", "failed", "cancelled"}:
+    if job.status in {"completed", "failed", "cancelled", "paused_spend_cap"}:
         return job
     job.status = "cancelled"
     job.progress_message = "Cancelled by user"

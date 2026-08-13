@@ -12,12 +12,13 @@ from helix.agents.catalog import get_agent
 from helix.config import get_settings
 from helix.db import models as m
 from helix.llm.client import (
-    estimate_cost_usd,
+    cost_from_usage,
     get_llm_client_for_tenant,
     parse_tool_args,
     serialize_tool_calls,
 )
 from helix.services.brief import build_domain_context
+from helix.services.cost_tracking import record_openrouter_spend
 from helix.tools.handlers import ToolContext
 from helix.tools.registry import execute_tool, tools_for_agent
 
@@ -88,6 +89,9 @@ def run_agent(
     tool_trace: list[dict[str, Any]] = []
     ctx = ToolContext(db, tenant_id, agent_key, owner_user_id=owner_user_id)
     total_cost = 0.0
+    total_prompt_tokens = 0
+    total_completion_tokens = 0
+    cost_sources: list[str] = []
     final_text = ""
 
     try:
@@ -102,9 +106,14 @@ def run_agent(
             msg = choice.message
             usage = getattr(response, "usage", None)
             if usage:
-                total_cost += estimate_cost_usd(
-                    getattr(usage, "prompt_tokens", 0) or 0,
-                    getattr(usage, "completion_tokens", 0) or 0,
+                amt, src = cost_from_usage(usage, model=client.model)
+                total_cost += amt
+                cost_sources.append(src)
+                total_prompt_tokens += int(
+                    getattr(usage, "prompt_tokens", 0) or 0
+                )
+                total_completion_tokens += int(
+                    getattr(usage, "completion_tokens", 0) or 0
                 )
 
             if msg.tool_calls:
@@ -148,12 +157,22 @@ def run_agent(
             health.last_status = "ok"
             health.run_count += 1
             health.estimated_cost_usd += total_cost
-        tenant.spent_usd += total_cost
+        record_openrouter_spend(tenant, total_cost)
+        cost_source = (
+            "provider"
+            if cost_sources and all(s == "provider" for s in cost_sources)
+            else ("mixed" if cost_sources else "none")
+        )
+        if cost_sources and all(s == "estimate" for s in cost_sources):
+            cost_source = "estimate"
 
         run.status = "completed"
         run.output_text = final_text
         run.tool_trace_json = json.dumps(tool_trace, default=str)
         run.cost_usd = total_cost
+        run.cost_source = cost_source
+        run.prompt_tokens = total_prompt_tokens
+        run.completion_tokens = total_completion_tokens
         run.finished_at = datetime.now(timezone.utc)
         db.commit()
 
@@ -164,6 +183,10 @@ def run_agent(
             "output": final_text,
             "tool_calls": tool_trace,
             "cost_usd": total_cost,
+            "openrouter_cost_usd": total_cost,
+            "cost_source": cost_source,
+            "prompt_tokens": total_prompt_tokens,
+            "completion_tokens": total_completion_tokens,
             "provider": client.provider,
             "model": client.model,
         }
@@ -176,7 +199,14 @@ def run_agent(
             run.error = str(e)
             run.tool_trace_json = json.dumps(tool_trace, default=str)
             run.cost_usd = total_cost
+            run.cost_source = "partial"
+            run.prompt_tokens = total_prompt_tokens
+            run.completion_tokens = total_completion_tokens
             run.finished_at = datetime.now(timezone.utc)
+        # Still bill tokens already consumed before the error
+        tenant = db.query(m.Tenant).filter_by(id=tenant_id).first()
+        if tenant and total_cost > 0:
+            record_openrouter_spend(tenant, total_cost)
         health = (
             db.query(m.AgentHealth)
             .filter_by(tenant_id=tenant_id, agent=agent_key)

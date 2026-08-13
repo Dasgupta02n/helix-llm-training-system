@@ -90,3 +90,54 @@ def apply_migrations(engine: Engine) -> None:
                 )
             except Exception:
                 pass
+
+        # Phase 0 cost tracking: split OpenRouter / Apify spend + job caps
+        tenant_cols = _column_names(engine, "tenants")
+        if tenant_cols:
+            for name in ("openrouter_spent_usd", "apify_spent_usd"):
+                if name not in tenant_cols:
+                    conn.execute(
+                        text(f"ALTER TABLE tenants ADD COLUMN {name} FLOAT DEFAULT 0")
+                    )
+            # Backfill: historical spent_usd was OpenRouter-only estimates
+            if "openrouter_spent_usd" not in tenant_cols:
+                conn.execute(
+                    text(
+                        "UPDATE tenants SET openrouter_spent_usd = COALESCE(spent_usd, 0) "
+                        "WHERE COALESCE(openrouter_spent_usd, 0) = 0"
+                    )
+                )
+
+        bj_cols = _column_names(engine, "batch_jobs")
+        if bj_cols:
+            bj_additions = {
+                "openrouter_cost_usd": "FLOAT DEFAULT 0",
+                "apify_cost_usd": "FLOAT DEFAULT 0",
+                "cost_usd": "FLOAT DEFAULT 0",
+                "target_gold": "INTEGER DEFAULT 0",
+                "spend_cap_usd": "FLOAT DEFAULT 0",
+            }
+            for name, typ in bj_additions.items():
+                if name not in bj_cols:
+                    conn.execute(
+                        text(f"ALTER TABLE batch_jobs ADD COLUMN {name} {typ}")
+                    )
+
+        gj_cols = _column_names(engine, "gather_jobs")
+        if gj_cols and "cost_usd" not in gj_cols:
+            conn.execute(
+                text("ALTER TABLE gather_jobs ADD COLUMN cost_usd FLOAT DEFAULT 0")
+            )
+
+        ar_cols = _column_names(engine, "agent_runs")
+        if ar_cols:
+            ar_additions = {
+                "cost_source": "VARCHAR(20)",
+                "prompt_tokens": "INTEGER DEFAULT 0",
+                "completion_tokens": "INTEGER DEFAULT 0",
+            }
+            for name, typ in ar_additions.items():
+                if name not in ar_cols:
+                    conn.execute(
+                        text(f"ALTER TABLE agent_runs ADD COLUMN {name} {typ}")
+                    )

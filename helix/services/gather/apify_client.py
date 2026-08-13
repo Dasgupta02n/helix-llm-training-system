@@ -147,11 +147,18 @@ def search_web(
     dataset_id = run.get("defaultDatasetId")
     fetch_limit = max(max_results, per_page * pages)
     items = fetch_dataset_items(dataset_id, limit=fetch_limit) if dataset_id else []
+    from helix.services.cost_tracking import apify_cost_from_run
+
+    cost_usd, cost_source = apify_cost_from_run(run)
     return items, {
         "run_id": run.get("id"),
         "dataset_id": dataset_id,
         "actor": actor,
         "max_pages": pages,
+        "cost_usd": cost_usd,
+        "cost_source": cost_source,
+        "usage_total_usd": run.get("usageTotalUsd"),
+        "usage_usd": run.get("usageUsd"),
     }
 
 
@@ -172,7 +179,18 @@ def fetch_page(url: str) -> tuple[dict[str, Any], dict[str, Any]]:
     dataset_id = run.get("defaultDatasetId")
     items = fetch_dataset_items(dataset_id, limit=5) if dataset_id else []
     item = items[0] if items else {"url": url, "title": "", "text": ""}
-    return item, {"run_id": run.get("id"), "dataset_id": dataset_id, "actor": actor}
+    from helix.services.cost_tracking import apify_cost_from_run
+
+    cost_usd, cost_source = apify_cost_from_run(run)
+    return item, {
+        "run_id": run.get("id"),
+        "dataset_id": dataset_id,
+        "actor": actor,
+        "cost_usd": cost_usd,
+        "cost_source": cost_source,
+        "usage_total_usd": run.get("usageTotalUsd"),
+        "usage_usd": run.get("usageUsd"),
+    }
 
 
 def health_check() -> dict[str, Any]:

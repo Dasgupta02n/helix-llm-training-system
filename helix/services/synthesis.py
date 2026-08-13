@@ -12,7 +12,8 @@ from sqlalchemy.orm import Session
 
 from helix.config import get_settings
 from helix.db import models as m
-from helix.llm.client import get_llm_client_for_tenant
+from helix.llm.client import cost_from_usage, get_llm_client_for_tenant
+from helix.services.cost_tracking import record_openrouter_spend
 from helix.services.library import (
     AVAILABLE_VARY_PARAMETERS,
     get_or_create_scope,
@@ -158,6 +159,14 @@ No markdown fences."""
         messages=[{"role": "user", "content": prompt}],
         tools=None,
     )
+    usage = getattr(resp, "usage", None)
+    if usage:
+        amt, _src = cost_from_usage(usage, model=client.model)
+        if amt > 0:
+            record_openrouter_spend(tenant, amt)
+            # Stash on tenant for this call chain via attribute (cleared by caller)
+            prev = float(getattr(tenant, "_synth_cost_usd", 0.0) or 0.0)
+            setattr(tenant, "_synth_cost_usd", prev + amt)
     text = (resp.choices[0].message.content or "").strip()
     # strip fences if any
     text = re.sub(r"^```(?:json)?\s*", "", text)
@@ -267,6 +276,8 @@ def run_synthesis(
     db.commit()
 
     tenant = db.query(m.Tenant).filter_by(id=tenant_id).first()
+    if tenant is not None:
+        setattr(tenant, "_synth_cost_usd", 0.0)
     created = 0
     errors: list[str] = []
 
@@ -319,6 +330,7 @@ def run_synthesis(
         run.notes = f"Completed with {len(errors)} warnings"
     db.commit()
 
+    openrouter_cost = float(getattr(tenant, "_synth_cost_usd", 0.0) or 0.0) if tenant else 0.0
     return {
         "ok": True,
         "run_id": run.id,
@@ -328,5 +340,8 @@ def run_synthesis(
         "parameters": parameters,
         "warnings": errors,
         "stats": library_stats(db, owner_user_id, tenant_id),
+        "openrouter_cost_usd": round(openrouter_cost, 6),
+        "apify_cost_usd": 0.0,
+        "cost_usd": round(openrouter_cost, 6),
         "message": f"Created {created} synthesized examples from {run.gold_processed} gold rows. Stored forever in your account.",
     }

@@ -129,13 +129,18 @@ def dashboard(
 ) -> dict:
     tenant = _tenant_for(user, slug, db)
     ctx = ToolContext(db, tenant.id, "operations_dashboard")
+    from helix.services.cost_tracking import tenant_cost_breakdown
+
+    costs = tenant_cost_breakdown(tenant)
     return {
         "tenant": {
             "id": tenant.id,
             "slug": tenant.slug,
             "name": tenant.name,
             "plan": tenant.plan,
-            "spent_usd": tenant.spent_usd,
+            "spent_usd": costs["spent_usd"],
+            "openrouter_spent_usd": costs["openrouter_usd"],
+            "apify_spent_usd": costs["apify_usd"],
             "monthly_budget_usd": tenant.monthly_budget_usd,
         },
         "metrics": get_success_metrics(ctx),
@@ -185,6 +190,9 @@ def list_runs(
             "provider": r.provider,
             "model": r.model,
             "cost_usd": r.cost_usd,
+            "cost_source": getattr(r, "cost_source", None),
+            "prompt_tokens": getattr(r, "prompt_tokens", 0) or 0,
+            "completion_tokens": getattr(r, "completion_tokens", 0) or 0,
             "created_at": r.created_at.isoformat() if r.created_at else None,
             "error": r.error,
             "output_preview": (r.output_text or "")[:240],
@@ -215,6 +223,9 @@ def get_run(
         "provider": r.provider,
         "model": r.model,
         "cost_usd": r.cost_usd,
+        "cost_source": getattr(r, "cost_source", None),
+        "prompt_tokens": getattr(r, "prompt_tokens", 0) or 0,
+        "completion_tokens": getattr(r, "completion_tokens", 0) or 0,
         "error": r.error,
         "created_at": r.created_at.isoformat() if r.created_at else None,
         "finished_at": r.finished_at.isoformat() if r.finished_at else None,

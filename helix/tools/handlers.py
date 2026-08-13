@@ -359,6 +359,7 @@ def trigger_discovery(
         "from_cache": out.get("from_cache", False),
         "deduped_query": out.get("deduped_query", False),
         "gatherer": "apify",
+        "apify_cost_usd": float(out.get("apify_cost_usd") or 0.0),
         "message": out.get("message"),
         "query": query,
         # convenience: same as get_discovery_results
@@ -2062,10 +2063,26 @@ def get_success_metrics(ctx: ToolContext, **_: Any) -> dict:
         "open_contradictions": ctx.db.query(m.Contradiction)
         .filter_by(tenant_id=ctx.tenant_id, resolution_status="open")
         .count(),
-        "budget": {
-            "monthly_usd": tenant.monthly_budget_usd if tenant else 0,
-            "spent_usd": tenant.spent_usd if tenant else 0,
-        },
+        "budget": _budget_dict(tenant),
+    }
+
+
+def _budget_dict(tenant: m.Tenant | None) -> dict:
+    from helix.services.cost_tracking import (
+        GOLD_COST_CAP_USD_PER_1000,
+        tenant_cost_breakdown,
+    )
+
+    b = tenant_cost_breakdown(tenant)
+    return {
+        "monthly_usd": b["monthly_usd"],
+        "spent_usd": b["spent_usd"],
+        "openrouter_usd": b["openrouter_usd"],
+        "apify_usd": b["apify_usd"],
+        "gold_cap_per_1000_usd": GOLD_COST_CAP_USD_PER_1000,
+        # Friendly labels for UI
+        "openrouter_label": "OpenRouter (LLM)",
+        "apify_label": "Apify (gather)",
     }
 
 

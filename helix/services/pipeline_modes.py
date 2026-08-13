@@ -220,6 +220,7 @@ def run_code_pipeline_batch(
 
     created_candidates = 0
     gather_results = 0
+    apify_cost_usd = 0.0
     queries_tried: list[str] = []
     if assign.get("assignment"):
         from helix.services.research_targets import (
@@ -274,6 +275,7 @@ def run_code_pipeline_batch(
                         job.get("error") or job.get("message") or "Gather failed"
                     )
                     continue
+                apify_cost_usd += float(job.get("apify_cost_usd") or 0.0)
                 for r in job.get("results") or []:
                     url = (r.get("url") or "").strip()
                     key = url or (r.get("title") or "")
@@ -814,6 +816,7 @@ def run_code_pipeline_batch(
         "corpus_gold_new": corpus_gold_new if owner_user_id else 0,
         "candidates_new": created_candidates,
         "gather_results": gather_results,
+        "apify_cost_usd": round(apify_cost_usd, 6),
         "zero_evidence": zero_evidence,
         "warnings": warnings,
         "domain": brief.get("domain") or "",
@@ -861,6 +864,9 @@ def run_pipeline_batch(
                 pass
 
     gold_before = _user_gold_count(db, owner_user_id, tenant_id)
+    tenant_row = db.query(m.Tenant).filter_by(id=tenant_id).first()
+    or_before = float(getattr(tenant_row, "openrouter_spent_usd", 0.0) or 0.0) if tenant_row else 0.0
+    ap_before = float(getattr(tenant_row, "apify_spent_usd", 0.0) or 0.0) if tenant_row else 0.0
 
     _progress("Gathering sources (Apify/code) from your research plan…")
     code_res = run_code_pipeline_batch(
@@ -898,11 +904,13 @@ def run_pipeline_batch(
                 trigger="batch",
                 owner_user_id=owner_user_id,
             )
+            agent_cost = float(r.get("cost_usd") or r.get("openrouter_cost_usd") or 0.0)
             results.append(
                 {
                     "agent": key,
                     "status": r.get("status"),
-                    "cost_usd": r.get("cost_usd"),
+                    "cost_usd": agent_cost,
+                    "cost_source": r.get("cost_source"),
                     "run_id": r.get("run_id"),
                 }
             )
@@ -920,7 +928,23 @@ def run_pipeline_batch(
     if owner_user_id is None:
         gold_new = int(code_res.get("gold_new") or 0)
 
+    # Re-read tenant spend deltas so gold_quality LLM synth + agents both count
+    db.refresh(tenant_row) if tenant_row else None
+    or_after = float(getattr(tenant_row, "openrouter_spent_usd", 0.0) or 0.0) if tenant_row else 0.0
+    ap_after = float(getattr(tenant_row, "apify_spent_usd", 0.0) or 0.0) if tenant_row else 0.0
+    openrouter_cost_usd = max(0.0, or_after - or_before)
+    apify_cost_usd = max(0.0, ap_after - ap_before)
+    # Fallback if split counters missing on old rows mid-migration
+    if openrouter_cost_usd == 0.0 and apify_cost_usd == 0.0:
+        apify_cost_usd = float(code_res.get("apify_cost_usd") or 0.0)
+        openrouter_cost_usd = sum(
+            float(r.get("cost_usd") or 0.0)
+            for r in results
+            if r.get("agent")
+        )
+
     elapsed = time.time() - t0
+    total_cost = openrouter_cost_usd + apify_cost_usd
     if gold_new == 0 and zero_evidence and int(code_res.get("gather_results") or 0) == 0:
         user_message = (
             "No verifiable sources found for this topic — 0 new gold examples. "
@@ -941,6 +965,10 @@ def run_pipeline_batch(
             f"(candidates={code_res.get('candidates_new', 0)}, "
             f"gather_hits={code_res.get('gather_results', 0)})."
         )
+    user_message += (
+        f" Cost: OpenRouter ${openrouter_cost_usd:.4f} + Apify ${apify_cost_usd:.4f} "
+        f"= ${total_cost:.4f}."
+    )
 
     return {
         "quality_mode": quality_mode,
@@ -956,4 +984,7 @@ def run_pipeline_batch(
         "user_message": user_message,
         "results": results,
         "meta": MODE_META[quality_mode],
+        "openrouter_cost_usd": round(openrouter_cost_usd, 6),
+        "apify_cost_usd": round(apify_cost_usd, 6),
+        "cost_usd": round(total_cost, 6),
     }

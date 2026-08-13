@@ -86,10 +86,34 @@ def get_llm_client_for_tenant(tenant: Tenant | None = None) -> LLMClient:
     return build_client_from_settings(s)
 
 
-def estimate_cost_usd(prompt_tokens: int, completion_tokens: int) -> float:
-    """Rough cost estimate; OpenRouter bills vary by model."""
-    # Conservative midpoint for Grok-class models via OpenRouter
-    return (prompt_tokens * 2.0 + completion_tokens * 6.0) / 1_000_000
+def estimate_cost_usd(
+    prompt_tokens: int,
+    completion_tokens: int,
+    *,
+    model: str | None = None,
+) -> float:
+    """
+    Token-rate fallback when provider does not return usage.cost.
+
+    Prefer cost_from_usage() which reads OpenRouter's billed usage.cost.
+    Old formula (2/6 per 1M) over-counted vs real OpenRouter charges.
+    """
+    from helix.services.cost_tracking import estimate_token_cost_usd
+
+    return estimate_token_cost_usd(
+        prompt_tokens, completion_tokens, model=model
+    )
+
+
+def cost_from_usage(
+    usage: Any,
+    *,
+    model: str | None = None,
+) -> tuple[float, str]:
+    """Return (usd, source) using OpenRouter actual cost when present."""
+    from helix.services.cost_tracking import openrouter_cost_from_usage
+
+    return openrouter_cost_from_usage(usage, model=model)
 
 
 def serialize_tool_calls(message: Any) -> list[dict[str, Any]]:

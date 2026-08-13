@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 
 from helix.db.session import SessionLocal
 from helix.db import models as m
+from helix.services.cost_tracking import should_pause_for_spend_cap
 from helix.services.pipeline_modes import run_pipeline_batch
 from helix.services.synthesis import run_synthesis
 
@@ -103,6 +104,12 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             )
             items = int(result.get("items_processed") or 0)
             gold_new = int(result.get("gold_new") or 0)
+            or_cost = float(result.get("openrouter_cost_usd") or 0.0)
+            ap_cost = float(result.get("apify_cost_usd") or 0.0)
+            batch_cost = float(result.get("cost_usd") or (or_cost + ap_cost))
+            job.openrouter_cost_usd = float(job.openrouter_cost_usd or 0.0) + or_cost
+            job.apify_cost_usd = float(job.apify_cost_usd or 0.0) + ap_cost
+            job.cost_usd = float(job.cost_usd or 0.0) + batch_cost
             # Accumulate job-level gold so final status isn't last-batch-only
             try:
                 prev_summary = json.loads(job.result_summary_json or "{}")
@@ -115,6 +122,9 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 {
                     "batch_index": batch_index,
                     "gold_new": gold_new,
+                    "openrouter_cost_usd": or_cost,
+                    "apify_cost_usd": ap_cost,
+                    "cost_usd": batch_cost,
                     "user_message": result.get("user_message"),
                     "elapsed_seconds": result.get("elapsed_seconds"),
                 }
@@ -125,11 +135,19 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 "gold_new": gold_new,  # this batch only
                 "total_gold_new": total_gold,  # all batches so far
                 "total_synth_new": total_synth,
+                "openrouter_cost_usd": job.openrouter_cost_usd,
+                "apify_cost_usd": job.apify_cost_usd,
+                "cost_usd": job.cost_usd,
+                "spend_cap_usd": job.spend_cap_usd,
+                "target_gold": job.target_gold,
                 "batches": batch_log[-20:],
                 "zero_evidence": bool(result.get("zero_evidence")) and total_gold == 0,
                 "user_message": result.get("user_message"),
                 "job_user_message": (
                     f"Job so far: {total_gold} new gold across {batch_index} batch(es). "
+                    f"Cost ${job.cost_usd:.4f} "
+                    f"(OR ${job.openrouter_cost_usd:.4f} + Apify ${job.apify_cost_usd:.4f}) "
+                    f"/ cap ${float(job.spend_cap_usd or 0):.4f}. "
                     f"This batch: {result.get('user_message') or f'{gold_new} gold'}."
                 ),
                 "warnings": result.get("warnings") or [],
@@ -140,6 +158,8 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 job,
                 f"Batch {batch_index}/{job.total_batches} done (pipeline mode {job.quality_mode}): "
                 f"gold_new={gold_new} (job total={total_gold}), units~{items}, "
+                f"cost=${batch_cost:.4f} (OR ${or_cost:.4f} + Apify ${ap_cost:.4f}), "
+                f"job total ${job.cost_usd:.4f}/{float(job.spend_cap_usd or 0):.4f} cap, "
                 f"{result.get('elapsed_seconds')}s. "
                 f"{result.get('user_message') or ''}",
                 level=level,
@@ -158,6 +178,9 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 use_llm=use_llm,
             )
             items = int(result.get("synthesized_count") or 0)
+            or_cost = float(result.get("openrouter_cost_usd") or result.get("cost_usd") or 0.0)
+            job.openrouter_cost_usd = float(job.openrouter_cost_usd or 0.0) + or_cost
+            job.cost_usd = float(job.cost_usd or 0.0) + or_cost
             try:
                 prev_summary = json.loads(job.result_summary_json or "{}")
             except json.JSONDecodeError:
@@ -169,16 +192,21 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 "quality_mode": job.quality_mode,
                 "total_gold_new": total_gold,
                 "total_synth_new": total_synth,
+                "openrouter_cost_usd": job.openrouter_cost_usd,
+                "apify_cost_usd": job.apify_cost_usd,
+                "cost_usd": job.cost_usd,
+                "spend_cap_usd": job.spend_cap_usd,
                 "job_user_message": (
                     f"Job so far: {total_synth} synthetic rows across "
-                    f"{batch_index} batch(es)."
+                    f"{batch_index} batch(es); cost ${job.cost_usd:.4f}."
                 ),
             }
             _log(
                 db,
                 job,
                 f"Batch {batch_index}/{job.total_batches} done (synthesis mode {job.quality_mode}): "
-                f"{items} synthetic rows (job total={total_synth})"
+                f"{items} synthetic rows (job total={total_synth}), "
+                f"cost=${or_cost:.4f} (job ${job.cost_usd:.4f})"
                 + ("" if result.get("ok") else f" — {result.get('message')}"),
                 level="info" if result.get("ok") else "warn",
             )
@@ -201,6 +229,39 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             db.commit()
             return
 
+        # Hard spend-cap auto-pause (OpenRouter + Apify combined)
+        try:
+            summ_for_cap = json.loads(job.result_summary_json or "{}")
+        except Exception:  # noqa: BLE001
+            summ_for_cap = {}
+        units_for_cap = (
+            int(summ_for_cap.get("total_gold_new") or 0)
+            if job.job_type == "pipeline"
+            else int(summ_for_cap.get("total_synth_new") or 0)
+        )
+        pause, pause_msg = should_pause_for_spend_cap(
+            cost_usd=float(job.cost_usd or 0.0),
+            gold_new=units_for_cap,
+            target_gold=int(job.target_gold or (job.batch_size * job.total_batches)),
+            completed_batches=job.completed_batches,
+            total_batches=job.total_batches,
+        )
+        if pause:
+            job.status = "paused_spend_cap"
+            job.finished_at = _now()
+            job.eta_seconds = 0
+            job.progress_message = pause_msg
+            summ_for_cap["spend_cap_paused"] = True
+            summ_for_cap["spend_cap_message"] = pause_msg
+            summ_for_cap["openrouter_cost_usd"] = job.openrouter_cost_usd
+            summ_for_cap["apify_cost_usd"] = job.apify_cost_usd
+            summ_for_cap["cost_usd"] = job.cost_usd
+            summ_for_cap["job_user_message"] = pause_msg
+            job.result_summary_json = json.dumps(summ_for_cap, default=str)
+            _log(db, job, pause_msg, level="warn")
+            db.commit()
+            return
+
         if job.completed_batches >= job.total_batches or not job.auto_continue:
             job.status = "completed"
             job.finished_at = _now()
@@ -211,27 +272,39 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 summ = {}
             total_gold = int(summ.get("total_gold_new") or 0)
             total_synth = int(summ.get("total_synth_new") or 0)
+            cost_note = (
+                f" Cost ${float(job.cost_usd or 0):.4f} "
+                f"(OpenRouter ${float(job.openrouter_cost_usd or 0):.4f} + "
+                f"Apify ${float(job.apify_cost_usd or 0):.4f})"
+                f" / cap ${float(job.spend_cap_usd or 0):.4f}."
+            )
             if job.job_type == "pipeline":
                 if total_gold > 0:
                     job.progress_message = (
                         f"Completed {job.completed_batches}/{job.total_batches} batches — "
                         f"{total_gold} new gold example(s) saved to your library."
+                        + cost_note
                     )
                 else:
                     job.progress_message = (
                         f"Completed {job.completed_batches}/{job.total_batches} batches — "
                         f"0 new gold examples "
                         f"(last batch: {summ.get('user_message') or 'no new rows'})."
+                        + cost_note
                     )
             else:
                 job.progress_message = (
                     f"Completed {job.completed_batches}/{job.total_batches} batches — "
                     f"{total_synth} synthetic row(s) saved."
+                    + cost_note
                 )
             # Keep cumulative totals on the summary for the UI
             summ["job_user_message"] = job.progress_message
             summ["total_gold_new"] = total_gold
             summ["total_synth_new"] = total_synth
+            summ["openrouter_cost_usd"] = job.openrouter_cost_usd
+            summ["apify_cost_usd"] = job.apify_cost_usd
+            summ["cost_usd"] = job.cost_usd
             job.result_summary_json = json.dumps(summ, default=str)
             _log(db, job, job.progress_message, level="info")
         else:
@@ -242,7 +315,9 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 total_gold = 0
             job.progress_message = (
                 f"Finished batch {job.completed_batches}/{job.total_batches} "
-                f"({total_gold} gold so far). "
+                f"({total_gold} gold so far; "
+                f"${float(job.cost_usd or 0):.4f}/"
+                f"${float(job.spend_cap_usd or 0):.4f} cap). "
                 f"ETA ~{int(job.eta_seconds or 0)}s. Continuing automatically…"
             )
             job.status = "pending"  # re-queue next batch
