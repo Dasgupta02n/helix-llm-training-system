@@ -843,7 +843,7 @@ class RiuSession(Base):
     status: Mapped[str] = mapped_column(String(40), default="active", index=True)
     # active | completed | abandoned
     phase: Mapped[str] = mapped_column(String(40), default="greet")
-    # greet | discover | plan | formats | goals | own_data | confirm | running | done
+    # greet | discover | plan | formats | goals | own_data | materials | pricing | confirm | running | done
     state_json: Mapped[str] = mapped_column(Text, default="{}")
     messages_json: Mapped[str] = mapped_column(Text, default="[]")
     last_job_id: Mapped[str | None] = mapped_column(String(32), nullable=True)

@@ -43,6 +43,10 @@ from helix.services.user_gold_upload import (
     USER_UPLOAD_SOURCE_KIND,
     import_zip_as_gold,
 )
+from helix.services.user_material_upload import (
+    USER_MATERIAL_SOURCE_KIND,
+    import_material_zip_as_trainable,
+)
 
 router = APIRouter(prefix="/api/t/{slug}/library", tags=["library"])
 
@@ -154,7 +158,7 @@ def list_gold(
     topic: str | None = None,
     source: str | None = Query(
         None,
-        description="Optional filter: user_upload | seed | pipeline | corpus",
+        description="Optional filter: user_upload | user_material | seed | pipeline | corpus",
     ),
     user: m.User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -172,6 +176,12 @@ def list_gold(
             q = q.filter(
                 m.GoldExample.source_kind.in_(
                     [USER_UPLOAD_SOURCE_KIND, "byo", "upload"]
+                )
+            )
+        elif src in {"user_material", "material", "materials"}:
+            q = q.filter(
+                m.GoldExample.source_kind.in_(
+                    [USER_MATERIAL_SOURCE_KIND, "material", "materials"]
                 )
             )
         else:
@@ -220,6 +230,55 @@ async def upload_gold_zip(
         fileobj=io.BytesIO(raw),
         filename=file.filename or "upload.zip",
         default_topic=(topic or "user_upload").strip()[:80] or "user_upload",
+        enforce_cap=True,
+    )
+    if not out.get("ok"):
+        raise HTTPException(400, out.get("error") or "Import failed")
+    out["stats"] = library_stats(db, user.id, tenant.id)
+    return out
+
+
+@router.post("/gold/upload-materials-zip")
+async def upload_materials_zip(
+    slug: str,
+    file: UploadFile = File(...),
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """
+    Unlabeled materials zip (scripts, rulebooks, notes) → converted trainable
+    gold-format rows (source_kind=user_material).
+    """
+    tenant = _tenant_for(user, slug, db)
+    name = (file.filename or "materials.zip").lower()
+    if not name.endswith(".zip"):
+        raise HTTPException(400, "Please upload a .zip file")
+    raw = await file.read()
+    if not raw:
+        raise HTTPException(400, "Empty file")
+    if len(raw) > MAX_ZIP_BYTES:
+        raise HTTPException(
+            400, f"Zip too large (max {MAX_ZIP_BYTES // (1024 * 1024)} MB)"
+        )
+    import io
+
+    domain = ""
+    try:
+        from helix.services.brief import get_active_project, project_to_dict
+
+        proj = get_active_project(db, tenant.id)
+        if proj:
+            domain = str(project_to_dict(proj).get("domain") or "")
+    except Exception:  # noqa: BLE001
+        pass
+
+    out = import_material_zip_as_trainable(
+        db,
+        owner_user_id=user.id,
+        tenant_id=tenant.id,
+        fileobj=io.BytesIO(raw),
+        filename=file.filename or "materials.zip",
+        domain=domain,
         enforce_cap=True,
     )
     if not out.get("ok"):
@@ -499,7 +558,7 @@ def export_library(
     slug: str,
     kind: str = Query(
         "all",
-        pattern="^(all|gold|synthetic|user_upload)$",
+        pattern="^(all|gold|synthetic|user_upload|user_material|trainable)$",
     ),
     format: str = Query("jsonl", pattern="^(jsonl|json)$"),
     user: m.User = Depends(get_current_user),
@@ -507,11 +566,19 @@ def export_library(
 ):
     """Export the signed-in user's permanent library (never expires).
 
-    kind=user_upload → only bring-your-own gold-format rows (Double Helix ready).
+    kind=user_upload → labeled BYO gold rows
+    kind=user_material → converted unlabeled materials
+    kind=trainable → all gold-format training rows (mined + uploads + materials)
     """
     tenant = _tenant_for(user, slug, db)
     items: list[dict[str, Any]] = []
-    if kind in {"all", "gold", "user_upload"}:
+    if kind in {
+        "all",
+        "gold",
+        "user_upload",
+        "user_material",
+        "trainable",
+    }:
         q = db.query(m.GoldExample).filter_by(
             owner_user_id=user.id, tenant_id=tenant.id, is_archived=False
         )
@@ -520,6 +587,17 @@ def export_library(
                 m.GoldExample.source_kind.in_(
                     [USER_UPLOAD_SOURCE_KIND, "byo", "upload"]
                 )
+            )
+        elif kind == "user_material":
+            q = q.filter(
+                m.GoldExample.source_kind.in_(
+                    [USER_MATERIAL_SOURCE_KIND, "material", "materials"]
+                )
+            )
+        elif kind == "trainable":
+            # All non-rejected gold (including uploads & materials)
+            q = q.filter(
+                m.GoldExample.verification_status != "rejected"
             )
         for g in q.order_by(m.GoldExample.created_at.asc()).all():
             items.append(gold_to_dict(g, tenant_slug=tenant.slug))
@@ -543,13 +621,21 @@ def export_library(
         )
 
     def gen():
+        slim_kinds = {
+            USER_UPLOAD_SOURCE_KIND,
+            "byo",
+            "upload",
+            USER_MATERIAL_SOURCE_KIND,
+            "material",
+            "materials",
+        }
         for row in items:
             # Stable training shape for Double Helix / external trainers
-            if kind == "user_upload" or row.get("source_kind") in {
-                USER_UPLOAD_SOURCE_KIND,
-                "byo",
-                "upload",
-            }:
+            if kind in {
+                "user_upload",
+                "user_material",
+                "trainable",
+            } or row.get("source_kind") in slim_kinds:
                 slim = {
                     "id": row.get("id"),
                     "topic": row.get("topic"),

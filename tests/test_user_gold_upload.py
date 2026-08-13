@@ -141,6 +141,7 @@ def test_heuristic_own_data_phase():
     assert turn["state_patch"].get("has_own_data") is True
     assert turn["state_patch"].get("own_data_awaiting_upload") is True
 
+    # Skip labeled → materials (unlabeled) phase, not jump to confirm
     turn2 = _heuristic_turn("skip", {}, "own_data")
-    assert turn2["phase"] == "confirm"
+    assert turn2["phase"] == "materials"
     assert turn2["state_patch"].get("own_data_awaiting_upload") is False

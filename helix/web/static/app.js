@@ -983,6 +983,7 @@ async function loadLibrary() {
     const userN =
       stats.gold_user_count != null ? stats.gold_user_count : stats.gold_count;
     const uploadN = stats.gold_user_upload_count || 0;
+    const matN = stats.gold_user_material_count || 0;
     $("libraryProgress").innerHTML = `
       <div class="stat-card tone-accent">
         <div class="label">Your generated gold</div>
@@ -993,7 +994,11 @@ async function loadLibrary() {
             : ""
         }${
           uploadN
-            ? ` · ${uploadN} from your zip upload(s)`
+            ? ` · ${uploadN} labeled upload(s)`
+            : ""
+        }${
+          matN
+            ? ` · ${matN} from materials`
             : ""
         }</div>
       </div>
@@ -1003,9 +1008,12 @@ async function loadLibrary() {
         <div class="sub">of ${stats.synthetic_target.toLocaleString()} goal · ${stats.synthetic_progress_pct}% · kept forever</div>
       </div>`;
     if ($("userUploadCountHint")) {
-      $("userUploadCountHint").textContent = uploadN
-        ? `${uploadN} gold-format row(s) from your uploads (Double Helix ready). Use Export my uploads to download.`
-        : "No zip uploads yet. Upload labeled data above or via Riu during setup.";
+      const bits = [];
+      if (uploadN) bits.push(`${uploadN} labeled gold upload(s)`);
+      if (matN) bits.push(`${matN} material-converted row(s)`);
+      $("userUploadCountHint").textContent = bits.length
+        ? `${bits.join(" · ")}. Export my uploads / Export materials / Export all trainable for Double Helix.`
+        : "No personal uploads yet. Use the zip uploaders above or finish Riu setup.";
     }
 
     if (!gold.items.length) {
@@ -1189,21 +1197,30 @@ async function exportLibrary(kind) {
   }
 }
 
-async function uploadGoldZip(fileInput, statusEl, { viaRiu = false } = {}) {
+async function uploadGoldZip(fileInput, statusEl, { viaRiu = false, materials = false } = {}) {
   if (!state.tenantSlug) throw new Error("Pick a workspace first");
   const file = fileInput?.files?.[0];
   if (!file) throw new Error("Choose a .zip file first");
   if (!/\.zip$/i.test(file.name)) throw new Error("File must be a .zip");
   if (statusEl) {
-    statusEl.textContent = "Uploading & converting to gold format…";
+    statusEl.textContent = materials
+      ? "Uploading materials & converting to trainable format…"
+      : "Uploading & converting to gold format…";
     statusEl.className = "status-line";
   }
   const fd = new FormData();
   fd.append("file", file);
-  fd.append("topic", "user_upload");
-  const path = viaRiu
-    ? `/api/t/${state.tenantSlug}/riu/upload-gold-zip`
-    : `/api/t/${state.tenantSlug}/library/gold/upload-zip`;
+  if (!materials) fd.append("topic", "user_upload");
+  let path;
+  if (materials) {
+    path = viaRiu
+      ? `/api/t/${state.tenantSlug}/riu/upload-materials-zip`
+      : `/api/t/${state.tenantSlug}/library/gold/upload-materials-zip`;
+  } else {
+    path = viaRiu
+      ? `/api/t/${state.tenantSlug}/riu/upload-gold-zip`
+      : `/api/t/${state.tenantSlug}/library/gold/upload-zip`;
+  }
   const res = await fetch(path, {
     method: "POST",
     headers: { Authorization: `Bearer ${state.token}` },
@@ -1212,10 +1229,10 @@ async function uploadGoldZip(fileInput, statusEl, { viaRiu = false } = {}) {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.detail || data.error || "Upload failed");
   if (statusEl) {
-    statusEl.textContent = data.message || `Saved ${data.created || 0} gold rows.`;
+    statusEl.textContent = data.message || `Saved ${data.created || 0} rows.`;
     statusEl.className = "status-line ok";
   }
-  toast(`Saved ${data.created || 0} gold-format example(s)`);
+  toast(`Saved ${data.created || 0} trainable example(s)`);
   if (fileInput) fileInput.value = "";
   if (viaRiu && data.session) {
     renderRiuMessages(data.session.messages || []);
@@ -1227,14 +1244,18 @@ async function uploadGoldZip(fileInput, statusEl, { viaRiu = false } = {}) {
 }
 
 function updateRiuUploadPanel(session) {
-  const panel = $("riuUploadPanel");
-  if (!panel) return;
-  const show =
+  const goldPanel = $("riuUploadPanel");
+  const matPanel = $("riuMaterialsPanel");
+  const showGold =
     !!session?.show_gold_zip_upload ||
-    session?.phase === "own_data" ||
     !!session?.state?.own_data_awaiting_upload ||
-    !!session?.state?.has_own_data;
-  panel.classList.toggle("hidden", !show);
+    (session?.phase === "own_data" && !!session?.state?.has_own_data);
+  const showMat =
+    !!session?.show_materials_zip_upload ||
+    !!session?.state?.materials_awaiting_upload ||
+    (session?.phase === "materials" && !!session?.state?.has_materials);
+  if (goldPanel) goldPanel.classList.toggle("hidden", !showGold);
+  if (matPanel) matPanel.classList.toggle("hidden", !showMat);
 }
 
 // ── Home ────────────────────────────────────────────────────────────
@@ -1845,10 +1866,18 @@ function renderRiuState(state) {
     ["Variations", s.variations_per_gold],
     ["Quality mode", s.quality_mode],
     [
-      "Your uploads",
+      "Labeled uploads",
       s.own_data_uploaded
         ? `${s.own_data_count || 0} gold row(s)`
         : s.has_own_data
+          ? "awaiting zip"
+          : null,
+    ],
+    [
+      "Materials",
+      s.materials_uploaded
+        ? `${s.materials_count || 0} converted row(s)`
+        : s.has_materials
           ? "awaiting zip"
           : null,
     ],
@@ -2102,6 +2131,10 @@ if ($("exportSynthBtn")) $("exportSynthBtn").onclick = () => exportLibrary("synt
 if ($("exportAllLibraryBtn")) $("exportAllLibraryBtn").onclick = () => exportLibrary("all");
 if ($("exportUserUploadBtn"))
   $("exportUserUploadBtn").onclick = () => exportLibrary("user_upload");
+if ($("exportMaterialsBtn"))
+  $("exportMaterialsBtn").onclick = () => exportLibrary("user_material");
+if ($("exportTrainableBtn"))
+  $("exportTrainableBtn").onclick = () => exportLibrary("trainable");
 if ($("libraryGoldZipBtn")) {
   $("libraryGoldZipBtn").onclick = () =>
     uploadGoldZip($("libraryGoldZip"), $("libraryUploadStatus"), { viaRiu: false }).catch(
@@ -2114,12 +2147,38 @@ if ($("libraryGoldZipBtn")) {
       }
     );
 }
+if ($("libraryMaterialsZipBtn")) {
+  $("libraryMaterialsZipBtn").onclick = () =>
+    uploadGoldZip($("libraryMaterialsZip"), $("libraryMaterialsStatus"), {
+      viaRiu: false,
+      materials: true,
+    }).catch((e) => {
+      if ($("libraryMaterialsStatus")) {
+        $("libraryMaterialsStatus").textContent = e.message;
+        $("libraryMaterialsStatus").className = "status-line error";
+      }
+      toast(e.message, "err");
+    });
+}
 if ($("riuGoldZipBtn")) {
   $("riuGoldZipBtn").onclick = () =>
     uploadGoldZip($("riuGoldZip"), $("riuUploadStatus"), { viaRiu: true }).catch((e) => {
       if ($("riuUploadStatus")) {
         $("riuUploadStatus").textContent = e.message;
         $("riuUploadStatus").className = "status-line error";
+      }
+      toast(e.message, "err");
+    });
+}
+if ($("riuMaterialsZipBtn")) {
+  $("riuMaterialsZipBtn").onclick = () =>
+    uploadGoldZip($("riuMaterialsZip"), $("riuMaterialsStatus"), {
+      viaRiu: true,
+      materials: true,
+    }).catch((e) => {
+      if ($("riuMaterialsStatus")) {
+        $("riuMaterialsStatus").textContent = e.message;
+        $("riuMaterialsStatus").className = "status-line error";
       }
       toast(e.message, "err");
     });

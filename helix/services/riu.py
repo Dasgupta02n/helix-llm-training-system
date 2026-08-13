@@ -53,18 +53,23 @@ Your job:
 Tone: friendly, non-technical, short paragraphs. Avoid jargon (say "training examples" not "SFT dataset").
 
 Conversation phases:
-- greet → discover → plan → formats → goals → own_data → confirm → running → done
+- greet → discover → plan → formats → goals → own_data → materials → pricing → confirm → running → done
 
-After goals are set, ALWAYS ask whether the user has their own labeled data
-(CSV/JSON/JSONL in a zip) they want saved in gold format for Double Helix later.
-- If yes: set has_own_data=true, own_data_awaiting_upload=true, phase=own_data,
-  and tell them to use the upload control (or My data → Upload my gold zip).
-- If no/skip: set has_own_data=false, continue to confirm.
+After goals:
+1) ALWAYS ask if they have labeled data (zip of Q&A) for gold format / Double Helix.
+   - yes → own_data_awaiting_upload; show gold zip upload
+   - no/skip → materials phase
+2) ALWAYS ask if they have unlabeled materials (sales scripts, rulebooks, formulas,
+   teacher notes, etc.) that should be converted into trainable gold-format pairs.
+   - yes → materials_awaiting_upload; show materials zip upload
+   - no/skip → pricing phase
+3) Pricing phase: give a clear cost estimate + full setup summary; ask them to
+   type start to confirm. Only then emit start_pipeline.
 
 You MUST reply with ONLY a JSON object (no markdown fences) of this shape:
 {
   "reply": "What you say to the user in plain English",
-  "phase": "greet|discover|plan|formats|goals|own_data|confirm|running|done",
+  "phase": "greet|discover|plan|formats|goals|own_data|materials|pricing|confirm|running|done",
   "state_patch": {
     "project_name": "...",
     "domain": "...",
@@ -87,6 +92,8 @@ You MUST reply with ONLY a JSON object (no markdown fences) of this shape:
     "run_synthesis": false,
     "has_own_data": false,
     "own_data_awaiting_upload": false,
+    "has_materials": false,
+    "materials_awaiting_upload": false,
     "notes": "..."
   },
   "actions": [
@@ -104,7 +111,7 @@ Rules for actions:
 - Emit save_plan only when you have project_name + domain + mission (categories helpful).
 - Emit save_format when you have a sample input and sample output (or enough to invent a sensible sample from their domain — mark sample as illustrative).
 - Emit save_goals when gold_target / variations known (defaults 5000 and 4 ok).
-- Emit start_pipeline only after user confirms they want to run (or they clearly said "go"/"start"/"run it").
+- Emit start_pipeline only after user confirms they want to run (or they clearly said "go"/"start"/"run it") from pricing/confirm.
 - Emit start_synthesis only if user wants variations and gold goals are set; usually after pipeline is started or they already have gold.
 - progress is 0–100 estimate of setup completeness.
 - Merge state_patch with prior state; only include keys you want to update.
@@ -139,10 +146,13 @@ def session_to_dict(row: m.RiuSession) -> dict[str, Any]:
     if not isinstance(state, dict):
         state = {}
     phase = row.phase or "greet"
-    show_upload = bool(
+    show_gold_upload = bool(
         state.get("own_data_awaiting_upload")
-        or state.get("has_own_data")
-        or phase == "own_data"
+        or (phase == "own_data" and state.get("has_own_data"))
+    )
+    show_materials_upload = bool(
+        state.get("materials_awaiting_upload")
+        or (phase == "materials" and state.get("has_materials"))
     )
     return {
         "id": row.id,
@@ -152,9 +162,12 @@ def session_to_dict(row: m.RiuSession) -> dict[str, Any]:
         "messages": _load_json(row.messages_json, []),
         "last_job_id": row.last_job_id,
         "last_synth_job_id": row.last_synth_job_id,
-        "show_gold_zip_upload": show_upload,
+        "show_gold_zip_upload": show_gold_upload,
+        "show_materials_zip_upload": show_materials_upload,
         "own_data_uploaded": bool(state.get("own_data_uploaded")),
         "own_data_count": int(state.get("own_data_count") or 0),
+        "materials_uploaded": bool(state.get("materials_uploaded")),
+        "materials_count": int(state.get("materials_count") or 0),
         "created_at": row.created_at.isoformat() if row.created_at else None,
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
         "assistant_name": RIU_NAME,
@@ -510,40 +523,113 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         else:
             patch["has_own_data"] = bool(state.get("own_data_uploaded"))
             patch["own_data_awaiting_upload"] = False
-            try:
-                q = int(state.get("quality_mode") or 2)
-                g = int(state.get("gold_target") or 5000)
-                v = int(state.get("variations_per_gold") or 4)
-                batches = int(state.get("total_batches") or 2)
-                bsize = int(state.get("batch_size") or 5)
-            except (TypeError, ValueError):
-                q, g, v, batches, bsize = 2, 5000, 4, 2, 5
+            reply = (
+                "Next: do you have **other materials** that aren’t already labeled "
+                "Q&A — but you’d still want the model trained on?\n\n"
+                "Examples: a **tele-sales script**, a **game referee rulebook**, "
+                "**formulas/lesson notes** for a teacher, SOPs, product manuals…\n\n"
+                "Reply **yes** (zip upload — I’ll convert them into trainable "
+                "gold-format pairs) or **no** / **skip**."
+            )
+            next_phase = "materials"
+            progress = 88
+    elif phase == "materials":
+        yes = any(
+            w in lower
+            for w in (
+                "yes",
+                "yeah",
+                "yep",
+                "y",
+                "i have",
+                "i do",
+                "upload",
+                "zip",
+                "script",
+                "rulebook",
+                "formula",
+                "manual",
+                "sop",
+                "materials",
+            )
+        ) and not any(
+            w in lower for w in ("no", "skip", "later", "not now", "don't", "nope")
+        )
+        no = any(
+            w in lower
+            for w in ("no", "skip", "later", "not now", "don't have", "nope", "nah")
+        ) or lower.strip() in {"n", "no thanks"}
+        if lower.strip() in {"done", "continue", "next", "ok", "okay"} and state.get(
+            "materials_uploaded"
+        ):
+            no = True
+            yes = False
+        if yes and not no:
+            patch["has_materials"] = True
+            patch["materials_awaiting_upload"] = True
+            reply = (
+                "Great. Use **Upload materials zip** below (or **My data**).\n\n"
+                "Zip freeform docs: `.txt`, `.md`, `.html`, `.csv`, `.json` — "
+                "scripts, rulebooks, notes, formulas, SOPs.\n\n"
+                "I’ll convert them into the **best-fit trainable gold format** "
+                "so they work alongside mined gold and your labeled uploads. "
+                "You can download them anytime from My data.\n\n"
+                "After uploading, reply **done** or **continue**. "
+                "Or **skip** to go to pricing."
+            )
+            next_phase = "materials"
+            progress = 90
+        else:
+            patch["has_materials"] = bool(state.get("materials_uploaded"))
+            patch["materials_awaiting_upload"] = False
+            # Build pricing + summary → confirm
+            from helix.services.user_material_upload import estimate_setup_pricing
+
+            merged = {**state, **patch}
+            pricing = estimate_setup_pricing(merged)
+            patch["pricing_estimate"] = pricing
             pname = state.get("project_name") or "My project"
             mission = state.get("mission") or "Collect great training examples"
             cats = state.get("categories") or ["general"]
-            own_note = ""
-            if state.get("own_data_uploaded"):
-                own_note = (
-                    f"• Your uploads: **{int(state.get('own_data_count') or 0)}** "
-                    "gold-format row(s) saved\n"
-                )
+            lines = "\n".join(f"• {ln}" for ln in pricing["summary_lines"])
+            own_n = int(state.get("own_data_count") or 0)
+            mat_n = int(state.get("materials_count") or 0)
+            data_bits = []
+            if own_n:
+                data_bits.append(f"{own_n} labeled gold")
+            if mat_n:
+                data_bits.append(f"{mat_n} material rows")
+            data_line = (
+                f"• Your data: **{', '.join(data_bits)}**\n" if data_bits else ""
+            )
             reply = (
-                "Here's the setup I'll apply:\n\n"
+                "Here’s your **pricing estimate** and setup summary:\n\n"
                 f"• Project: **{pname}**\n"
                 f"• Goal: {mission}\n"
                 f"• Topics: {', '.join(cats)}\n"
-                f"• Gold target: **{g:,}** · variations/gold: **{v}**\n"
-                f"• Quality mode: **{q}** (1 best … 4 cheapest)\n"
-                f"{own_note}"
-                f"• First run: **{batches} batches** × "
-                f"**{bsize}** items (keeps going if you sign out)\n\n"
-                "Type **start** to save everything and begin collecting. "
-                "Or tell me what to change."
+                f"{data_line}"
+                f"{lines}\n\n"
+                "Type **start** to confirm and begin collecting. "
+                "Or tell me what to change (e.g. `gold 1000`, `quality cheap`)."
             )
             next_phase = "confirm"
-            progress = 90
+            progress = 94
             actions.append({"type": "save_goals"})
             actions.append({"type": "save_plan"})
+    elif phase == "pricing":
+        # Alias: same as materials→confirm path if LLM lands here
+        from helix.services.user_material_upload import estimate_setup_pricing
+
+        pricing = estimate_setup_pricing(state)
+        patch["pricing_estimate"] = pricing
+        lines = "\n".join(f"• {ln}" for ln in pricing["summary_lines"])
+        reply = (
+            f"Pricing & summary:\n\n{lines}\n\n"
+            "Type **start** to confirm and begin, or say what to change."
+        )
+        next_phase = "confirm"
+        progress = 94
+        actions.append({"type": "save_goals"})
     elif phase == "running":
         if wants_run:
             reply = (
