@@ -1,56 +1,112 @@
 {% extends "public_base.html" %}
 {% block title %}Helix{% endblock %}
-{% block meta_description %}Helix mines domain-specific gold training data from the web and your docs, quality-gates it, synthesizes variants, and exports fine-tune-ready datasets—without a labeling team.{% endblock %}
+{% block meta_description %}Helix is a gold training-data studio—not a chatbot, prompt tool, or labeling factory. Mine domain-specific gold examples, quality-gate them, and export fine-tune-ready datasets. Meet Riu, your setup guide. Built for SEO and GEO: models that answer from your domain, not generic web text.{% endblock %}
 {% block canonical %}https://c7xai.in/{% endblock %}
 {% block main_class %}public-home{% endblock %}
 {% block content %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "Helix",
+  "applicationCategory": "DeveloperApplication",
+  "operatingSystem": "Web",
+  "url": "https://c7xai.in/",
+  "description": "No-code gold training-data studio: plan in plain English with Riu, mine evidence, quality-gate gold examples, synthesize variants, and export fine-tune-ready datasets.",
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free during public beta for approved accounts" },
+  "publisher": { "@type": "Organization", "name": "c7x AI", "url": "https://c7xai.in/about" }
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {"@type": "Question", "name": "Is Helix a chatbot?", "acceptedAnswer": {"@type": "Answer", "text": "No. Riu is a setup guide. Helix is a dataset studio that produces gold training files you own."}},
+    {"@type": "Question", "name": "How is Helix different from ChatGPT, LangSmith, or Scale?", "acceptedAnswer": {"@type": "Answer", "text": "Chat tools generate answers. Prompt/eval platforms debug live agents. Labeling factories annotate at enterprise scale. Helix mines and quality-gates the gold dataset you need before you fine-tune."}},
+    {"@type": "Question", "name": "What is GEO?", "acceptedAnswer": {"@type": "Answer", "text": "Generative Engine Optimization: making your domain the source AI systems cite. Helix gold trains models on your facts and voice so they win search and AI-overview answers."}},
+    {"@type": "Question", "name": "Who is Riu?", "acceptedAnswer": {"@type": "Answer", "text": "Riu is Helix’s conversational setup guide. She interviews you, collects labeled and unlabeled data, shows a pricing estimate, and starts mining only after you confirm."}}
+  ]
+}
+</script>
+
 <section class="landing-hero">
   <div class="page-kicker">Built for product &amp; ops teams · Early beta</div>
   <h1>Gold training data for your domain—not another chat box.</h1>
   <p class="lead">
-    Helix is a <strong>no-code dataset studio</strong>: plain-English plans, evidence mining,
-    quality-gated gold examples, synthesis, and export for fine-tuning or eval sets.
-    Built for small teams who need task-specific data fast—not enterprise labeling factories
-    and not prompt/eval consoles.
+    Everyone else sells you a <strong>chat window</strong>, a <strong>prompt debugger</strong>, or a
+    <strong>labeling army</strong>. Helix is the missing layer:
+    a <strong>no-code dataset studio</strong> that mines, gates, and exports
+    <strong>task-specific gold</strong> so you can actually train or evaluate a model that knows
+    <em>your</em> domain.
   </p>
   <div class="flex" style="margin-top:20px;flex-wrap:wrap;gap:10px">
     <a class="btn btn-primary btn-lg" href="/app">Get started</a>
-    <a class="btn btn-secondary btn-lg" href="/docs">How it works</a>
-    <a class="btn btn-ghost btn-lg" href="/pricing">Pricing</a>
+    <a class="btn btn-secondary btn-lg" href="/#riu">Meet Riu</a>
+    <a class="btn btn-ghost btn-lg" href="/#different">Why we’re different</a>
   </div>
   <div class="pill-row">
-    <span class="badge accent">Domain-agnostic mining</span>
-    <span class="badge">BYO corpus &amp; gold zip</span>
-    <span class="badge">Quality gates</span>
+    <span class="badge accent">Dataset studio, not a chatbot</span>
+    <span class="badge">Riu setup guide</span>
+    <span class="badge">SEO + GEO ready gold</span>
     <span class="badge">~$35 / 1,000 gold target</span>
     <span class="badge">Export for fine-tunes</span>
   </div>
 </section>
 
-<section class="landing-decision" id="when">
-  <h2>When Helix is the right tool</h2>
-  <div class="landing-decision-grid">
-    <div class="card">
-      <h3>Choose Helix when…</h3>
-      <ul class="hint">
-        <li>You need a <strong>custom dataset</strong> for SFT / fine-tuning or offline eval</li>
-        <li>Ops/product owns quality and cannot wait on a labeling vendor</li>
-        <li>You have FAQs/policies (or public sources) to turn into gold Q&amp;A pairs</li>
-        <li>You want mining + gates + synthesis + export in one studio</li>
-      </ul>
-    </div>
-    <div class="card">
-      <h3>Choose something else when…</h3>
-      <ul class="hint">
-        <li><strong>Prompting / evals / observability</strong> for an already-live agent (prompt platforms)</li>
-        <li><strong>Huge multimodal annotation</strong> programs (enterprise data engines)</li>
-        <li>You only need a chatbot UI and have no plan to train or eval offline</li>
-      </ul>
-      <p class="hint mb-0">
-        Many stacks use Helix for the dataset, then train and evaluate elsewhere.
-      </p>
-    </div>
+<section class="landing-decision" id="different">
+  <h2>Why Helix is not like anything you already have</h2>
+  <p class="section-lead">
+    If you already have a chatbot, a RAG stack, or a prompt dashboard, you still do not have
+    <strong>owned gold training data</strong>. That is the job Helix does—and the job those tools skip.
+  </p>
+  <div class="compare-wrap">
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th scope="col">What teams buy today</th>
+          <th scope="col">What it actually does</th>
+          <th scope="col">What Helix does instead</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">ChatGPT, Claude, generic chat UIs</th>
+          <td>Answers in a box. Forgets your policy tomorrow. You do not own a dataset.</td>
+          <td>Produces <strong>gold Q&amp;A files you keep</strong>—for fine-tunes, evals, and Double Helix later.</td>
+        </tr>
+        <tr>
+          <th scope="row">Prompt / eval consoles (LangSmith, Braintrust, etc.)</th>
+          <td>Debug a live agent. Great after you already have a product.</td>
+          <td>Builds the <strong>offline training set first</strong>—before you ship or fine-tune.</td>
+        </tr>
+        <tr>
+          <th scope="row">Enterprise labeling (Scale, Labelbox)</th>
+          <td>Huge annotation programs. Slow, expensive, vendor-run.</td>
+          <td>Product/ops mines and gates gold <strong>without a labeling factory</strong>.</td>
+        </tr>
+        <tr>
+          <th scope="row">RAG / knowledge bases</th>
+          <td>Retrieves docs at runtime. The model never learns your voice.</td>
+          <td>Turns docs + web evidence into <strong>trainable pairs</strong> the model can internalize.</td>
+        </tr>
+        <tr>
+          <th scope="row">Fine-tune UIs that assume you have JSONL</th>
+          <td>Train if you already have clean data. Most teams do not.</td>
+          <td>Helix <strong>creates that JSONL</strong>—mined, gated, and exportable.</td>
+        </tr>
+        <tr>
+          <th scope="row">Raw scrapers / “just dump the website”</th>
+          <td>Noisy text. Models refuse, echo, or mix domains.</td>
+          <td>Hard quality gates reject junk. Plan-scoped mining. Spend cap you can audit.</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
+  <p class="hint" style="margin-top:16px;max-width:62ch">
+    Use Helix for the dataset. Train and evaluate wherever you want. We are not competing with your chat UI—
+    we are the reason that UI finally sounds like your company.
+  </p>
 </section>
 
 <div class="landing-features" id="how">
@@ -71,26 +127,99 @@
   </div>
 </div>
 
-<section class="landing-decision" id="riu">
-  <h2>Riu sets up the studio with you</h2>
-  <div class="landing-decision-grid">
-    <div class="card">
-      <h3>Interview, not a prompt dump</h3>
+<section class="landing-decision riu-intro" id="riu">
+  <p class="page-kicker">Meet Riu</p>
+  <h2>Riu is your studio guide—not another chatbot to train</h2>
+  <p class="section-lead">
+    Riu (pronounced <em>ree-oo</em>) is Helix’s conversational operator. She does not answer customer tickets.
+    She interviews <strong>you</strong>, configures the studio, estimates cost, and starts mining
+    only after you say so.
+  </p>
+  <div class="riu-intro-grid">
+    <div class="riu-portrait card">
+      <div class="riu-mark" aria-hidden="true">R</div>
+      <h3>Who she is</h3>
       <p class="hint">
-        Riu asks what you are training, your quality bar, whether you have
-        <strong>labeled Q&amp;A</strong>, then whether you have
-        <strong>unlabeled materials</strong> (sales scripts, rulebooks, formulas).
+        A plain-English setup agent inside Helix. No jargon. One or two questions at a time.
+        She remembers your plan, formats, goals, and uploads across the session.
       </p>
-      <p class="hint mb-0">Then she shows a <strong>pricing estimate</strong> and starts mining only after you confirm.</p>
+      <p class="hint mb-0">
+        When work starts, mining jobs keep running after you log out. Riu is the front door—not the model you ship.
+      </p>
     </div>
     <div class="card">
-      <h3>Bring your own data</h3>
+      <h3>What she asks</h3>
+      <ol class="riu-steps">
+        <li>What product or domain are you training for?</li>
+        <li>What should a perfect example look like?</li>
+        <li>How much gold do you want, and at what quality?</li>
+        <li>Do you have <strong>labeled</strong> Q&amp;A? Upload a zip if yes.</li>
+        <li>Any <strong>unlabeled</strong> materials—sales scripts, rulebooks, formulas? She converts them to gold format.</li>
+        <li>She shows a <strong>pricing estimate</strong>. You type <strong>start</strong>. Then she works.</li>
+      </ol>
+    </div>
+  </div>
+  <div class="flex" style="margin-top:18px;flex-wrap:wrap;gap:10px">
+    <a class="btn btn-primary" href="/app">Talk to Riu in the studio</a>
+    <a class="btn btn-secondary" href="/docs">Riu in the docs</a>
+  </div>
+</section>
+
+<section class="landing-decision" id="seo-geo">
+  <p class="page-kicker">SEO · GEO</p>
+  <h2>Gold data that wins search and generative answers</h2>
+  <p class="section-lead">
+    <strong>SEO</strong> is how people find you in search. <strong>GEO</strong> (generative engine optimization)
+    is how AI systems—ChatGPT, Perplexity, Google AI Overviews—choose <em>whose</em> facts to cite.
+    Generic chatbots and RAG dumps do not train a model on your domain. Helix does.
+  </p>
+  <div class="landing-decision-grid">
+    <div class="card">
+      <h3>For search (SEO)</h3>
       <ul class="hint">
-        <li>Zip of labeled pairs → gold format</li>
-        <li>Zip of unlabeled docs → converted trainable pairs</li>
-        <li>Download anytime from <strong>My data</strong></li>
-        <li>Ready for later <strong>Double Helix</strong> training jobs</li>
+        <li>Domain-specific Q&amp;A your site and help center can actually publish</li>
+        <li>Consistent voice and facts—not scraped marketing paste</li>
+        <li>Datasets you own and version, so content teams and models stay aligned</li>
       </ul>
+    </div>
+    <div class="card">
+      <h3>For AI answers (GEO)</h3>
+      <ul class="hint">
+        <li>Fine-tunes that internalize <strong>your</strong> policies, scripts, and formulas</li>
+        <li>Quality gates so models do not refuse, echo, or mix another brand’s domain</li>
+        <li>Labeled + unlabeled materials in one gold format—ready for Double Helix</li>
+      </ul>
+    </div>
+  </div>
+  <p class="hint" style="margin-top:14px;max-width:62ch">
+    Other tools optimize a prompt or a crawl. Helix optimizes the <strong>training set</strong>
+    those engines and your own model will learn from.
+  </p>
+</section>
+
+<section class="landing-decision" id="when">
+  <h2>When Helix is the right tool</h2>
+  <div class="landing-decision-grid">
+    <div class="card">
+      <h3>Choose Helix when…</h3>
+      <ul class="hint">
+        <li>You need a <strong>custom dataset</strong> for SFT / fine-tuning or offline eval</li>
+        <li>Ops/product owns quality and cannot wait on a labeling vendor</li>
+        <li>You have FAQs/policies (or public sources) to turn into gold Q&amp;A pairs</li>
+        <li>You want mining + gates + synthesis + export in one studio</li>
+        <li>You care about <strong>SEO and GEO</strong>: answers that stay on-brand</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Choose something else when…</h3>
+      <ul class="hint">
+        <li><strong>Prompting / evals / observability</strong> for an already-live agent</li>
+        <li><strong>Huge multimodal annotation</strong> programs (enterprise data engines)</li>
+        <li>You only need a chatbot UI and have no plan to train or eval offline</li>
+      </ul>
+      <p class="hint mb-0">
+        Many stacks use Helix for the dataset, then train and evaluate elsewhere.
+      </p>
     </div>
   </div>
 </section>
@@ -142,12 +271,20 @@
       <p>No. Riu is a setup guide. The product is a <strong>dataset studio</strong> that produces gold training files you own.</p>
     </details>
     <details>
-      <summary>Do I need a labeling team?</summary>
-      <p>No. Helix mines evidence, applies quality gates, and lets you bring your own docs. You review the library—not a vendor queue.</p>
+      <summary>How is Helix different from ChatGPT or a prompt platform?</summary>
+      <p>Those generate or debug answers. Helix <strong>mines and quality-gates the gold dataset</strong> you use to train or evaluate. Different job.</p>
     </details>
     <details>
-      <summary>What can I upload?</summary>
-      <p>Labeled jsonl/json/csv zips, unlabeled scripts/rulebooks/notes as zip, or paste/fetch corpus docs. All exportable from My data.</p>
+      <summary>What is GEO?</summary>
+      <p><strong>Generative engine optimization</strong>: making your domain the source AI systems cite. Helix gold trains models on your facts and voice—not generic web text.</p>
+    </details>
+    <details>
+      <summary>Who is Riu?</summary>
+      <p>Helix’s conversational setup guide. She collects your plan, labeled zips, unlabeled materials, shows a pricing estimate, and starts mining only after you confirm.</p>
+    </details>
+    <details>
+      <summary>Do I need a labeling team?</summary>
+      <p>No. Helix mines evidence, applies quality gates, and lets you bring your own docs. You review the library—not a vendor queue.</p>
     </details>
     <details>
       <summary>How do I get access?</summary>
@@ -164,7 +301,7 @@
   </p>
   <div class="flex" style="margin-top:16px;gap:10px;flex-wrap:wrap">
     <a class="btn btn-secondary" href="/docs" style="background:var(--paper);color:var(--ink)">Read docs</a>
-    <a class="btn btn-secondary" href="/about" style="background:transparent;color:var(--paper);border-color:var(--paper)">Who we are</a>
+    <a class="btn btn-secondary" href="/#riu" style="background:transparent;color:var(--paper);border-color:var(--paper)">Meet Riu</a>
     <a class="btn btn-secondary" href="/app" style="background:var(--paper);color:var(--ink)">Open studio</a>
   </div>
 </div>

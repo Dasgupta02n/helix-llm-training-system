@@ -85,6 +85,18 @@ def test_homepage_has_trust_links_not_dead_docs():
         assert f'href="{path}"' in r.text, path
 
 
+def test_homepage_introduces_riu_and_seo_geo():
+    r = client.get("/")
+    assert r.status_code == 200
+    low = r.text.lower()
+    assert 'id="riu"' in r.text
+    assert "meet riu" in low or "riu is" in low
+    assert 'id="seo-geo"' in r.text
+    assert "generative" in low or "geo" in low
+    assert "langsmith" in low or "labeling" in low or "rag" in low
+    assert "application/ld+json" in r.text
+
+
 def test_site_nav_on_inner_pages():
     r = client.get("/pricing")
     assert r.status_code == 200
