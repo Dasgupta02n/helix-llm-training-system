@@ -63,8 +63,12 @@ After goals:
    teacher notes, etc.) that should be converted into trainable gold-format pairs.
    - yes → materials_awaiting_upload; show materials zip upload
    - no/skip → pricing phase
-3) Pricing phase: give a clear cost estimate + full setup summary; ask them to
-   type start to confirm. Only then emit start_pipeline.
+3) Pricing / confirm: DO NOT invent dollar amounts, hourly ETAs, or gold yields.
+   The server attaches the official Helix estimate ($35 per 1,000 gold, corpus
+   gate). You may introduce it, but never quote a different per-1k price or say
+   5000 examples will finish in hours. With zero corpus, 5000 gold cannot start.
+   Web-only exploratory is 10 examples. Only emit start_pipeline after confirm
+   AND only for a job the official estimate says can start.
 
 You MUST reply with ONLY a JSON object (no markdown fences) of this shape:
 {
@@ -84,7 +88,7 @@ You MUST reply with ONLY a JSON object (no markdown fences) of this shape:
     "sample_input": "...",
     "sample_output": "...",
     "sample_rationale": "...",
-    "gold_target": 5000,
+    "gold_target": 10,
     "variations_per_gold": 4,
     "quality_mode": 2,
     "batch_size": 5,
@@ -110,8 +114,13 @@ You MUST reply with ONLY a JSON object (no markdown fences) of this shape:
 Rules for actions:
 - Emit save_plan only when you have project_name + domain + mission (categories helpful).
 - Emit save_format when you have a sample input and sample output (or enough to invent a sensible sample from their domain — mark sample as illustrative).
-- Emit save_goals when gold_target / variations known (defaults 5000 and 4 ok).
-- Emit start_pipeline only after user confirms they want to run (or they clearly said "go"/"start"/"run it") from pricing/confirm.
+- Emit save_goals when gold_target / variations known. gold_target is a library
+  goal, not a promise this job will produce that many. First job is batch_size
+  × total_batches (default 5×2=10).
+- Never invent costs. Official rate is $35 / 1,000 gold.
+- Emit start_pipeline only after the user confirms AND they either have corpus
+  or explicitly accepted the 10-example exploratory job ("start 10").
+  Do not emit start_pipeline for a 5000-gold promise with zero attached data.
 - Emit start_synthesis only if user wants variations and gold goals are set; usually after pipeline is started or they already have gold.
 - progress is 0–100 estimate of setup completeness.
 - Merge state_patch with prior state; only include keys you want to update.
@@ -341,6 +350,123 @@ def _refuses_run(text: str) -> bool:
             "later",
         )
     )
+
+
+def _user_denied_attached_data(text: str) -> bool:
+    t = (text or "").lower()
+    cues = (
+        "no corpus",
+        "zero corpus",
+        "0 corpus",
+        "no documents",
+        "zero documents",
+        "no labeled",
+        "zero labeled",
+        "no data",
+        "don't have data",
+        "do not have data",
+        "web research only",
+        "web only",
+        "pure web",
+        "nothing to upload",
+        "no files",
+        "no source material",
+    )
+    return any(c in t for c in cues)
+
+
+def _wants_exploratory(text: str) -> bool:
+    t = (text or "").strip().lower()
+    if t in {"start 10", "start ten", "exploratory", "start small", "start exploratory"}:
+        return True
+    return bool(re.search(r"\bstart\s+(10|ten|small|exploratory)\b", t))
+
+
+def _looks_like_cost_quote(reply: str) -> bool:
+    r = reply or ""
+    if re.search(r"\$\s*\d", r):
+        return True
+    low = r.lower()
+    return any(
+        w in low
+        for w in (
+            "credit",
+            "estimate",
+            "per 1,000",
+            "per 1000",
+            "hours",
+            "gold examples",
+        )
+    )
+
+
+def riu_start_block_reason(state: dict[str, Any]) -> str | None:
+    """Same gate as jobs, but also treat library gold_target as the requested volume."""
+    from helix.services.corpus import LARGE_PIPELINE_UNITS
+
+    if state.get("accept_exploratory"):
+        return None
+    try:
+        gold_target = int(state.get("gold_target") or 0)
+    except (TypeError, ValueError):
+        gold_target = 0
+    try:
+        units = int(state.get("batch_size") or 5) * int(state.get("total_batches") or 2)
+    except (TypeError, ValueError):
+        units = 10
+    corpus_docs = int(state.get("corpus_docs") or 0)
+    intended = max(gold_target, units)
+    if intended > LARGE_PIPELINE_UNITS and corpus_docs <= 0:
+        return (
+            f"I will not launch **{intended:,}** gold with no attached corpus. "
+            "Large jobs (more than 10 units) need source material under My data. "
+            "Web-research-only can run an exploratory **10**-example job — type "
+            "**start 10**. Official rate is **$35 / 1,000** gold "
+            f"(so {intended:,} ≈ **${intended / 1000.0 * 35:.0f}**, not a lower guess)."
+        )
+    return None
+
+
+def official_estimate_for_state(state: dict[str, Any]) -> dict[str, Any]:
+    from helix.services.user_material_upload import estimate_setup_pricing
+
+    return estimate_setup_pricing(state)
+
+
+def apply_official_riu_estimate(
+    reply: str,
+    *,
+    phase: str,
+    state: dict[str, Any],
+) -> str:
+    """Replace invented $ / hour quotes with the job-system estimate."""
+    from helix.services.user_material_upload import format_official_estimate
+
+    pricing = official_estimate_for_state(state)
+    state["pricing_estimate"] = pricing
+    block = format_official_estimate(
+        pricing, project=str(state.get("project_name") or state.get("domain") or "")
+    )
+    ph = (phase or "").lower()
+    if ph in {"pricing", "confirm"} or _looks_like_cost_quote(reply):
+        lead = (reply or "").strip()
+        # Drop leftover invented dollar/hour sentences from the model.
+        cleaned: list[str] = []
+        for para in re.split(r"\n{2,}", lead):
+            if re.search(r"\$\s*\d", para) or re.search(
+                r"\b(\d+\s*[-–]\s*\d+|\d+)\s*hours?\b", para, re.I
+            ):
+                continue
+            if "just type start" in para.lower() and not pricing.get(
+                "can_start_requested"
+            ):
+                continue
+            cleaned.append(para.strip())
+        intro = "\n\n".join(p for p in cleaned if p).strip()
+        if intro:
+            return f"{intro}\n\n{block}"
+        return block
+    return reply
 
 
 def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
@@ -591,7 +717,6 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             pname = state.get("project_name") or "My project"
             mission = state.get("mission") or "Collect great training examples"
             cats = state.get("categories") or ["general"]
-            lines = "\n".join(f"• {ln}" for ln in pricing["summary_lines"])
             own_n = int(state.get("own_data_count") or 0)
             mat_n = int(state.get("materials_count") or 0)
             data_bits = []
@@ -602,15 +727,16 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             data_line = (
                 f"• Your data: **{', '.join(data_bits)}**\n" if data_bits else ""
             )
+            from helix.services.user_material_upload import format_official_estimate
+
             reply = (
-                "Here’s your **pricing estimate** and setup summary:\n\n"
+                "Here’s the official setup summary — numbers come from the same "
+                "$35/1k + corpus rules as mining jobs, not a guess.\n\n"
                 f"• Project: **{pname}**\n"
                 f"• Goal: {mission}\n"
                 f"• Topics: {', '.join(cats)}\n"
                 f"{data_line}"
-                f"{lines}\n\n"
-                "Type **start** to confirm and begin collecting. "
-                "Or tell me what to change (e.g. `gold 1000`, `quality cheap`)."
+                f"{format_official_estimate(pricing)}\n"
             )
             next_phase = "confirm"
             progress = 94
@@ -622,10 +748,11 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
 
         pricing = estimate_setup_pricing(state)
         patch["pricing_estimate"] = pricing
-        lines = "\n".join(f"• {ln}" for ln in pricing["summary_lines"])
+        from helix.services.user_material_upload import format_official_estimate
+
         reply = (
-            f"Pricing & summary:\n\n{lines}\n\n"
-            "Type **start** to confirm and begin, or say what to change."
+            "Official pricing (same meters as jobs):\n\n"
+            f"{format_official_estimate(pricing)}\n"
         )
         next_phase = "confirm"
         progress = 94
@@ -742,11 +869,18 @@ def _llm_turn(
 
     # Put state snapshot as the first user turn, then dialogue.
     # Drop trailing assistant-only incomplete turns.
+    from helix.services.user_material_upload import format_official_estimate
+
+    official = format_official_estimate(official_estimate_for_state(state))
     context = (
         f"Current phase: {phase}\n"
         f"Collected state JSON:\n{json.dumps(state, ensure_ascii=False)[:4000]}\n"
+        "OFFICIAL ESTIMATE (authoritative — copy these facts, do not invent others):\n"
+        f"{official[:2500]}\n"
         "Respond with the required JSON object only. "
-        "Only emit start_pipeline after the user clearly confirms."
+        "Do not quote dollar amounts or hour ETAs except those in the official estimate. "
+        "Only emit start_pipeline after the user clearly confirms AND the official "
+        "estimate says the requested volume can start (or they said start 10)."
     )
     chat_messages: list[dict[str, Any]] = [{"role": "user", "content": context}]
     for h in hist:
@@ -997,12 +1131,20 @@ def _apply_start_pipeline(
 ) -> dict[str, Any]:
     from helix.services.corpus import require_corpus_for_large_job
 
+    reason = riu_start_block_reason(state)
+    if reason:
+        raise ValueError(reason)
+    # Exploratory: force the 10-unit web job, never a 5000-row launch.
+    batch_size = int(state.get("batch_size") or 5)
+    total_batches = int(state.get("total_batches") or 2)
+    if state.get("accept_exploratory"):
+        batch_size, total_batches = 5, 2
     require_corpus_for_large_job(
         db,
         tenant_id=tenant_id,
         owner_user_id=user_id,
-        batch_size=int(state.get("batch_size") or 5),
-        total_batches=int(state.get("total_batches") or 2),
+        batch_size=batch_size,
+        total_batches=total_batches,
     )
     job = create_batch_job(
         db,
@@ -1010,10 +1152,10 @@ def _apply_start_pipeline(
         tenant_id=tenant_id,
         job_type="pipeline",
         quality_mode=int(state.get("quality_mode") or 2),
-        batch_size=int(state.get("batch_size") or 5),
-        total_batches=int(state.get("total_batches") or 2),
+        batch_size=batch_size,
+        total_batches=total_batches,
         auto_continue=True,
-        config={"source": "riu"},
+        config={"source": "riu", "exploratory": bool(state.get("accept_exploratory"))},
     )
     return {"ok": True, "action": "start_pipeline", "job": job_to_dict(job)}
 
@@ -1146,6 +1288,20 @@ def handle_user_message(
     except Exception:  # noqa: BLE001
         pass
 
+    if _user_denied_attached_data(text):
+        state["has_own_data"] = False
+        state["has_materials"] = False
+        state["own_data_count"] = 0
+        state["materials_count"] = 0
+        # Keep live corpus_docs from DB; user claim is extra signal when DB is also empty.
+        if int(state.get("corpus_docs") or 0) == 0:
+            state["attached_support"] = 0
+
+    if _wants_exploratory(text):
+        state["accept_exploratory"] = True
+        state["batch_size"] = 5
+        state["total_batches"] = 2
+
     if text.lower().strip() in {"restart", "start over", "reset"}:
         # soft reset state but keep session
         new = create_session(db, user_id=user.id, tenant_id=tenant.id)
@@ -1176,6 +1332,27 @@ def handle_user_message(
         state["phase_targets"] = {c: 40 for c in state["categories"][:12]}
     # Formats from Riu replace demo defaults by default
     state.setdefault("replace_formats", True)
+
+    if _wants_exploratory(text):
+        state["accept_exploratory"] = True
+
+    # Never let the model launch a 5000-gold job the corpus gate would refuse
+    actions = list(turn.get("actions") or [])
+    block = riu_start_block_reason(state)
+    if block and not state.get("accept_exploratory"):
+        actions = [a for a in actions if a.get("type") != "start_pipeline"]
+        turn["actions"] = actions
+
+    # Official estimate overwrites invented $ / hour quotes
+    next_phase_guess = str(turn.get("phase") or phase)
+    turn["reply"] = apply_official_riu_estimate(
+        str(turn.get("reply") or ""),
+        phase=next_phase_guess,
+        state=state,
+    )
+    if block and _wants_run(text) and not state.get("accept_exploratory"):
+        turn["reply"] = f"{block}\n\n{turn['reply']}"
+        turn["phase"] = "confirm"
 
     # Monotonic setup progress (never go backward)
     prev_progress = 0
@@ -1218,7 +1395,10 @@ def handle_user_message(
         if r.get("ok") and r.get("action") == "start_synthesis" and r.get("job"):
             reply += f"\n\nSynthesis job **{r['job']['id']}** is queued."
         if not r.get("ok") and r.get("error"):
-            reply += f"\n\n(Note: {r.get('action')} failed: {r.get('error')})"
+            if r.get("action") == "start_pipeline":
+                reply = f"{r.get('error')}\n\n{reply}"
+            else:
+                reply += f"\n\n(Note: {r.get('action')} failed: {r.get('error')})"
 
     # Surface format replacement to the user when Riu rewrote topics
     for ar in action_results:

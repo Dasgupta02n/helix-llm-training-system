@@ -371,14 +371,29 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
             f"You asked for **{gold_target:,}** gold. Your attached data supports "
             f"about **{attached:,}** pairs (corpus {corpus_units} + labeled {own} + "
             f"materials {mats}). I will **not** pretend we can mint {gold_target:,} "
-            f"from that. The first job is only **{first_job_units}** units "
-            f"(${first_job_cap:.2f} cap); extra gold would need more corpus or "
-            "later web mining jobs."
+            f"from that. At the product rate, {gold_target:,} gold would be about "
+            f"**${target_mining_usd:,.2f}** — not a lower guessed band."
         )
     else:
         honest_lines.append(
             f"Requested **{gold_target:,}** gold is within attached support "
             f"(~{attached:,} pairs)."
+        )
+
+    can_start_requested = not (
+        gold_target > 10 and corpus_docs <= 0 and attached <= 0
+    )
+    if not can_start_requested:
+        honest_lines.append(
+            f"Web-research-only (no corpus) can start an **exploratory** job of "
+            f"**{first_job_units}** examples, hard cap **${first_job_cap:.2f}**. "
+            f"Type **start 10** for that. Typing **start** alone will **not** "
+            f"launch {gold_target:,} — large jobs need attached corpus."
+        )
+    else:
+        honest_lines.append(
+            f"First job hard cap: **${first_job_cap:.2f}** for **{first_job_units}** "
+            f"units ({batches}×{bsize}). Type **start** to queue that job."
         )
 
     return {
@@ -398,13 +413,17 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
         "corpus_units": corpus_units,
         "attached_support": attached,
         "requested_exceeds_corpus": gold_target > attached,
+        "can_start_requested": can_start_requested,
+        "first_job_units": first_job_units,
         "summary_lines": [
-            f"Mining goal (if corpus supported it): ~**${target_mining_usd:,.2f}** "
-            f"all-in for **{gold_target:,}** gold "
-            f"(target **${GOLD_COST_CAP_USD_PER_1000:.0f}/1,000**; OpenRouter + Apify).",
-            f"First job hard cap: **${first_job_cap:.2f}** for **{first_job_units}** units "
-            f"({batches}×{bsize}); jobs pause for your consent if trajectory exceeds this.",
-            f"Quality mode **{q}** — {mode_note}.",
+            f"Helix rate: **${GOLD_COST_CAP_USD_PER_1000:.0f} per 1,000 gold** "
+            f"all-in (OpenRouter + Apify). "
+            f"**{gold_target:,}** gold ≈ **${target_mining_usd:,.2f}** if we can "
+            f"actually produce it — not a lower guessed range.",
+            f"First job: **{first_job_units}** units, spend cap **${first_job_cap:.2f}** "
+            f"({batches}×{bsize}). Jobs pause if trajectory would exceed the cap.",
+            f"Quality mode **{q}** — {mode_note}. Time for this first job is "
+            f"**one small batch (minutes, not hours)** — not a 3–6 hour 5,000-row run.",
             *honest_lines,
             (
                 f"Your uploads already in library: **{own}** labeled gold + **{mats}** "
@@ -417,3 +436,13 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
             f"${DOUBLE_HELIX_TRAINING_COST_MAX_USD:.0f}** per job (not charged now).",
         ],
     }
+
+
+def format_official_estimate(pricing: dict[str, Any], *, project: str = "") -> str:
+    """User-facing block. Riu must show this instead of invented $ / hour quotes."""
+    lines = list(pricing.get("summary_lines") or [])
+    head = "Official Helix estimate (from the same $35/1k + corpus rules as jobs):"
+    if project:
+        head = f"{head}\n• Project: **{project}**"
+    body = "\n".join(f"• {ln}" if not ln.startswith("•") else ln for ln in lines)
+    return f"{head}\n{body}"
