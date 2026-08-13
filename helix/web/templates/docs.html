@@ -1,6 +1,7 @@
 {% extends "public_base.html" %}
 {% block title %}Docs{% endblock %}
-{% block meta_description %}Helix documentation — Plan, formats, mining, corpus, gold library, and export basics for the training data studio.{% endblock %}
+{% block canonical %}https://c7xai.in/docs{% endblock %}
+{% block meta_description %}Helix documentation — Plan, Riu, formats, mining, corpus, gold library, BYO zips, spend cap, and export.{% endblock %}
 {% block content %}
 <article class="legal-doc">
   <p class="page-kicker">Documentation · Product guide</p>
@@ -30,6 +31,12 @@
     The research plan (domain, mission, categories, sources, tone) steers mining and quality. Change the plan
     when you switch domains (e.g. food-delivery support → HR policy)—ontology and discovery target the active plan.
   </p>
+  <h3>Riu</h3>
+  <p>
+    Conversational setup: product, quality bar, <strong>labeled gold zip</strong>, then
+    <strong>unlabeled materials</strong> (scripts, rulebooks, formulas). Riu shows a
+    <strong>pricing estimate</strong> and starts mining only after you type start.
+  </p>
   <h3>Formats / topics</h3>
   <p>
     Example formats define what a good training row looks like (input/output shape). They set the quality bar
@@ -38,12 +45,24 @@
   <h3>Mining</h3>
   <p>
     Jobs gather evidence (web search via Apify when configured), score relevance by domain, and promote
-    candidates. Quality modes trade helper depth vs cost. Jobs continue after logout.
+    candidates. Quality modes trade helper depth vs cost. Jobs continue after logout. Combined spend is
+    capped at about <strong>$35 per 1,000 gold</strong> (scaled to job size); jobs pause for consent if
+    trajectory would exceed the cap.
   </p>
   <h3>Corpus (bring your own)</h3>
   <p>
     Paste FAQ/policy text or fetch a URL. Corpus is promoted into evidence and gold before generic web scraps
     when you mine—critical for niche or internal knowledge public search will not find.
+  </p>
+  <h3>Your labeled data</h3>
+  <p>
+    Upload a zip of jsonl/json/csv with input+output (or question/answer). Stored as gold-format rows,
+    downloadable from My data · Export my uploads.
+  </p>
+  <h3>Unlabeled materials</h3>
+  <p>
+    Upload scripts, rulebooks, lesson notes as a zip. Helix converts them into trainable gold-format pairs
+    (Export materials). They sit alongside mined gold and labeled uploads for later Double Helix training.
   </p>
   <h3>Gold library</h3>
   <p>

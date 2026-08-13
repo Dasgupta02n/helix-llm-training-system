@@ -1,31 +1,31 @@
 {% extends "public_base.html" %}
 {% block title %}Pricing{% endblock %}
-{% block meta_description %}Helix pricing — free during public beta; contact us for enterprise and high-volume mining.{% endblock %}
+{% block canonical %}https://c7xai.in/pricing{% endblock %}
+{% block meta_description %}Helix pricing — free during public beta; ~$35 per 1,000 gold examples as the mining cost target; Double Helix training later.{% endblock %}
 {% block content %}
 <article class="legal-doc">
   <p class="page-kicker">Pricing · Early beta</p>
   <h1>Simple pricing while we build in public</h1>
   <p class="lead">
     Helix is in <strong>open beta</strong>. We are optimizing for product quality and honest feedback—not
-    complex enterprise packaging yet.
+    complex enterprise packaging yet. Access is gated by account creation and admin approval—not a checkout.
   </p>
 
   <div class="pricing-grid">
     <div class="pricing-card">
-      <h2>Beta</h2>
+      <h2>Beta studio</h2>
       <p class="price">Free</p>
       <p class="hint">During testing for approved accounts</p>
       <ul>
         <li>Workspace + research plan (any domain)</li>
+        <li>Riu setup (labeled gold zip + unlabeled materials)</li>
         <li>Mining jobs (Apify gather + quality gates)</li>
-        <li>Gold library &amp; synthesis controls</li>
-        <li>Bring-your-own corpus</li>
-        <li>Export training files</li>
+        <li>Gold library, synthesis, exports</li>
         <li>Jobs that keep running after sign-out</li>
+        <li>Spend-cap pause at ~$35 / 1,000 gold trajectory</li>
       </ul>
       <p class="hint">
-        Usage may be rate-limited. LLM and gather costs are subject to our provider quotas;
-        heavy use may be throttled to keep the beta stable for everyone.
+        Provider usage (OpenRouter + Apify) is metered in-app. Heavy use may be throttled so the beta stays stable.
       </p>
       <a class="btn btn-primary" href="/app">Open studio</a>
     </div>
@@ -43,6 +43,14 @@
       <a class="btn btn-ghost" href="/contact">Contact page</a>
     </div>
   </div>
+
+  <h2>How we design cost (so you can audit us)</h2>
+  <ul>
+    <li><strong>Mining target:</strong> about <strong>$35 all-in per 1,000 gold examples</strong> (OpenRouter + Apify combined).</li>
+    <li><strong>Jobs:</strong> auto-pause if spend trajectory would exceed that ratio; you must confirm to continue past the cap.</li>
+    <li><strong>In-app meter:</strong> OpenRouter and Apify shown separately, using provider-billed amounts when available.</li>
+    <li><strong>Double Helix (not charged yet):</strong> optional LoRA/QLoRA training later, designed for about <strong>$15–50 per training job</strong>.</li>
+  </ul>
 
   <h2>What you’re paying for (when paid plans land)</h2>
   <p>

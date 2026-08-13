@@ -1,122 +1,171 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Helix — Gold training-data studio for domain LLMs</title>
-  <meta name="description" content="Helix mines domain-specific gold training data from the web and your docs, quality-gates it, synthesizes variants, and exports fine-tune-ready datasets—without a labeling team." />
-  <link rel="stylesheet" href="/static/app.css?v={{ static_v }}" />
-</head>
-<body>
-  <div class="landing-shell">
-    <header class="landing-top">
-      <a class="brand" href="/" style="display:flex;align-items:center;gap:11px;color:inherit;text-decoration:none">
-        <div class="brand-mark">H</div>
-        <div class="brand-text">
-          <strong>Helix</strong>
-          <span>Training data studio</span>
-        </div>
-      </a>
-      <nav class="flex" style="gap:10px;flex-wrap:wrap;align-items:center">
-        <a class="btn btn-ghost btn-sm" href="/docs">Docs</a>
-        <a class="btn btn-ghost btn-sm" href="/pricing">Pricing</a>
-        <a class="btn btn-ghost btn-sm" href="/about">About</a>
-        <a class="btn btn-secondary" href="/app">Open studio</a>
-      </nav>
-    </header>
-
-    <section class="landing-hero">
-      <div class="page-kicker">Built for product &amp; ops teams · Early beta</div>
-      <h1>Gold training data for your domain—not another chat box.</h1>
-      <p class="lead">
-        Helix is a <strong>no-code dataset studio</strong>: plain-English plans, evidence mining,
-        quality-gated gold examples, synthesis, and export for fine-tuning or eval sets.
-        Built for small teams who need task-specific data fast—not enterprise labeling factories
-        and not prompt/eval consoles.
-      </p>
-      <div class="flex" style="margin-top:20px;flex-wrap:wrap;gap:10px">
-        <a class="btn btn-primary btn-lg" href="/app">Get started</a>
-        <a class="btn btn-secondary btn-lg" href="/docs">How it works</a>
-        <a class="btn btn-ghost btn-lg" href="/pricing">Pricing</a>
-      </div>
-      <div class="pill-row">
-        <span class="badge accent">Domain-agnostic mining</span>
-        <span class="badge">BYO corpus</span>
-        <span class="badge">Quality gates</span>
-        <span class="badge">Export for fine-tunes</span>
-      </div>
-    </section>
-
-    <section class="landing-decision">
-      <h2>When Helix is the right tool</h2>
-      <div class="landing-decision-grid">
-        <div class="card">
-          <h3>Choose Helix when…</h3>
-          <ul class="hint">
-            <li>You need a <strong>custom dataset</strong> for SFT / fine-tuning or offline eval</li>
-            <li>Ops/product owns quality and cannot wait on a labeling vendor</li>
-            <li>You have FAQs/policies (or public sources) to turn into gold Q&amp;A pairs</li>
-            <li>You want mining + gates + synthesis + export in one studio</li>
-          </ul>
-        </div>
-        <div class="card">
-          <h3>Choose something else when…</h3>
-          <ul class="hint">
-            <li><strong>Prompting / evals / observability</strong> for an already-live agent (prompt platforms)</li>
-            <li><strong>Huge multimodal annotation</strong> programs (enterprise data engines)</li>
-            <li>You only need a chatbot UI and have no plan to train or eval offline</li>
-          </ul>
-          <p class="hint mb-0">
-            Many stacks use Helix for the dataset, then train and evaluate elsewhere.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <div class="landing-features">
-      <div class="card">
-        <div class="feature-icon">1</div>
-        <h3>Plan in plain English</h3>
-        <p class="hint mb-0">Domain, mission, categories, tone—Riu or Plan tab. Any vertical, not locked to one demo.</p>
-      </div>
-      <div class="card">
-        <div class="feature-icon">2</div>
-        <h3>Mine + quality-gate gold</h3>
-        <p class="hint mb-0">Web gather and/or your corpus. Helpers judge; hard gates reject refuse/echo junk.</p>
-      </div>
-      <div class="card">
-        <div class="feature-icon">3</div>
-        <h3>Synthesize &amp; export</h3>
-        <p class="hint mb-0">Controlled variants, library that keeps forever, download training files for your trainer.</p>
-      </div>
-    </div>
-
-    <div class="poster-banner">
-      <h2>Not Scale. Not a prompt IDE. Dataset mining.</h2>
-      <p>
-        Fast path for task-specific gold data—lighter than enterprise labeling platforms,
-        focused where prompt tools stop: offline training sets you can own and version.
-      </p>
-      <div class="flex" style="margin-top:16px;gap:10px;flex-wrap:wrap">
-        <a class="btn btn-secondary" href="/docs" style="background:var(--paper);color:var(--ink)">Read docs</a>
-        <a class="btn btn-secondary" href="/about" style="background:transparent;color:var(--paper);border-color:var(--paper)">Who we are</a>
-      </div>
-    </div>
-
-    <footer class="public-footer">
-      <div class="public-footer-inner">
-        <div><strong>Helix</strong> by c7x AI · Early beta · {{ version }}</div>
-        <div class="public-footer-links">
-          <a href="/privacy">Privacy</a>
-          <a href="/terms">Terms</a>
-          <a href="/security">Security</a>
-          <a href="/pricing">Pricing</a>
-          <a href="/docs">Docs</a>
-          <a href="/about">About</a>
-          <a href="/contact">Contact</a>
-        </div>
-      </div>
-    </footer>
+{% extends "public_base.html" %}
+{% block title %}Helix{% endblock %}
+{% block meta_description %}Helix mines domain-specific gold training data from the web and your docs, quality-gates it, synthesizes variants, and exports fine-tune-ready datasets—without a labeling team.{% endblock %}
+{% block canonical %}https://c7xai.in/{% endblock %}
+{% block main_class %}public-home{% endblock %}
+{% block content %}
+<section class="landing-hero">
+  <div class="page-kicker">Built for product &amp; ops teams · Early beta</div>
+  <h1>Gold training data for your domain—not another chat box.</h1>
+  <p class="lead">
+    Helix is a <strong>no-code dataset studio</strong>: plain-English plans, evidence mining,
+    quality-gated gold examples, synthesis, and export for fine-tuning or eval sets.
+    Built for small teams who need task-specific data fast—not enterprise labeling factories
+    and not prompt/eval consoles.
+  </p>
+  <div class="flex" style="margin-top:20px;flex-wrap:wrap;gap:10px">
+    <a class="btn btn-primary btn-lg" href="/app">Get started</a>
+    <a class="btn btn-secondary btn-lg" href="/docs">How it works</a>
+    <a class="btn btn-ghost btn-lg" href="/pricing">Pricing</a>
   </div>
-</body>
-</html>
+  <div class="pill-row">
+    <span class="badge accent">Domain-agnostic mining</span>
+    <span class="badge">BYO corpus &amp; gold zip</span>
+    <span class="badge">Quality gates</span>
+    <span class="badge">~$35 / 1,000 gold target</span>
+    <span class="badge">Export for fine-tunes</span>
+  </div>
+</section>
+
+<section class="landing-decision" id="when">
+  <h2>When Helix is the right tool</h2>
+  <div class="landing-decision-grid">
+    <div class="card">
+      <h3>Choose Helix when…</h3>
+      <ul class="hint">
+        <li>You need a <strong>custom dataset</strong> for SFT / fine-tuning or offline eval</li>
+        <li>Ops/product owns quality and cannot wait on a labeling vendor</li>
+        <li>You have FAQs/policies (or public sources) to turn into gold Q&amp;A pairs</li>
+        <li>You want mining + gates + synthesis + export in one studio</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Choose something else when…</h3>
+      <ul class="hint">
+        <li><strong>Prompting / evals / observability</strong> for an already-live agent (prompt platforms)</li>
+        <li><strong>Huge multimodal annotation</strong> programs (enterprise data engines)</li>
+        <li>You only need a chatbot UI and have no plan to train or eval offline</li>
+      </ul>
+      <p class="hint mb-0">
+        Many stacks use Helix for the dataset, then train and evaluate elsewhere.
+      </p>
+    </div>
+  </div>
+</section>
+
+<div class="landing-features" id="how">
+  <div class="card">
+    <div class="feature-icon">1</div>
+    <h3>Plan in plain English</h3>
+    <p class="hint mb-0">Talk to Riu or use the Plan tab. Domain, mission, categories, tone—any vertical.</p>
+  </div>
+  <div class="card">
+    <div class="feature-icon">2</div>
+    <h3>Mine + quality-gate gold</h3>
+    <p class="hint mb-0">Web gather and/or your corpus. Helpers judge; hard gates reject refuse/echo junk.</p>
+  </div>
+  <div class="card">
+    <div class="feature-icon">3</div>
+    <h3>Synthesize &amp; export</h3>
+    <p class="hint mb-0">Controlled variants, library that keeps forever, download training files for your trainer.</p>
+  </div>
+</div>
+
+<section class="landing-decision" id="riu">
+  <h2>Riu sets up the studio with you</h2>
+  <div class="landing-decision-grid">
+    <div class="card">
+      <h3>Interview, not a prompt dump</h3>
+      <p class="hint">
+        Riu asks what you are training, your quality bar, whether you have
+        <strong>labeled Q&amp;A</strong>, then whether you have
+        <strong>unlabeled materials</strong> (sales scripts, rulebooks, formulas).
+      </p>
+      <p class="hint mb-0">Then she shows a <strong>pricing estimate</strong> and starts mining only after you confirm.</p>
+    </div>
+    <div class="card">
+      <h3>Bring your own data</h3>
+      <ul class="hint">
+        <li>Zip of labeled pairs → gold format</li>
+        <li>Zip of unlabeled docs → converted trainable pairs</li>
+        <li>Download anytime from <strong>My data</strong></li>
+        <li>Ready for later <strong>Double Helix</strong> training jobs</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="landing-decision" id="cost">
+  <h2>Cost you can check against real bills</h2>
+  <div class="landing-decision-grid">
+    <div class="card">
+      <h3>Mining target</h3>
+      <p class="price-inline">~$35 / 1,000 gold</p>
+      <p class="hint mb-0">
+        All-in OpenRouter + Apify. Jobs pause if trajectory would exceed the cap;
+        you confirm before spending more.
+      </p>
+    </div>
+    <div class="card">
+      <h3>Double Helix (later)</h3>
+      <p class="price-inline">~$15–50 / train job</p>
+      <p class="hint mb-0">
+        Optional LoRA/QLoRA on a GPU host, packaged for you to run locally (Ollama/vLLM).
+        Not billed yet — we design cost tracking for this now.
+      </p>
+    </div>
+  </div>
+</section>
+
+<section class="landing-decision" id="trust">
+  <h2>Public pages (diligence-ready)</h2>
+  <p class="hint" style="max-width:62ch">
+    Evaluators should not hit dead links. Privacy, terms, security, pricing, docs, about, and contact
+    are live HTML—not a hijacked OpenAPI explorer.
+  </p>
+  <div class="trust-row">
+    <a href="/privacy">Privacy</a>
+    <a href="/terms">Terms</a>
+    <a href="/security">Security</a>
+    <a href="/pricing">Pricing</a>
+    <a href="/docs">Docs</a>
+    <a href="/about">About</a>
+    <a href="/contact">Contact</a>
+  </div>
+</section>
+
+<section class="landing-decision" id="faq">
+  <h2>FAQ</h2>
+  <div class="faq-list">
+    <details open>
+      <summary>Is Helix a chatbot?</summary>
+      <p>No. Riu is a setup guide. The product is a <strong>dataset studio</strong> that produces gold training files you own.</p>
+    </details>
+    <details>
+      <summary>Do I need a labeling team?</summary>
+      <p>No. Helix mines evidence, applies quality gates, and lets you bring your own docs. You review the library—not a vendor queue.</p>
+    </details>
+    <details>
+      <summary>What can I upload?</summary>
+      <p>Labeled jsonl/json/csv zips, unlabeled scripts/rulebooks/notes as zip, or paste/fetch corpus docs. All exportable from My data.</p>
+    </details>
+    <details>
+      <summary>How do I get access?</summary>
+      <p>Create an account at the studio. During beta, email verification and admin approval may apply. No payment system yet.</p>
+    </details>
+  </div>
+</section>
+
+<div class="poster-banner">
+  <h2>Not Scale. Not a prompt IDE. Dataset mining.</h2>
+  <p>
+    Fast path for task-specific gold data—lighter than enterprise labeling platforms,
+    focused where prompt tools stop: offline training sets you can own and version.
+  </p>
+  <div class="flex" style="margin-top:16px;gap:10px;flex-wrap:wrap">
+    <a class="btn btn-secondary" href="/docs" style="background:var(--paper);color:var(--ink)">Read docs</a>
+    <a class="btn btn-secondary" href="/about" style="background:transparent;color:var(--paper);border-color:var(--paper)">Who we are</a>
+    <a class="btn btn-secondary" href="/app" style="background:var(--paper);color:var(--ink)">Open studio</a>
+  </div>
+</div>
+{% endblock %}

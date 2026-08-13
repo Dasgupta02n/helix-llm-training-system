@@ -80,3 +80,29 @@ def test_homepage_has_trust_links_not_dead_docs():
     # Positioning wedge language
     low = r.text.lower()
     assert "dataset" in low or "training data" in low or "gold" in low
+    assert "chat box" in low or "not a chatbot" in low or "not another chat" in low
+    for path in ("/security", "/about", "/contact", "/pricing", "/terms"):
+        assert f'href="{path}"' in r.text, path
+
+
+def test_site_nav_on_inner_pages():
+    r = client.get("/pricing")
+    assert r.status_code == 200
+    assert "Open studio" in r.text
+    assert "$35" in r.text or "35" in r.text
+    assert "Double Helix" in r.text or "double helix" in r.text.lower()
+
+
+def test_docs_cover_riu_and_materials():
+    r = client.get("/docs")
+    body = r.text.lower()
+    assert "riu" in body
+    assert "material" in body or "rulebook" in body or "script" in body
+    assert "export" in body
+
+
+def test_app_login_has_legal_links():
+    r = client.get("/app")
+    assert r.status_code == 200
+    assert 'href="/privacy"' in r.text
+    assert 'href="/terms"' in r.text
