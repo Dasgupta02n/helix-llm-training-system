@@ -174,4 +174,7 @@ CATEGORIES = [
     "finance",
 ]
 
-SOURCES = ["instagram", "tiktok", "youtube", "x", "blog"]
+# Default gather channels when a plan does not name sources.
+# Free-text plan sources (education sites, forums, docs, …) are adapted in
+# helix.services.source_adapter — do not treat this list as the only reachable set.
+SOURCES = ["web", "blog", "docs", "forum", "youtube", "instagram", "tiktok", "x"]

@@ -369,6 +369,98 @@ def corpus_count(db: Session, tenant_id: str, project_id: str | None = None) -> 
     return q.count()
 
 
+def estimate_corpus_support(
+    db: Session,
+    *,
+    tenant_id: str,
+    owner_user_id: str | None = None,
+) -> dict[str, Any]:
+    """How many gold pairs the user's attached plan-scoped corpus can actually yield."""
+    from helix.services.user_gold_upload import USER_UPLOAD_SOURCE_KIND
+    from helix.services.user_material_upload import USER_MATERIAL_SOURCE_KIND
+
+    docs = list_corpus(
+        db,
+        tenant_id=tenant_id,
+        owner_user_id=owner_user_id,
+        limit=50,
+        scope_to_plan=True,
+    )
+    units = 0
+    for doc in docs:
+        units += len(
+            extract_training_units(
+                title=doc.title or "Corpus document",
+                content=doc.content_text or "",
+                category=doc.category or "general",
+            )
+        )
+
+    labeled = 0
+    materials = 0
+    if owner_user_id:
+        q = db.query(m.GoldExample).filter_by(
+            owner_user_id=owner_user_id,
+            tenant_id=tenant_id,
+            is_archived=False,
+        )
+        labeled = (
+            q.filter(
+                m.GoldExample.source_kind.in_(
+                    [USER_UPLOAD_SOURCE_KIND, "byo", "upload"]
+                )
+            ).count()
+        )
+        materials = (
+            q.filter(
+                m.GoldExample.source_kind.in_(
+                    [USER_MATERIAL_SOURCE_KIND, "material", "materials"]
+                )
+            ).count()
+        )
+
+    return {
+        "corpus_docs": len(docs),
+        "corpus_units": units,
+        "labeled_rows": labeled,
+        "material_rows": materials,
+        "attached_support": units + labeled + materials,
+    }
+
+
+# Jobs larger than this (batch_size × total_batches) need an attached corpus.
+LARGE_PIPELINE_UNITS = 10
+
+
+def require_corpus_for_large_job(
+    db: Session,
+    *,
+    tenant_id: str,
+    owner_user_id: str | None,
+    batch_size: int,
+    total_batches: int,
+) -> dict[str, Any]:
+    """
+    Block large mining jobs when this plan has no attached corpus.
+
+    Returns the support stats. Raises ValueError when the job is large and
+    corpus_docs == 0.
+    """
+    stats = estimate_corpus_support(
+        db, tenant_id=tenant_id, owner_user_id=owner_user_id
+    )
+    units = max(1, int(batch_size or 1) * int(total_batches or 1))
+    stats["job_units"] = units
+    stats["large"] = units > LARGE_PIPELINE_UNITS
+    if stats["large"] and int(stats["corpus_docs"] or 0) <= 0:
+        raise ValueError(
+            "Large mining jobs (more than 10 units) require an attached corpus "
+            "for this plan. Paste FAQs, policies, or scripts under My data, "
+            "then retry. Exploratory runs of 10 units or fewer can still mine the web."
+        )
+    return stats
+
+
 def write_corpus_units_as_gold(
     db: Session,
     *,

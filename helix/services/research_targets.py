@@ -156,21 +156,34 @@ def build_search_queries(
     source: str = "web",
     attempt: int = 0,
     max_queries: int = 4,
+    extra_operators: list[str] | None = None,
+    source_label: str = "",
 ) -> list[str]:
     """
     Build varied search queries for one discovery attempt.
 
     attempt=0 → primary focused queries
     attempt=1+ → broader operators + alternate phrasings (never identical to attempt 0)
+
+    extra_operators / source_label come from the brief `sources` adapter so a
+    named type like "consumer credit card education" is actually searched.
     """
     kind = research_domain_kind(brief, category)
     domain = (brief.get("domain") or "").strip()
     cats = [str(c) for c in (brief.get("categories") or [])]
     mission = _mission_snip(brief)
-    ops = operators_for_kind(kind)
+    ops = list(extra_operators or []) + operators_for_kind(kind)
+    # de-dupe ops while keeping order
+    seen_ops: set[str] = set()
+    ops = [o for o in ops if o and not (o.lower() in seen_ops or seen_ops.add(o.lower()))]
     base_terms = [t for t in [category, domain] if t]
+    label = (source_label or "").strip()
 
     queries: list[str] = []
+
+    # Named source type as search terms (education sites, sales scripts, …)
+    if label and label.lower() not in {"web", "blog", "docs", source.lower()}:
+        queries.append(f"{category} {domain} {label}".strip()[:240])
 
     # Core: category + domain + kind-specific operator rotation
     op = ops[attempt % len(ops)] if ops else "guide"

@@ -108,6 +108,16 @@ KIND_DEFAULTS: dict[str, dict[str, Any]] = {
         "options": [],
         "action_label": "Respond",
     },
+    "source_alignment": {
+        "question": (
+            "A named source type in the plan could not be gathered as requested. "
+            "Acknowledge, attach corpus, or change Plan → sources."
+        ),
+        "expected_answer_type": "acknowledge",
+        "options": [],
+        "action_label": "Acknowledge",
+        "needs_input": False,
+    },
 }
 
 

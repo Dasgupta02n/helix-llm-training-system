@@ -133,6 +133,7 @@ def test_estimate_pricing_includes_caps():
     assert p["first_job_unit_cap_usd"] == 0.35  # 10 units * 35/1000
     assert p["your_labeled_rows"] == 10
     assert p["your_material_rows"] == 5
+    assert p["requested_exceeds_corpus"] is True
     assert len(p["summary_lines"]) >= 3
 
 

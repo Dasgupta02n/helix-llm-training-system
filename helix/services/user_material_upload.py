@@ -348,6 +348,38 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
 
     own = int(state.get("own_data_count") or 0)
     mats = int(state.get("materials_count") or 0)
+    corpus_docs = int(state.get("corpus_docs") or 0)
+    corpus_units = int(state.get("corpus_units") or 0)
+    attached = int(state.get("attached_support") or 0)
+    if attached <= 0:
+        attached = corpus_units + own + mats
+
+    honest_lines: list[str] = []
+    if corpus_docs or corpus_units:
+        honest_lines.append(
+            f"Attached corpus: **{corpus_docs}** doc(s) → about **{corpus_units}** "
+            "trainable pairs we can extract."
+        )
+    else:
+        honest_lines.append(
+            "No corpus is attached for this plan. A **large** mining job "
+            "(more than 10 units) will be blocked until you paste source material "
+            "under My data."
+        )
+    if gold_target > attached:
+        honest_lines.append(
+            f"You asked for **{gold_target:,}** gold. Your attached data supports "
+            f"about **{attached:,}** pairs (corpus {corpus_units} + labeled {own} + "
+            f"materials {mats}). I will **not** pretend we can mint {gold_target:,} "
+            f"from that. The first job is only **{first_job_units}** units "
+            f"(${first_job_cap:.2f} cap); extra gold would need more corpus or "
+            "later web mining jobs."
+        )
+    else:
+        honest_lines.append(
+            f"Requested **{gold_target:,}** gold is within attached support "
+            f"(~{attached:,} pairs)."
+        )
 
     return {
         "gold_target": gold_target,
@@ -362,17 +394,23 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
         "double_helix_training_usd_max": DOUBLE_HELIX_TRAINING_COST_MAX_USD,
         "your_labeled_rows": own,
         "your_material_rows": mats,
+        "corpus_docs": corpus_docs,
+        "corpus_units": corpus_units,
+        "attached_support": attached,
+        "requested_exceeds_corpus": gold_target > attached,
         "summary_lines": [
-            f"Mining goal: ~**${target_mining_usd:,.2f}** all-in for **{gold_target:,}** gold "
-            f"(target **${GOLD_COST_CAP_USD_PER_1000:.0f}/1,000** examples; OpenRouter + Apify).",
+            f"Mining goal (if corpus supported it): ~**${target_mining_usd:,.2f}** "
+            f"all-in for **{gold_target:,}** gold "
+            f"(target **${GOLD_COST_CAP_USD_PER_1000:.0f}/1,000**; OpenRouter + Apify).",
             f"First job hard cap: **${first_job_cap:.2f}** for **{first_job_units}** units "
             f"({batches}×{bsize}); jobs pause for your consent if trajectory exceeds this.",
             f"Quality mode **{q}** — {mode_note}.",
+            *honest_lines,
             (
-                f"Your data already in library: **{own}** labeled gold + **{mats}** "
+                f"Your uploads already in library: **{own}** labeled gold + **{mats}** "
                 "material-converted rows (downloadable; Double Helix ready)."
                 if (own or mats)
-                else "No personal uploads yet — mining will collect gold from your plan."
+                else "No labeled/material uploads yet."
             ),
             f"Optional later: **Double Helix** training ~**"
             f"${DOUBLE_HELIX_TRAINING_COST_MIN_USD:.0f}–"

@@ -226,7 +226,7 @@ def create_session(db: Session, *, user_id: str, tenant_id: str) -> m.RiuSession
                 "mission": "",
                 "research_questions": [],
                 "categories": [],
-                "sources": [],
+                "sources": ["docs", "web"],
                 "phase_targets": {},
                 "topic_key": "",
                 "format_name": "",
@@ -384,7 +384,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         patch["categories"] = cats or ["general"]
         targets = {c: 40 for c in patch["categories"][:8]}
         patch["phase_targets"] = targets
-        patch["sources"] = state.get("sources") or ["docs", "tickets", "web"]
+        patch["sources"] = state.get("sources") or ["docs", "web"]
         reply = (
             f"Topics noted: **{', '.join(patch['categories'])}**.\n\n"
             "Show me a **perfect example** of what a training row should look like.\n"
@@ -995,6 +995,15 @@ def _apply_save_goals(
 def _apply_start_pipeline(
     db: Session, *, user_id: str, tenant_id: str, state: dict
 ) -> dict[str, Any]:
+    from helix.services.corpus import require_corpus_for_large_job
+
+    require_corpus_for_large_job(
+        db,
+        tenant_id=tenant_id,
+        owner_user_id=user_id,
+        batch_size=int(state.get("batch_size") or 5),
+        total_batches=int(state.get("total_batches") or 2),
+    )
     job = create_batch_job(
         db,
         owner_user_id=user_id,
@@ -1118,6 +1127,24 @@ def handle_user_message(
         "ts": _now().isoformat(),
     }
     messages.append(user_msg)
+
+    try:
+        from helix.services.corpus import estimate_corpus_support
+
+        cstats = estimate_corpus_support(
+            db, tenant_id=tenant.id, owner_user_id=user.id
+        )
+        state["corpus_docs"] = cstats["corpus_docs"]
+        state["corpus_units"] = cstats["corpus_units"]
+        state["attached_support"] = cstats["attached_support"]
+        state["own_data_count"] = int(state.get("own_data_count") or 0) or cstats[
+            "labeled_rows"
+        ]
+        state["materials_count"] = int(state.get("materials_count") or 0) or cstats[
+            "material_rows"
+        ]
+    except Exception:  # noqa: BLE001
+        pass
 
     if text.lower().strip() in {"restart", "start over", "reset"}:
         # soft reset state but keep session

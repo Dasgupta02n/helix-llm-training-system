@@ -90,6 +90,7 @@ def score_all_active(ctx: ToolContext, **_: Any) -> dict:
 
     cats = ctx.db.query(m.CategoryState).filter_by(tenant_id=ctx.tenant_id).all()
     brief_cats: set[str] | None = None
+    proj = None
     try:
         proj = get_active_project(ctx.db, ctx.tenant_id)
         if proj:
@@ -102,9 +103,32 @@ def score_all_active(ctx: ToolContext, **_: Any) -> dict:
                 brief_cats = set(raw)
     except Exception:  # noqa: BLE001
         brief_cats = None
-    sources = (
-        ctx.db.query(m.SourceReliability).filter_by(tenant_id=ctx.tenant_id).all()
-    )
+    from helix.services.source_adapter import adapt_sources
+
+    brief_source_labels: list[str] = []
+    try:
+        if proj:
+            brief_source_labels = [
+                str(s).strip()
+                for s in (project_to_dict(proj).get("sources") or [])
+                if str(s).strip()
+            ]
+    except Exception:  # noqa: BLE001
+        brief_source_labels = []
+    adapted = adapt_sources(brief_source_labels)
+    if not adapted:
+        # Fall back to reliability table, but skip phyllo and do not invent
+        # that Instagram is the plan's source list.
+        rel_rows = (
+            ctx.db.query(m.SourceReliability)
+            .filter_by(tenant_id=ctx.tenant_id)
+            .all()
+        )
+        adapted = adapt_sources(
+            [r.source for r in rel_rows if r.source and r.source != "phyllo"]
+            or ["web", "blog"]
+        )
+
     scores = []
     for cat in cats:
         if brief_cats is not None and cat.name not in brief_cats:
@@ -112,13 +136,12 @@ def score_all_active(ctx: ToolContext, **_: Any) -> dict:
         if int(cat.phase_target or 0) <= 0:
             continue
         gap = max(0, cat.phase_target - cat.verified_count) / max(cat.phase_target, 1)
-        for src in sources:
-            if src.source == "phyllo":
-                continue
+        for spec in adapted:
+            rel = 0.75 if spec.get("reachable") else 0.05
             score = round(
                 0.45 * gap
                 + 0.25 * cat.verification_rate_14d
-                + 0.20 * src.reliability
+                + 0.20 * rel
                 - 0.10 * min(cat.cost_per_verified_14d, 2.0) / 2.0
                 + 0.10 * (1 if cat.weeks_missed_target else 0),
                 4,
@@ -126,7 +149,10 @@ def score_all_active(ctx: ToolContext, **_: Any) -> dict:
             scores.append(
                 {
                     "category": cat.name,
-                    "source": src.source,
+                    "source": spec["label"],
+                    "channel": spec.get("channel"),
+                    "reachable": bool(spec.get("reachable")),
+                    "unreachable_reason": spec.get("reason"),
                     "priority_score": score,
                     "verified_count": cat.verified_count,
                     "phase_target": cat.phase_target,
@@ -169,7 +195,7 @@ def write_work_queue(ctx: ToolContext, assignments: list | None = None, **_: Any
             id=_uid("wq_"),
             tenant_id=ctx.tenant_id,
             category=a.get("category", "beauty"),
-            source=a.get("source", "instagram"),
+            source=a.get("source", "web"),
             priority_score=float(a.get("priority_score", 0.5)),
             assigned_agent="discovery",
             status="open",

@@ -216,8 +216,20 @@ def gather_search(
     search_q = f"{query}".strip()
     if category and category.lower() not in search_q.lower():
         search_q = f"{search_q} {category}".strip()
-    if source in {"instagram", "tiktok", "youtube", "x"}:
-        search_q = f"{search_q} site:{_site_hint(source)}"
+    from helix.services.source_adapter import SOCIAL_CHANNELS, adapt_source
+
+    spec = adapt_source(source)
+    gather_channel = spec.get("channel") or "web"
+    if gather_channel in SOCIAL_CHANNELS:
+        hint = _site_hint(gather_channel)
+        if hint:
+            search_q = f"{search_q} site:{hint}"
+    elif spec.get("operators"):
+        # Public non-social type: keep the named phrase in the query.
+        op0 = spec["operators"][0]
+        if op0 and op0.lower() not in search_q.lower():
+            search_q = f"{search_q} {op0}".strip()
+    source = gather_channel if gather_channel != "unreachable" else "web"
 
     cache_key = _hash(tenant_id, source, search_q, str(max_results), domain_kind or "")
     job = m.GatherJob(

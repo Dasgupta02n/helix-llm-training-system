@@ -233,27 +233,82 @@ def run_code_pipeline_batch(
 
         a = assign["assignment"]
         kind = research_domain_kind(brief, a.get("category") or "")
-        # Ontology-routed source preference (support → web/help docs, not social ads)
-        preferred = preferred_sources(kind)
-        source = a.get("source") or preferred[0] or "web"
-        if kind == "support" and source in {"instagram", "tiktok", "youtube", "x", "facebook"}:
-            source = "web"
-            steps.append("source_reroute:support→web")
+        from helix.services.source_adapter import SOCIAL_CHANNELS, sources_for_gather
+
+        gather_specs = sources_for_gather(
+            brief_sources=list(brief.get("sources") or []),
+            assignment_source=a.get("source"),
+            domain_kind=kind,
+            fallback=preferred_sources(kind),
+        )
+        unreachable_specs = [s for s in gather_specs if not s.get("reachable")]
+        reachable_specs = [s for s in gather_specs if s.get("reachable")]
+        if not reachable_specs:
+            reachable_specs = sources_for_gather(
+                brief_sources=[],
+                assignment_source="web",
+                domain_kind=kind,
+                fallback=["web"],
+            )
+        # Social assignment must not override a plan that named education/docs/forums.
+        if kind != "influencer" and any(
+            s.get("channel") in SOCIAL_CHANNELS for s in reachable_specs
+        ) and any(
+            s.get("channel") not in SOCIAL_CHANNELS for s in reachable_specs
+        ):
+            reachable_specs = [
+                s for s in reachable_specs if s.get("channel") not in SOCIAL_CHANNELS
+            ] or reachable_specs
+
+        if unreachable_specs:
+            labels = ", ".join(s["label"] for s in unreachable_specs)
+            reasons = "; ".join(
+                f"{s['label']}: {s.get('reason') or 'not publicly searchable'}"
+                for s in unreachable_specs
+            )
+            warnings.append(f"source_alignment: cannot reach {labels} — {reasons}")
+            steps.append(f"source_unreachable:{len(unreachable_specs)}")
+            h.create_escalation(
+                ctx,
+                kind="source_alignment",
+                message=(
+                    f"The plan names source type(s) we cannot gather from the public web: "
+                    f"{reasons}. Attach those as corpus/materials, or change Plan → sources. "
+                    f"Discovery will still search: "
+                    + ", ".join(s["label"] for s in reachable_specs)
+                    + "."
+                ),
+                payload={
+                    "unreachable": [s["label"] for s in unreachable_specs],
+                    "attempted": [s["label"] for s in reachable_specs],
+                },
+            )
+
+        source = reachable_specs[0]["channel"]
+        steps.append(
+            "sources:"
+            + ",".join(f"{s['label']}→{s['channel']}" for s in gather_specs[:6])
+        )
 
         min_hits = min_evidence_threshold(batch_size)
         # Adaptive gather: vary queries and deepen crawl until min evidence or max attempts
         max_attempts = 3
         seen_urls: set[str] = set()
         all_results: list[dict[str, Any]] = []
+        hits_by_label: dict[str, int] = {s["label"]: 0 for s in reachable_specs}
 
         for attempt in range(max_attempts):
             deep = attempt >= 1
+            spec = reachable_specs[attempt % len(reachable_specs)]
+            source = spec["channel"]
             qs = build_search_queries(
                 brief,
                 category=a["category"],
                 source=source,
                 attempt=attempt,
                 max_queries=2 if attempt == 0 else 3,
+                extra_operators=spec.get("operators") or [],
+                source_label=spec.get("label") or "",
             )
             attempt_hits = 0
             for query in qs:
@@ -299,6 +354,7 @@ def run_code_pipeline_batch(
                     r = {**r, "_kind_score": kind_sc["relevance_score"], "_query": query}
                     all_results.append(r)
                     attempt_hits += 1
+                    hits_by_label[spec["label"]] = hits_by_label.get(spec["label"], 0) + 1
                 h.record_search(
                     ctx, source=source, query=query, category=a["category"]
                 )
@@ -324,6 +380,35 @@ def run_code_pipeline_batch(
             warnings.append(
                 f"No verifiable sources found for “{a['category']}” "
                 f"after {len(queries_tried)} varied queries. 0 new candidates."
+            )
+
+        empty_named = [
+            s["label"]
+            for s in reachable_specs
+            if hits_by_label.get(s["label"], 0) == 0
+            and (s.get("label") or "").lower()
+            not in {"web", "blog", "docs", s.get("channel", "")}
+        ]
+        if empty_named:
+            warnings.append(
+                "source_alignment: attempted but 0 hits for "
+                + ", ".join(empty_named)
+            )
+            h.create_escalation(
+                ctx,
+                kind="source_alignment",
+                message=(
+                    "Discovery searched the public web for these plan source types "
+                    f"and found nothing usable: {', '.join(empty_named)}. "
+                    "This is not a silent fallback to Instagram/TikTok — those "
+                    "were not used as a substitute. Attach corpus for those "
+                    "sources, or rename Plan → sources to something we can query."
+                ),
+                payload={
+                    "zero_yield": empty_named,
+                    "hits_by_source": hits_by_label,
+                    "queries_tried": queries_tried[:12],
+                },
             )
 
         for r in all_results[: max(batch_size * 2, min_hits)]:

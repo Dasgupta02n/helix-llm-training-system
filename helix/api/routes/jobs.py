@@ -82,6 +82,18 @@ def start_pipeline_job(
     db: Session = Depends(get_db),
 ) -> dict:
     tenant = _tenant_for(user, slug, db)
+    from helix.services.corpus import require_corpus_for_large_job
+
+    try:
+        require_corpus_for_large_job(
+            db,
+            tenant_id=tenant.id,
+            owner_user_id=user.id,
+            batch_size=body.batch_size,
+            total_batches=body.total_batches,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
     job = create_batch_job(
         db,
         owner_user_id=user.id,
