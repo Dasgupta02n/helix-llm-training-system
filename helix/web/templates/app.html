@@ -303,6 +303,7 @@
             <button class="btn btn-secondary btn-sm" id="libraryMaterialsZipBtn" type="button">Upload materials zip</button>
             <button class="btn btn-ghost btn-sm" id="exportMaterialsBtn" type="button">Export materials</button>
             <button class="btn btn-ghost btn-sm" id="exportTrainableBtn" type="button">Export all trainable</button>
+            <button class="btn btn-secondary btn-sm" id="doubleHelixZipBtn" type="button">Double Helix zip (Llama 3.1 8B QLoRA)</button>
           </div>
           <p id="libraryMaterialsStatus" class="status-line"></p>
           <p class="hint" id="userUploadCountHint"></p>
@@ -401,6 +402,10 @@
               <h3 class="mt-0 mb-0">Gold in your account</h3>
               <button class="btn btn-ghost btn-sm" id="exportGoldBtn" type="button">Export gold</button>
             </div>
+            <label class="flex" style="align-items:center;gap:.5rem;font-weight:500">
+              <input id="exportChatFormat" type="checkbox" checked style="width:auto;min-height:auto;margin:0" />
+              LoRA/QLoRA chat-format JSONL (user/assistant messages)
+            </label>
             <p class="hint">Real-world verified / curated examples you own.</p>
             <div id="goldList"></div>
           </div>

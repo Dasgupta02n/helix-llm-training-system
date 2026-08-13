@@ -1183,10 +1183,11 @@ async function synthesize() {
   }
 }
 
-async function exportLibrary(kind) {
+async function exportLibrary(kind, fmt) {
   try {
+    const format = fmt || ($("exportChatFormat") && $("exportChatFormat").checked ? "chat" : "jsonl");
     const res = await fetch(
-      `/api/t/${state.tenantSlug}/library/export?kind=${encodeURIComponent(kind)}&format=jsonl`,
+      `/api/t/${state.tenantSlug}/library/export?kind=${encodeURIComponent(kind)}&format=${encodeURIComponent(format)}`,
       { headers: { Authorization: `Bearer ${state.token}` } }
     );
     if (!res.ok) throw new Error("Download failed");
@@ -2143,6 +2144,29 @@ if ($("exportMaterialsBtn"))
   $("exportMaterialsBtn").onclick = () => exportLibrary("user_material");
 if ($("exportTrainableBtn"))
   $("exportTrainableBtn").onclick = () => exportLibrary("trainable");
+if ($("doubleHelixZipBtn")) {
+  $("doubleHelixZipBtn").onclick = async () => {
+    try {
+      const res = await fetch(`/api/t/${state.tenantSlug}/library/double-helix/package`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${state.token}` },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "helix_double_helix_v1.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast("Double Helix zip downloaded");
+    } catch (e) {
+      toast(e.message || "Package failed", "err");
+    }
+  };
+}
 if ($("libraryGoldZipBtn")) {
   $("libraryGoldZipBtn").onclick = () =>
     uploadGoldZip($("libraryGoldZip"), $("libraryUploadStatus"), { viaRiu: false }).catch(

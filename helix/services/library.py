@@ -395,6 +395,16 @@ def library_stats(db: Session, user_id: str, tenant_id: str) -> dict[str, Any]:
     }
 
 
+def gold_to_chat_messages(input_text: str, output_text: str) -> dict[str, Any]:
+    """LoRA/QLoRA-ready chat JSONL row."""
+    return {
+        "messages": [
+            {"role": "user", "content": input_text or ""},
+            {"role": "assistant", "content": output_text or ""},
+        ]
+    }
+
+
 def gold_to_dict(g: m.GoldExample, tenant_slug: str | None = None) -> dict[str, Any]:
     from helix.services.gold_quality import rejection_fields_from_meta
 

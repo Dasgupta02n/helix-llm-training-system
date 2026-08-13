@@ -39,15 +39,15 @@ def _tenant_for(user: m.User, slug: str, db: Session) -> m.Tenant:
 
 class PipelineJobCreate(BaseModel):
     quality_mode: int = Field(2, ge=1, le=4, description="1=best quality, 4=lowest cost")
-    batch_size: int = Field(5, ge=1, le=10)
-    total_batches: int = Field(1, ge=1, le=500)
+    batch_size: int = Field(5, ge=1, le=100)
+    total_batches: int = Field(1, ge=1, le=100)
     auto_continue: bool = True
 
 
 class SynthesisJobCreate(BaseModel):
     quality_mode: int = Field(2, ge=1, le=4)
-    batch_size: int = Field(5, ge=1, le=10, description="Gold rows per batch")
-    total_batches: int = Field(1, ge=1, le=500)
+    batch_size: int = Field(5, ge=1, le=100, description="Gold rows per batch")
+    total_batches: int = Field(1, ge=1, le=100)
     auto_continue: bool = True
     variations_per_gold: int = Field(4, ge=1, le=20)
     parameters: list[str] = Field(default_factory=lambda: ["tone", "difficulty", "persona"])
@@ -69,7 +69,7 @@ def list_modes() -> dict:
             },
         },
         "modes": MODE_META,
-        "batch_size_max": 10,
+        "batch_size_max": 100,
         "survives_logout": True,
     }
 

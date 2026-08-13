@@ -560,7 +560,7 @@ def export_library(
         "all",
         pattern="^(all|gold|synthetic|user_upload|user_material|trainable)$",
     ),
-    format: str = Query("jsonl", pattern="^(jsonl|json)$"),
+    format: str = Query("jsonl", pattern="^(jsonl|json|chat)$"),
     user: m.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -620,6 +620,14 @@ def export_library(
             },
         )
 
+    def _chat_row(row: dict[str, Any]) -> dict[str, Any]:
+        from helix.services.library import gold_to_chat_messages
+
+        return gold_to_chat_messages(
+            row.get("input") or row.get("input_text") or "",
+            row.get("output") or row.get("output_text") or "",
+        )
+
     def gen():
         slim_kinds = {
             USER_UPLOAD_SOURCE_KIND,
@@ -630,6 +638,9 @@ def export_library(
             "materials",
         }
         for row in items:
+            if format == "chat":
+                yield json.dumps(_chat_row(row), ensure_ascii=False) + "\n"
+                continue
             # Stable training shape for Double Helix / external trainers
             if kind in {
                 "user_upload",
@@ -651,10 +662,49 @@ def export_library(
             else:
                 yield json.dumps(row, ensure_ascii=False) + "\n"
 
+    fname = f"helix_library_{safe}"
+    if format == "chat":
+        fname += "_chat"
     return StreamingResponse(
         gen(),
         media_type="application/x-ndjson",
         headers={
-            "Content-Disposition": f'attachment; filename="helix_library_{safe}.jsonl"'
+            "Content-Disposition": f'attachment; filename="{fname}.jsonl"'
+        },
+    )
+
+
+@router.post("/double-helix/package")
+def double_helix_package(
+    slug: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Zip chat-format gold + Llama 3.1 8B QLoRA notes. Admin-approved accounts only."""
+    if not (user.admin_approved or user.is_superadmin):
+        raise HTTPException(403, "Double Helix packaging is limited to approved accounts.")
+    tenant = _tenant_for(user, slug, db)
+    rows = (
+        db.query(m.GoldExample)
+        .filter_by(
+            owner_user_id=user.id,
+            tenant_id=tenant.id,
+            is_archived=False,
+        )
+        .filter(m.GoldExample.verification_status != "rejected")
+        .order_by(m.GoldExample.created_at.asc())
+        .all()
+    )
+    payload = [
+        {"input": g.input_text, "output": g.output_text, "id": g.id} for g in rows
+    ]
+    from helix.services.double_helix import build_package_zip
+
+    blob = build_package_zip(payload)
+    return StreamingResponse(
+        iter([blob]),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": 'attachment; filename="helix_double_helix_v1.zip"'
         },
     )

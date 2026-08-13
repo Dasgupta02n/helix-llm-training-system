@@ -43,7 +43,7 @@ def create_batch_job(
         raise ValueError("job_type must be pipeline or synthesis")
     quality_mode = clamp_mode(quality_mode)
     batch_size = clamp_batch_size(batch_size)
-    total_batches = max(1, min(int(total_batches), 500))
+    total_batches = max(1, min(int(total_batches), 100))
 
     # Conservative priors (recalibrated ~2–3× old heuristics from live runs)
     prior = eta_prior_seconds(job_type, quality_mode)

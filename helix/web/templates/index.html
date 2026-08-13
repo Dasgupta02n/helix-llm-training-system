@@ -221,13 +221,18 @@
     <div class="card">
       <h3>What she asks</h3>
       <ol class="riu-steps">
-        <li>What product or domain are you training for?</li>
-        <li>What should a perfect example look like?</li>
-        <li>How much gold do you want, and at what quality?</li>
-        <li>Do you have <strong>labeled</strong> Q&amp;A? Upload a zip if yes.</li>
-        <li>Any <strong>unlabeled</strong> materials—sales scripts, rulebooks, formulas? She converts them to gold format.</li>
-        <li>She shows a <strong>pricing estimate</strong>. You type <strong>start</strong>. Then she works.</li>
+        <li>What <strong>role</strong> will the AI perform?</li>
+        <li>One <strong>perfect example</strong>, then 1–3 <strong>edge cases</strong> (more if the role is high-risk).</li>
+        <li>Official <strong>$35 / 1k</strong> estimate. Confirm — then mining starts.</li>
+        <li>After gold is ready: optional <strong>variations</strong> (you opt in).</li>
       </ol>
+      <div class="riu-example hint" style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px">
+        <strong>Example exchange</strong>
+        <p class="mb-0"><em>You:</em> Screen CVs for a backend role.</p>
+        <p class="mb-0"><em>Riu:</em> High-risk hiring role — I need 3 edge cases and a human-review quality bar. Give me one perfect score request and ideal reply.</p>
+        <p class="mb-0"><em>You:</em> I have no corpus. I want 5000 gold.</p>
+        <p class="mb-0"><em>Riu:</em> 5000 ≈ $175 at $35/1k and needs corpus. Web-only can start 10 examples ($0.35). Type start 10.</p>
+      </div>
     </div>
   </div>
   <div class="flex" style="margin-top:18px;flex-wrap:wrap;gap:10px">
@@ -310,8 +315,10 @@
       <h3>Double Helix (later)</h3>
       <p class="price-inline">~$15–50 / train job</p>
       <p class="hint mb-0">
-        Optional LoRA/QLoRA on a GPU host, packaged for you to run locally (Ollama/vLLM).
-        Not billed yet — we design cost tracking for this now.
+        v1 is <strong>Llama 3.1 8B + QLoRA only</strong>. Download a zip of chat-format gold,
+        Meta license note, Ollama/vLLM instructions, and a usage/ownership/liability declaration.
+        No payment. Approved accounts only. You obtain Llama weights under Meta’s license;
+        Helix does not ship the base model.
       </p>
     </div>
   </div>

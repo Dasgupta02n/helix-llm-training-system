@@ -79,7 +79,7 @@ def clamp_batch_size(n: int) -> int:
         v = int(n)
     except (TypeError, ValueError):
         v = 5
-    return max(1, min(10, v))
+    return max(1, min(100, v))
 
 
 def mode_llm_agents(mode: int) -> list[str]:
