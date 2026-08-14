@@ -312,6 +312,10 @@ def build_trained_zip(
 
     model = get_model(job.base_model_id) or {"id": job.base_model_id, "name": job.base_model_id, "license": "", "params_b": ""}
     chat_text, _alpaca = build_dataset_texts(gold_rows)
+    from helix.services.declaration import DECLARATION_TEXT
+
+    script_path = Path(__file__).resolve().parents[1] / "packaging" / "load_adapter.py"
+    script_src = script_path.read_text(encoding="utf-8") if script_path.is_file() else ""
     readme = f"""# Helix Double Helix trained package
 
 Base model: {model.get('id')}
@@ -323,11 +327,21 @@ Gold rows used: {job.gold_count}
 ## What is in this zip
 - `qlora/` — trained adapter weights (`adapter_model.safetensors` + `adapter_config.json`)
 - `tokenizer/` — tokenizer files for serving/merging
+- `load_adapter.py` — PEFT loader (run this)
 - `data/train_chat.jsonl` — the gold Helix used (from your account)
+- `DECLARATION.txt` — ownership and liability text you accepted
 - This is **not** a merged full-size model. A 7B–30B fp16 dump is 15–60 GB
   and is not hosted here. Load the adapter on top of the public base.
 
-## Load with PEFT
+## Load with the script (recommended)
+```bash
+pip install torch transformers peft accelerate
+python load_adapter.py --prompt "How do I reset my password?"
+# optional merge:
+python load_adapter.py --merge-to ./merged
+```
+
+## Load with PEFT (same steps the script runs)
 ```python
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from peft import PeftModel
@@ -347,6 +361,9 @@ Private Hugging Face copies (your token):
         zf.writestr("README.md", readme)
         zf.writestr("LICENSE.txt", LICENSE_NOTE)
         zf.writestr("USAGE_AND_LIABILITY.txt", USAGE_OWNERSHIP)
+        zf.writestr("DECLARATION.txt", DECLARATION_TEXT)
+        if script_src:
+            zf.writestr("load_adapter.py", script_src)
         zf.writestr("data/train_chat.jsonl", chat_text)
         zf.writestr(
             "meta.json",

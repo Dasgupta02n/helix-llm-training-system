@@ -874,3 +874,34 @@ class DoubleHelixTrainJob(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class LiabilityAcceptance(Base):
+    """Signed ownership/liability declaration. Never deleted — kept by email."""
+
+    __tablename__ = "liability_acceptances"
+    __table_args__ = (
+        UniqueConstraint(
+            "email",
+            "train_job_id",
+            "declaration_version",
+            name="uq_liability_email_job_version",
+        ),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    # Durable key. Survives account deletion. No FK on purpose (no cascade).
+    email: Mapped[str] = mapped_column(String(255), index=True)
+    owner_user_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    tenant_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    train_job_id: Mapped[str | None] = mapped_column(String(32), index=True, nullable=True)
+    declaration_version: Mapped[str] = mapped_column(String(40), default="dh-liability-v1")
+    declaration_text: Mapped[str] = mapped_column(Text)
+    accepted_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    ip_address: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    email_status: Mapped[str] = mapped_column(String(40), default="pending")
+    email_log_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    account_deleted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

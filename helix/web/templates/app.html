@@ -122,6 +122,7 @@
           <span id="userRole">Owner</span>
         </div>
         <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">Sign out</button>
+        <button class="btn btn-ghost btn-sm" id="deleteAccountBtn" type="button">Delete account</button>
       </div>
       <!-- keep userChip for JS showApp toggles (hidden structural hook) -->
       <div id="userChip" class="hidden" aria-hidden="true"></div>
@@ -332,6 +333,11 @@
           <div id="doubleHelixTrainDownloadWrap" class="hidden" style="margin-top:8px">
             <button class="btn btn-primary btn-sm" id="doubleHelixTrainDownloadBtn" type="button">Download trained model zip</button>
           </div>
+          <div style="margin-top:18px;border-top:1px solid var(--color-divider);padding-top:14px">
+            <h4 class="mt-0 mb-0">Signed declarations</h4>
+            <p class="hint">Copies of what you accepted. You cannot delete them. They stay keyed to your email if you remove the account.</p>
+            <div id="declarationList"></div>
+          </div>
         </div>
 
         <div class="pane pad" style="margin-bottom:1rem">
@@ -482,6 +488,21 @@
   </div>
 
   <div class="toast-host" id="toastHost"></div>
+  <div id="declarationModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="declarationTitle">
+    <div class="modal-card">
+      <h3 class="mt-0" id="declarationTitle">Own the model. Accept liability.</h3>
+      <p class="hint">You must accept this before the trained zip can download. A copy is emailed to you and kept in your account. You cannot delete that copy.</p>
+      <pre class="declaration-text" id="declarationBody"></pre>
+      <label class="flex" style="align-items:center;gap:.5rem;font-weight:500;margin:12px 0">
+        <input id="declarationConfirmBox" type="checkbox" style="width:auto;min-height:auto;margin:0" />
+        I have read this declaration and I accept it. I own this model and I am solely responsible for its use. Helix, Double Helix, and Riu are not liable.
+      </label>
+      <div class="flex" style="gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="declarationAcceptBtn" type="button">Accept and download</button>
+        <button class="btn btn-ghost" id="declarationCancelBtn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
   <script src="/static/app.js?v={{ static_v }}"></script>
 </body>
 </html>

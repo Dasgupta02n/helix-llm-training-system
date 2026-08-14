@@ -289,6 +289,42 @@ def change_password(
     return MessageResponse(message="Password updated.")
 
 
+class DeleteAccountRequest(BaseModel):
+    password: str = Field(min_length=1, max_length=128)
+    confirm: str = ""
+
+
+@router.post("/delete-account", response_model=MessageResponse)
+def delete_account(
+    body: DeleteAccountRequest,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> MessageResponse:
+    """Deactivate the account. Liability declarations are kept by email."""
+    if (body.confirm or "").strip().upper() != "DELETE":
+        raise HTTPException(400, "Type DELETE to confirm account removal.")
+    if not verify_password(body.password, user.hashed_password):
+        raise HTTPException(400, "Password is incorrect")
+    from helix.services.declaration import retain_after_account_delete
+
+    retain_after_account_delete(db, user=user)
+    invalidate_tokens(db, user.id, "verify_email")
+    invalidate_tokens(db, user.id, "reset_password")
+    invalidate_tokens(db, user.id, "set_password")
+    invalidate_tokens(db, user.id, "invite")
+    user.is_active = False
+    user.hashed_password = ""
+    user.password_set = False
+    user.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    return MessageResponse(
+        message=(
+            "Account removed. Your signed ownership declarations stay on file "
+            "keyed to this email and cannot be deleted."
+        )
+    )
+
+
 @router.post("/forgot-password", response_model=MessageResponse)
 def forgot_password(
     body: ForgotPasswordRequest, db: Session = Depends(get_db)

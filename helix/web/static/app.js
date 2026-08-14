@@ -305,6 +305,7 @@ function goTab(name) {
   if (name === "library") {
     loadDoubleHelixModels().catch(() => {});
     if (typeof loadDoubleHelixTrain === "function") loadDoubleHelixTrain().catch(() => {});
+    if (typeof loadDeclarations === "function") loadDeclarations().catch(() => {});
   }
 }
 
@@ -977,6 +978,7 @@ async function loadCorpus() {
 
 async function loadLibrary() {
   if (!$("libraryProgress")) return;
+  if (typeof loadDeclarations === "function") loadDeclarations().catch(() => {});
   try {
     const [stats, settings, gold, synth] = await Promise.all([
       api(`/api/t/${state.tenantSlug}/library/stats`),
@@ -2184,7 +2186,9 @@ function renderDoubleHelixTrain(job) {
     hint.textContent = job.error
       ? job.error
       : job.download_ready
-        ? "Training finished. The zip has the QLoRA adapter, tokenizer, and the gold used. Full merged 7B–30B weights are not included."
+        ? job.declaration_accepted
+          ? "Declaration on file. You can download the trained zip (adapter, tokenizer, gold, load_adapter.py)."
+          : "Training finished. Accept the ownership/liability declaration to download."
         : "Helix is using gold already in this account. You can still download the data zip anytime.";
   }
   if (wrap) wrap.classList.toggle("hidden", !job.download_ready);
@@ -2247,29 +2251,141 @@ if ($("doubleHelixTrainBtn")) {
     }
   };
 }
+async function loadDeclarations() {
+  const host = $("declarationList");
+  if (!host || !state.tenantSlug) return;
+  try {
+    const data = await api(`/api/t/${state.tenantSlug}/library/double-helix/declarations`);
+    const items = data.items || [];
+    if (!items.length) {
+      host.innerHTML = `<p class="hint">No signed declarations yet.</p>`;
+      return;
+    }
+    host.innerHTML = items
+      .map(
+        (d) =>
+          `<div class="pane pad" style="margin-bottom:8px">
+            <strong>${escapeHtml(d.declaration_version || "")}</strong>
+            <span class="hint"> · ${escapeHtml((d.accepted_at || "").slice(0, 19).replace("T", " "))} · job ${escapeHtml(d.train_job_id || "—")}</span>
+            <p class="hint mb-0">Cannot delete. Email copy: ${escapeHtml(d.email_status || "—")}</p>
+          </div>`
+      )
+      .join("");
+  } catch (_) {
+    host.innerHTML = "";
+  }
+}
+
+async function downloadTrainedZip(jobId) {
+  const res = await fetch(
+    `/api/t/${state.tenantSlug}/library/double-helix/train/${encodeURIComponent(jobId)}/download`,
+    { headers: { Authorization: `Bearer ${state.token}` } }
+  );
+  if (!res.ok) {
+    let msg = await res.text();
+    try {
+      const j = JSON.parse(msg);
+      const d = j.detail;
+      msg = d && d.message ? d.message : typeof d === "string" ? d : msg;
+    } catch (_) {
+      /* keep text */
+    }
+    throw new Error(msg || "Download failed");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `helix_trained_${jobId}.zip`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function openDeclarationModal(job) {
+  const modal = $("declarationModal");
+  const body = $("declarationBody");
+  const box = $("declarationConfirmBox");
+  if (!modal || !body) return;
+  const decl = await api(`/api/t/${state.tenantSlug}/library/double-helix/declaration`);
+  body.textContent = decl.text || "";
+  if (box) box.checked = false;
+  modal.dataset.jobId = job.id;
+  modal.classList.remove("hidden");
+}
+
+function closeDeclarationModal() {
+  const modal = $("declarationModal");
+  if (modal) modal.classList.add("hidden");
+}
+
 if ($("doubleHelixTrainDownloadBtn")) {
   $("doubleHelixTrainDownloadBtn").onclick = async () => {
     try {
       const data = await api(`/api/t/${state.tenantSlug}/library/double-helix/train`);
       const job = data.job;
       if (!job || !job.download_ready) throw new Error("Trained zip is not ready yet");
-      const res = await fetch(
-        `/api/t/${state.tenantSlug}/library/double-helix/train/${encodeURIComponent(job.id)}/download`,
-        { headers: { Authorization: `Bearer ${state.token}` } }
-      );
-      if (!res.ok) throw new Error(await res.text());
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `helix_trained_${job.id}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      if (!job.declaration_accepted) {
+        await openDeclarationModal(job);
+        return;
+      }
+      await downloadTrainedZip(job.id);
       toast("Trained zip downloaded");
     } catch (e) {
       toast(e.message || "Download failed", "err");
+    }
+  };
+}
+if ($("declarationCancelBtn")) $("declarationCancelBtn").onclick = closeDeclarationModal;
+if ($("declarationAcceptBtn")) {
+  $("declarationAcceptBtn").onclick = async () => {
+    const box = $("declarationConfirmBox");
+    const modal = $("declarationModal");
+    const jobId = modal && modal.dataset.jobId;
+    if (!box || !box.checked) {
+      toast("Tick the declaration box to accept.", "err");
+      return;
+    }
+    if (!jobId) return;
+    try {
+      await api(
+        `/api/t/${state.tenantSlug}/library/double-helix/train/${encodeURIComponent(jobId)}/accept-declaration`,
+        { method: "POST", body: JSON.stringify({ confirm: true }) }
+      );
+      closeDeclarationModal();
+      await downloadTrainedZip(jobId);
+      loadDeclarations().catch(() => {});
+      loadDoubleHelixTrain().catch(() => {});
+      toast("Declaration accepted. Copy emailed. Zip downloading.");
+    } catch (e) {
+      toast(e.message || "Could not accept declaration", "err");
+    }
+  };
+}
+if ($("deleteAccountBtn")) {
+  $("deleteAccountBtn").onclick = async () => {
+    const sure = window.prompt(
+      "This removes your login. Signed declarations stay on file keyed to your email and cannot be deleted. Type DELETE to continue."
+    );
+    if ((sure || "").trim().toUpperCase() !== "DELETE") return;
+    const password = window.prompt("Enter your password to delete this account.");
+    if (!password) return;
+    try {
+      await api("/api/auth/delete-account", {
+        method: "POST",
+        body: JSON.stringify({ password, confirm: "DELETE" }),
+      });
+      toast("Account removed. Declarations retained.");
+      state.token = "";
+      try {
+        localStorage.removeItem("helix_token");
+      } catch (_) {
+        /* ignore */
+      }
+      location.reload();
+    } catch (e) {
+      toast(e.message || "Could not delete account", "err");
     }
   };
 }

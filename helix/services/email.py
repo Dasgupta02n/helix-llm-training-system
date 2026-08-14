@@ -297,3 +297,48 @@ def send_invite_email(
         text=f"You're invited to {workspace} on Helix: {link}",
         template="invite",
     )
+
+
+def send_declaration_copy_email(
+    db: Session,
+    *,
+    to: str,
+    name: str,
+    accepted_at: str,
+    job_id: str,
+    version: str,
+    text: str,
+) -> dict[str, Any]:
+    import html as html_lib
+
+    safe = html_lib.escape(text).replace("\n", "<br>\n")
+    body = f"""
+      <h1 style="font-size:20px;margin:0 0 12px;">Your signed declaration</h1>
+      <p style="color:#c8c2b6;line-height:1.5;">Hi {html_lib.escape(name or "there")},</p>
+      <p style="color:#c8c2b6;line-height:1.5;">
+        This is a copy of the ownership and liability declaration you accepted
+        before downloading a Double Helix trained model.
+        Helix, Double Helix, and Riu keep this copy. You cannot delete it.
+        If you delete your account, this record stays keyed to <strong>{html_lib.escape(to)}</strong>.
+      </p>
+      <p style="color:#8f8890;font-size:13px;">
+        Accepted: {html_lib.escape(accepted_at or "—")}<br>
+        Train job: {html_lib.escape(job_id or "—")}<br>
+        Version: {html_lib.escape(version or "—")}
+      </p>
+      <div style="margin-top:20px;padding:16px;background:#0a0b10;border-radius:8px;font-size:13px;line-height:1.55;color:#c8c2b6;">
+        {safe}
+      </div>
+    """
+    plain = (
+        f"Copy of your Double Helix declaration (version {version}).\n"
+        f"Accepted: {accepted_at}\nJob: {job_id}\n\n{text}\n"
+    )
+    return send_email(
+        db,
+        to=to,
+        subject="Your Double Helix ownership and liability declaration",
+        html=_base_html("Declaration copy", body),
+        text=plain,
+        template="declaration_copy",
+    )

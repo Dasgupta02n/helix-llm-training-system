@@ -205,6 +205,12 @@ def test_trained_zip_has_adapter_tokenizer_and_gold(tmp_path: Path):
     assert "tokenizer/tokenizer.json" in names
     assert "data/train_chat.jsonl" in names
     assert "README.md" in names
+    assert "load_adapter.py" in names
+    assert "DECLARATION.txt" in names
+    readme = zf.read("README.md").decode()
+    assert "python load_adapter.py" in readme
+    script = zf.read("load_adapter.py").decode()
+    assert "PeftModel.from_pretrained" in script
     meta = json.loads(zf.read("meta.json"))
     assert meta["includes_full_merged_weights"] is False
     assert meta["training"] == "qlora"

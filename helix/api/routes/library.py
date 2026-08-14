@@ -6,7 +6,7 @@ import json
 import re
 from typing import Any
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -796,7 +796,13 @@ def double_helix_train_list(
     # so two HTTP clients cannot double-submit to RunPod.
     if job and job.status in {"running", "packaging"}:
         job = tick_train_job(db, job)
-    return {"job": job_to_dict(job) if job else None}
+    payload = job_to_dict(job) if job else None
+    if payload:
+        from helix.services.declaration import get_acceptance
+
+        acc = get_acceptance(db, email=user.email, train_job_id=job.id)
+        payload["declaration_accepted"] = bool(acc)
+    return {"job": payload}
 
 
 @router.get("/double-helix/train/{job_id}")
@@ -815,7 +821,97 @@ def double_helix_train_status(
         raise HTTPException(404, "Train job not found")
     if job.status in {"running", "packaging"}:
         job = tick_train_job(db, job)
-    return {"job": job_to_dict(job)}
+    payload = job_to_dict(job)
+    from helix.services.declaration import get_acceptance
+
+    acc = get_acceptance(db, email=user.email, train_job_id=job.id)
+    payload["declaration_accepted"] = bool(acc)
+    return {"job": payload}
+
+
+class DeclarationAcceptRequest(BaseModel):
+    confirm: bool = False
+
+
+def _client_meta(request: Request) -> tuple[str, str]:
+    ip = (request.headers.get("x-forwarded-for") or "").split(",")[0].strip()
+    if not ip and request.client:
+        ip = request.client.host or ""
+    ua = (request.headers.get("user-agent") or "")[:500]
+    return ip, ua
+
+
+@router.get("/double-helix/declaration")
+def double_helix_declaration_text(
+    slug: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    _require_approved(user)
+    _tenant_for(user, slug, db)
+    from helix.services.declaration import declaration_payload
+
+    return declaration_payload()
+
+
+@router.get("/double-helix/declarations")
+def double_helix_declaration_list(
+    slug: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Signed copies in this account. There is no delete."""
+    _require_approved(user)
+    _tenant_for(user, slug, db)
+    from helix.services.declaration import acceptance_to_dict, list_acceptances_for_user
+
+    rows = list_acceptances_for_user(db, email=user.email, owner_user_id=user.id)
+    return {
+        "can_delete": False,
+        "note": (
+            "These copies stay in your account and cannot be deleted. "
+            "If you delete the account, Helix still keeps them keyed to your email."
+        ),
+        "items": [acceptance_to_dict(r) for r in rows],
+    }
+
+
+@router.post("/double-helix/train/{job_id}/accept-declaration")
+def double_helix_accept_declaration(
+    slug: str,
+    job_id: str,
+    body: DeclarationAcceptRequest,
+    request: Request,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    _require_approved(user)
+    tenant = _tenant_for(user, slug, db)
+    job = db.query(m.DoubleHelixTrainJob).filter_by(id=job_id).first()
+    if not job or job.tenant_id != tenant.id or job.owner_user_id != user.id:
+        raise HTTPException(404, "Train job not found")
+    if job.status != "completed":
+        raise HTTPException(409, "Accept the declaration only when the trained zip is ready.")
+    from helix.services.declaration import accept_declaration, acceptance_to_dict
+
+    ip, ua = _client_meta(request)
+    try:
+        row = accept_declaration(
+            db,
+            user=user,
+            tenant_id=tenant.id,
+            train_job_id=job.id,
+            confirm=bool(body.confirm),
+            ip_address=ip,
+            user_agent=ua,
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {
+        "ok": True,
+        "acceptance": acceptance_to_dict(row),
+        "download_ready": True,
+    }
 
 
 @router.get("/double-helix/train/{job_id}/download")
@@ -827,6 +923,7 @@ def double_helix_train_download(
 ):
     _require_approved(user)
     tenant = _tenant_for(user, slug, db)
+    from helix.services.declaration import declaration_payload, get_acceptance
     from helix.services.double_helix_train import artifact_file
 
     job = db.query(m.DoubleHelixTrainJob).filter_by(id=job_id).first()
@@ -834,6 +931,19 @@ def double_helix_train_download(
         raise HTTPException(404, "Train job not found")
     if job.status != "completed":
         raise HTTPException(409, f"Train job is {job.status}, not ready to download.")
+    acc = get_acceptance(db, email=user.email, train_job_id=job.id)
+    if not acc:
+        raise HTTPException(
+            403,
+            {
+                "code": "declaration_required",
+                "message": (
+                    "Accept the ownership and liability declaration before "
+                    "downloading the trained model."
+                ),
+                "declaration": declaration_payload(),
+            },
+        )
     path = artifact_file(job)
     if not path:
         raise HTTPException(404, "Trained zip is not on disk yet.")
