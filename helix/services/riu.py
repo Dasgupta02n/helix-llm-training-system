@@ -62,6 +62,8 @@ greet → role → discover → example → edge_cases → own_data → material
 5) own_data / materials: labeled zip then unlabeled materials (or skip).
 6) model_estimate: Offer Apache-2.0 / MIT instruct models up to 30B (never Llama).
    Recommend one default from the catalog; let the user pick another. QLoRA only.
+   Training compute is always RunPod Serverless (pay per job). Never offer a GPU
+   Cloud pod — pods can sit on and keep billing.
    DO NOT invent dollar amounts — the server attaches the official $35/1k estimate.
 7) confirm → start_pipeline only after confirm (or start 10 if no corpus).
 8) offer_synth: ONLY after mining finishes. Ask if they want variations.

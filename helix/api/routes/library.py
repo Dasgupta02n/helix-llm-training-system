@@ -683,11 +683,14 @@ def double_helix_models(
     _tenant_for(user, slug, db)
     from helix.services.base_models import public_models
 
+    from helix.services.runpod_train import compute_policy
+
     return {
         "max_params_b": 30,
         "licenses": ["Apache-2.0", "MIT"],
         "excluded": ["Llama (Meta Community License)", "Gemma (Gemma license)"],
         "models": public_models(),
+        "compute": compute_policy(),
     }
 
 

@@ -36,3 +36,20 @@ def test_user_can_pick_qwen_14_and_phi4():
 def test_llama_not_resolvable():
     assert resolve_user_model_choice("llama 3.1 8b") is None
     assert get_model("meta-llama/Llama-3.1-8B-Instruct") is None
+
+
+def test_train_backend_is_serverless_never_pod():
+    from helix.services.runpod_train import (
+        COMPUTE_BACKEND,
+        assert_serverless_only,
+        compute_policy,
+    )
+
+    assert COMPUTE_BACKEND == "runpod_serverless"
+    assert compute_policy()["idle_charge"] is False
+    assert "pod" in compute_policy()["forbidden"]
+    try:
+        assert_serverless_only("pod")
+        assert False, "pods must be rejected"
+    except ValueError as e:
+        assert "serverless" in str(e).lower()

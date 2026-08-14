@@ -105,6 +105,11 @@ class Settings(BaseSettings):
     # Expose detailed health (Apify username/plan) only when true
     health_verbose: bool = False
 
+    # Double Helix trains only on RunPod Serverless (never GPU Cloud pods).
+    runpod_api_key: str = ""
+    runpod_serverless_endpoint_id: str = ""
+    hf_token: str = ""
+
     @property
     def is_production(self) -> bool:
         return self.helix_env.lower() in {"production", "prod", "vps"}

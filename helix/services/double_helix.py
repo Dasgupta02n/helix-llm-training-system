@@ -56,9 +56,10 @@ QLoRA VRAM hint: ~{model['vram_gb_qlora']} GB
 ## vLLM
 Serve the merged or adapter-backed model you trained.
 
-## RunPod
-If RUNPOD_API_KEY and HF_TOKEN are set on the Helix server, operators can launch
-a QLoRA job for this model. Otherwise use this zip on your own GPU.
+## RunPod (Serverless only)
+Helix/Riu always trains on **RunPod Serverless** (min workers = 0, pay per job).
+GPU Cloud pods are never used — they stay billed if left running.
+Set RUNPOD_API_KEY + RUNPOD_SERVERLESS_ENDPOINT_ID on the server.
 """
 
 
@@ -95,7 +96,8 @@ def build_package_zip(
                         {"id": m["id"], "name": m["name"], "license": m["license"], "params_b": m["params_b"]}
                         for m in public_models()
                     ],
-                    "runpod": False,
+                    "runpod": "serverless",
+                    "runpod_pods": False,
                 },
                 indent=2,
             ),
