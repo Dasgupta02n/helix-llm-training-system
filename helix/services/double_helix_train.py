@@ -165,7 +165,17 @@ def create_train_job(
             "Double Helix train is not ready on this server "
             "(needs RUNPOD_API_KEY, RUNPOD_SERVERLESS_ENDPOINT_ID, and HF_TOKEN)."
         )
-    existing = active_train_job(db, owner_user_id=owner_user_id, tenant_id=tenant_id)
+    existing = (
+        db.query(m.DoubleHelixTrainJob)
+        .filter(
+            m.DoubleHelixTrainJob.owner_user_id == owner_user_id,
+            m.DoubleHelixTrainJob.tenant_id == tenant_id,
+            m.DoubleHelixTrainJob.status.in_(ACTIVE_STATUSES),
+        )
+        .order_by(m.DoubleHelixTrainJob.created_at.desc())
+        .with_for_update()
+        .first()
+    )
     if existing:
         raise ValueError(
             f"A Double Helix train is already {existing.status} ({existing.id}). "
@@ -217,7 +227,26 @@ def _hf_token() -> str:
     return (getattr(get_settings(), "hf_token", "") or "").strip()
 
 
+def cancel_train_job(
+    db: Session, *, job: m.DoubleHelixTrainJob
+) -> m.DoubleHelixTrainJob:
+    if job.status in {"completed", "failed", "cancelled"}:
+        raise ValueError(f"Job is already {job.status}.")
+    job.status = "cancelled"
+    job.progress_message = "Cancelled. No further RunPod submit or packaging."
+    job.finished_at = _now()
+    job.updated_at = _now()
+    db.commit()
+    db.refresh(job)
+    return job
+
+
 def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
+    if job.runpod_job_id:
+        job.status = "running"
+        job.progress_message = "Resuming watch on the existing RunPod job."
+        job.updated_at = _now()
+        return
     token = _hf_token()
     rows = load_trainable_gold(
         db, owner_user_id=job.owner_user_id, tenant_id=job.tenant_id
@@ -279,6 +308,7 @@ def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
         "This usually takes 20–90 minutes depending on model size."
     )
     job.updated_at = _now()
+    db.commit()
 
 
 def _advance_running(job: m.DoubleHelixTrainJob) -> None:
@@ -455,12 +485,16 @@ def _advance_packaging(db: Session, job: m.DoubleHelixTrainJob) -> None:
 
 def tick_train_job(db: Session, job: m.DoubleHelixTrainJob) -> m.DoubleHelixTrainJob:
     try:
+        if job.status == "cancelled":
+            return job
         if job.status == "queued":
             _advance_queued(db, job)
         elif job.status == "uploading":
-            # Mid-crash resume: treat as queued again
-            job.status = "queued"
-            _advance_queued(db, job)
+            if job.runpod_job_id:
+                job.status = "running"
+            else:
+                job.status = "queued"
+                _advance_queued(db, job)
         elif job.status == "running":
             _advance_running(job)
             if job.status == "packaging":

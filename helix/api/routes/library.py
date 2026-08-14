@@ -914,6 +914,27 @@ def double_helix_accept_declaration(
     }
 
 
+@router.post("/double-helix/train/{job_id}/cancel")
+def double_helix_train_cancel(
+    slug: str,
+    job_id: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    _require_approved(user)
+    tenant = _tenant_for(user, slug, db)
+    from helix.services.double_helix_train import cancel_train_job, job_to_dict
+
+    job = db.query(m.DoubleHelixTrainJob).filter_by(id=job_id).first()
+    if not job or job.tenant_id != tenant.id or job.owner_user_id != user.id:
+        raise HTTPException(404, "Train job not found")
+    try:
+        job = cancel_train_job(db, job=job)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True, "job": job_to_dict(job)}
+
+
 @router.get("/double-helix/train/{job_id}/download")
 def double_helix_train_download(
     slug: str,

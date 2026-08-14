@@ -149,7 +149,11 @@ def list_jobs(
 ) -> dict:
     tenant = _tenant_for(user, slug, db)
     jobs = list_user_jobs(db, user.id, tenant.id)
-    active = [j for j in jobs if j["status"] in {"pending", "running"}]
+    active = [
+        j
+        for j in jobs
+        if j["status"] in {"pending", "running", "paused_spend_cap"}
+    ]
     return {"jobs": jobs, "active": active}
 
 

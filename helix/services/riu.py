@@ -912,8 +912,8 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             g, v = 10, 4
         extra = max(1, g) * max(1, v)
         extra_usd = round((extra / 1000.0) * GOLD_COST_CAP_USD_PER_1000, 2)
-        yes = any(w in lower for w in ("yes", "yeah", "yep", "variations", "synth"))
-        no = any(w in lower for w in ("no", "skip", "later", "not now"))
+        yes = bool(re.search(r"\b(yes|yeah|yep|variations|synth)\b", lower))
+        no = bool(re.search(r"\b(no|skip|later|not now)\b", lower))
         wants_train = (
             "confirm train" in lower
             or "train with double helix" in lower
@@ -1394,6 +1394,7 @@ def execute_actions(
     session: m.RiuSession,
     state: dict,
     actions: list[dict],
+    user_text: str = "",
 ) -> list[dict[str, Any]]:
     results: list[dict[str, Any]] = []
     # Deduplicate while preserving order
@@ -1422,6 +1423,15 @@ def execute_actions(
                     )
                 )
             elif atype == "start_pipeline":
+                if not _wants_run(user_text):
+                    results.append(
+                        {
+                            "ok": False,
+                            "action": atype,
+                            "error": "Say start to confirm a mining job.",
+                        }
+                    )
+                    continue
                 ok, reason = _ready_for_pipeline(state)
                 if not ok:
                     results.append({"ok": False, "action": atype, "error": reason})
@@ -1432,6 +1442,15 @@ def execute_actions(
                 session.last_job_id = r["job"]["id"]
                 results.append(r)
             elif atype == "start_synthesis":
+                if not re.search(r"\b(yes|yeah|yep|variations|synth)\b", user_text.lower()):
+                    results.append(
+                        {
+                            "ok": False,
+                            "action": atype,
+                            "error": "Say yes to confirm variations.",
+                        }
+                    )
+                    continue
                 r = _apply_start_synthesis(
                     db, user_id=user_id, tenant_id=tenant.id, state=state
                 )
@@ -1440,6 +1459,18 @@ def execute_actions(
             elif atype == "start_double_helix_train":
                 from helix.services.double_helix_train import create_train_job, job_to_dict
 
+                low = user_text.lower()
+                if "confirm train" not in low and not (
+                    "double helix" in low and "confirm" in low
+                ):
+                    results.append(
+                        {
+                            "ok": False,
+                            "action": atype,
+                            "error": "Say confirm train to start a paid GPU job.",
+                        }
+                    )
+                    continue
                 job = create_train_job(
                     db,
                     owner_user_id=user_id,
@@ -1598,6 +1629,7 @@ def handle_user_message(
         session=session,
         state=state,
         actions=turn.get("actions") or [],
+        user_text=text,
     )
 
     next_phase = str(turn.get("phase") or phase)

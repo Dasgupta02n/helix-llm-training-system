@@ -69,6 +69,10 @@ def create_tenant(
                 email=body.owner_email.lower(),
                 hashed_password=hash_password(body.owner_password),
                 full_name=body.name + " Owner",
+                email_verified=True,
+                admin_approved=True,
+                password_set=True,
+                is_active=True,
             )
             db.add(owner)
             db.flush()
@@ -134,6 +138,10 @@ def add_member(
             email=body.email.lower(),
             hashed_password=hash_password(body.password),
             full_name=body.full_name,
+            email_verified=True,
+            admin_approved=True,
+            password_set=True,
+            is_active=True,
         )
         db.add(target)
         db.flush()

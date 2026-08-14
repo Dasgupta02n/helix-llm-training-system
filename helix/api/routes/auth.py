@@ -333,7 +333,7 @@ def forgot_password(
     settings = get_settings()
     user = db.query(m.User).filter_by(email=body.email.lower().strip(), is_active=True).first()
     dev_link = None
-    if user:
+    if user and user.email_verified and (user.admin_approved or user.is_superadmin):
         invalidate_tokens(db, user.id, "reset_password")
         raw = create_auth_token(db, user.id, "reset_password")
         link = _app_link("reset", raw)
@@ -363,7 +363,6 @@ def reset_password(
         raise HTTPException(400, "Account not found")
     user.hashed_password = hash_password(body.password)
     user.password_set = True
-    user.email_verified = True
     user.updated_at = datetime.now(timezone.utc)
     db.commit()
     return MessageResponse(message="Password saved. You can sign in now.")
@@ -377,7 +376,7 @@ def set_password(
     if not ok_pw:
         raise HTTPException(400, pw_msg)
     token = consume_auth_token(
-        db, body.token, purpose=["set_password", "invite", "reset_password"]
+        db, body.token, purpose=["set_password", "invite"]
     )
     if not token:
         raise HTTPException(400, "This link is invalid or has expired.")
@@ -387,10 +386,11 @@ def set_password(
     user.hashed_password = hash_password(body.password)
     user.password_set = True
     user.email_verified = True
-    # Invited users are pre-approved by an admin
-    user.admin_approved = True
-    if not user.approved_at:
-        user.approved_at = datetime.now(timezone.utc)
+    # Invite / admin set-password only — never a forgot-password token.
+    if token.purpose in {"invite", "set_password"}:
+        user.admin_approved = True
+        if not user.approved_at:
+            user.approved_at = datetime.now(timezone.utc)
     user.is_active = True
     user.updated_at = datetime.now(timezone.utc)
     db.commit()

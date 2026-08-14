@@ -2203,6 +2203,7 @@ function renderDoubleHelixTrain(job) {
     statusEl.textContent = "";
     if (hint) hint.textContent = "";
     if (wrap) wrap.classList.add("hidden");
+    if ($("doubleHelixTrainCancelBtn")) $("doubleHelixTrainCancelBtn").classList.add("hidden");
     return;
   }
   statusEl.textContent = `${job.status}: ${job.progress || ""}`;
@@ -2217,6 +2218,11 @@ function renderDoubleHelixTrain(job) {
         : "Helix is using gold already in this account. You can still download the data zip anytime.";
   }
   if (wrap) wrap.classList.toggle("hidden", !job.download_ready);
+  const cancelBtn = $("doubleHelixTrainCancelBtn");
+  if (cancelBtn) {
+    const canCancel = ["queued", "uploading", "running", "packaging"].includes(job.status);
+    cancelBtn.classList.toggle("hidden", !canCancel);
+  }
   const active = ["queued", "uploading", "running", "packaging"].includes(job.status);
   if (active && !_dhTrainTimer) {
     _dhTrainTimer = setInterval(() => loadDoubleHelixTrain().catch(() => {}), 8000);
@@ -2253,6 +2259,23 @@ if ($("doubleHelixZipBtn")) {
       toast("Gold zip downloaded — train it anywhere");
     } catch (e) {
       toast(e.message || "Package failed", "err");
+    }
+  };
+}
+if ($("doubleHelixTrainCancelBtn")) {
+  $("doubleHelixTrainCancelBtn").onclick = async () => {
+    try {
+      const data = await api(`/api/t/${state.tenantSlug}/library/double-helix/train`);
+      const job = data.job;
+      if (!job) throw new Error("No train job");
+      const out = await api(
+        `/api/t/${state.tenantSlug}/library/double-helix/train/${encodeURIComponent(job.id)}/cancel`,
+        { method: "POST" }
+      );
+      renderDoubleHelixTrain(out.job);
+      toast("Training cancelled");
+    } catch (e) {
+      toast(e.message || "Could not cancel", "err");
     }
   };
 }
