@@ -517,8 +517,16 @@ function logout() {
   state.token = "";
   state.me = null;
   localStorage.removeItem("helix_token");
+  if (state.jobPollTimer) {
+    clearInterval(state.jobPollTimer);
+    state.jobPollTimer = null;
+  }
+  if (typeof _dhTrainTimer !== "undefined" && _dhTrainTimer) {
+    clearInterval(_dhTrainTimer);
+    _dhTrainTimer = null;
+  }
   showApp(false);
-  setAuthMode("login");
+  if (!authState.token) setAuthMode("login");
 }
 
 async function bootstrap() {
@@ -559,8 +567,7 @@ async function bootstrap() {
   localStorage.setItem("helix_tenant", state.tenantSlug);
 
   state.agents = await api(`/api/t/${state.tenantSlug}/agents`);
-  renderAgents();
-  clearSchemaForm();
+  if ($("agentList")) renderAgents();
   await refreshAll();
 }
 
@@ -571,7 +578,6 @@ async function refreshAll() {
   await Promise.all([
     refreshDashboard(),
     loadBrief(),
-    loadSchemas(),
     loadDatasets(),
     loadLibrary(),
     loadJobs(),
@@ -743,7 +749,7 @@ async function loadJobs() {
         : "No active jobs";
     }
     if (!jobs.length) {
-      $("jobsList").innerHTML = `<div class="empty"><div class="icon">⏱️</div>No jobs yet. Start a mining or synthesis job above.</div>`;
+      $("jobsList").innerHTML = `<div class="empty"><div class="icon">⏱️</div>No jobs yet. Ask Riu to start collecting, or start synthesis from My data.</div>`;
       state._jobsRenderKey = "";
       return;
     }
@@ -874,7 +880,7 @@ function startJobPolling() {
     // Always refresh jobs + library counts so healthy jobs never look dead
     loadJobs().catch(() => {});
     if ($("tab-library") && !$("tab-library").classList.contains("hidden")) {
-      loadLibrary().catch(() => {});
+      loadLibrary({ settings: false }).catch(() => {});
     }
   }, 2000);
 }
@@ -980,7 +986,7 @@ async function loadCorpus() {
   }
 }
 
-async function loadLibrary() {
+async function loadLibrary(opts = {}) {
   if (!$("libraryProgress")) return;
   if (typeof loadDeclarations === "function") loadDeclarations().catch(() => {});
   try {
@@ -991,11 +997,13 @@ async function loadLibrary() {
       api(`/api/t/${state.tenantSlug}/library/synthetic?limit=20`),
     ]);
 
-    $("goldTarget").value = settings.gold_target_count;
-    $("varPerGold").value = settings.variations_per_gold;
-    $("autoPromote").checked = !!settings.auto_promote_approved;
-    updateSynthHint();
-    renderParamPicker(settings.available_parameters, settings.vary_parameters);
+    if (opts.settings !== false) {
+      if ($("goldTarget")) $("goldTarget").value = settings.gold_target_count;
+      if ($("varPerGold")) $("varPerGold").value = settings.variations_per_gold;
+      if ($("autoPromote")) $("autoPromote").checked = !!settings.auto_promote_approved;
+      updateSynthHint();
+      renderParamPicker(settings.available_parameters, settings.vary_parameters);
+    }
 
     const seedN = stats.gold_seed_count || 0;
     const userN =
@@ -1093,7 +1101,7 @@ async function loadLibrary() {
     }
 
     if (!synth.items.length) {
-      $("synthList").innerHTML = `<div class="empty"><div class="icon">✨</div>No variations yet. Choose parameters and press “Create variations”.</div>`;
+      $("synthList").innerHTML = `<div class="empty"><div class="icon">✨</div>No variations yet. Choose parameters and press “Start synthesis job”.</div>`;
     } else {
       $("synthList").innerHTML = synth.items
         .map(
@@ -1399,7 +1407,7 @@ async function refreshDashboard() {
     $("runs").innerHTML = `
       <div class="empty">
         <div class="icon">✨</div>
-        No helper runs yet. Go to <strong>AI helpers</strong> and press “Run everything”.
+        No helper runs yet. Collection is started by <strong>Riu</strong>.
       </div>`;
     return;
   }
@@ -1547,6 +1555,7 @@ async function saveBrief() {
 // ── Formats ─────────────────────────────────────────────────────────
 
 function clearSchemaForm() {
+  if (!$("schemaFormTitle")) return;
   $("schemaFormTitle").textContent = "New format";
   $("schemaTopic").value = "";
   $("schemaTopic").readOnly = false;
@@ -1577,6 +1586,7 @@ function editSchema(s) {
 }
 
 async function loadSchemas() {
+  if (!$("schemaList")) return;
   state.schemas = await api(`/api/t/${state.tenantSlug}/schemas`);
   const active = state.schemas.filter((s) => s.is_active !== false);
   if (!active.length) {
@@ -1670,6 +1680,7 @@ async function saveSchema() {
 
 function renderAgents() {
   const list = $("agentList");
+  if (!list) return;
   list.innerHTML = "";
   state.agents.forEach((a) => {
     const meta = FRIENDLY_AGENTS[a.key] || {
@@ -2026,6 +2037,7 @@ async function restartRiu() {
   const data = await api(`/api/t/${state.tenantSlug}/riu/session`, { method: "POST" });
   renderRiuMessages(data.messages || []);
   renderRiuState(data.state || {});
+  updateRiuUploadPanel(data);
   if ($("riuProgressBadge")) $("riuProgressBadge").textContent = "Setup 0%";
   $("riuStatus").textContent = "New chat with Riu";
   toast("New chat with Riu");
@@ -2485,6 +2497,6 @@ document.querySelectorAll("[data-riu-quick]").forEach((btn) => {
 updatePipeQualityUI();
 updateSynthQualityUI();
 
-if (state.token) {
+if (state.token && !authState.token) {
   bootstrap().catch(() => logout());
 }
