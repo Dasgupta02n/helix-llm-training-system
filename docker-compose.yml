@@ -46,7 +46,7 @@ services:
         tar -xzf /tmp/helix.tgz -C /tmp/helix-src --strip-components=1
         find /app -mindepth 1 -maxdepth 1 ! -name data -exec rm -rf {} +
         cp -a /tmp/helix-src/. /app/
-        pip install --no-cache-dir -r requirements.txt
+        pip install --no-cache-dir --default-timeout=300 --retries 10 -r requirements.txt
         # Single worker: avoids multi-process bootstrap races + duplicate job workers
         exec uvicorn helix.api.main:app --host 0.0.0.0 --port 8000 --workers 1
     environment:

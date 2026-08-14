@@ -95,6 +95,10 @@ def create_private_repo(token: str, *, name: str, repo_type: str) -> str:
     return str(repo_id)
 
 
+def _plural(repo_type: str) -> str:
+    return "datasets" if repo_type == "dataset" else "models"
+
+
 def upload_text_files(
     token: str,
     *,
@@ -102,23 +106,77 @@ def upload_text_files(
     repo_type: str,
     files: dict[str, str],
 ) -> None:
-    """Upload small text files (JSONL/README). Uses huggingface_hub when available."""
-    try:
-        from huggingface_hub import HfApi
-    except ImportError as e:
-        raise ValueError(
-            "huggingface_hub is not installed on the server. "
-            "Add it to requirements and redeploy."
-        ) from e
-    api = HfApi(token=token)
-    for path_in_repo, text in files.items():
-        api.upload_file(
-            path_or_fileobj=text.encode("utf-8"),
-            path_in_repo=path_in_repo,
-            repo_id=repo_id,
-            repo_type=repo_type,
-            commit_message=f"Helix: add {path_in_repo}",
+    """Upload small text files via Hub commit API (no huggingface_hub package)."""
+    import base64
+
+    if not files:
+        return
+    lines = [
+        json.dumps(
+            {
+                "key": "header",
+                "value": {
+                    "summary": "Helix: upload gold / notes",
+                    "numFilesToAdd": len(files),
+                },
+            }
         )
+    ]
+    for path_in_repo, text in files.items():
+        raw = (text or "").encode("utf-8")
+        lines.append(
+            json.dumps(
+                {
+                    "key": "file",
+                    "value": {
+                        "path": path_in_repo,
+                        "encoding": "base64",
+                        "content": base64.b64encode(raw).decode("ascii"),
+                    },
+                }
+            )
+        )
+    url = f"https://huggingface.co/api/{_plural(repo_type)}/{repo_id}/commit/main"
+    req = urllib.request.Request(
+        url,
+        data=("\n".join(lines) + "\n").encode("utf-8"),
+        method="POST",
+        headers={
+            **_auth_headers(token),
+            "Content-Type": "application/x-ndjson",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=180) as resp:
+            resp.read()
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="replace")[:500]
+        raise ValueError(
+            f"Hugging Face upload to `{repo_id}` failed ({e.code}). {err}"
+        ) from e
+
+
+def _list_repo_paths(token: str, repo_id: str, repo_type: str) -> list[str]:
+    url = (
+        f"https://huggingface.co/api/{_plural(repo_type)}/{repo_id}/tree/main"
+        "?recursive=1"
+    )
+    req = urllib.request.Request(url, headers=_auth_headers(token), method="GET")
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            data = json.loads(resp.read().decode("utf-8", errors="replace"))
+    except urllib.error.HTTPError as e:
+        err = e.read().decode("utf-8", errors="replace")[:300]
+        raise ValueError(f"Could not list `{repo_id}` ({e.code}). {err}") from e
+    if not isinstance(data, list):
+        return []
+    out: list[str] = []
+    for item in data:
+        if not isinstance(item, dict):
+            continue
+        if item.get("type") in {"file", None} and item.get("path"):
+            out.append(str(item["path"]))
+    return out
 
 
 def download_repo_files(
@@ -129,21 +187,25 @@ def download_repo_files(
     repo_type: str = "model",
     allow_patterns: list[str] | None = None,
 ) -> Path:
-    try:
-        from huggingface_hub import snapshot_download
-    except ImportError as e:
-        raise ValueError(
-            "huggingface_hub is not installed on the server. "
-            "Add it to requirements and redeploy."
-        ) from e
     dest.mkdir(parents=True, exist_ok=True)
-    snapshot_download(
-        repo_id=repo_id,
-        repo_type=repo_type,
-        token=token,
-        local_dir=str(dest),
-        allow_patterns=allow_patterns,
-    )
+    wanted = {p.lower() for p in (allow_patterns or [])}
+    paths = _list_repo_paths(token, repo_id, repo_type)
+    if wanted:
+        paths = [p for p in paths if Path(p).name.lower() in wanted]
+    if not paths:
+        raise ValueError(f"No matching files in Hugging Face repo `{repo_id}`.")
+    prefix = "datasets/" if repo_type == "dataset" else ""
+    for rel in paths:
+        url = f"https://huggingface.co/{prefix}{repo_id}/resolve/main/{rel}"
+        req = urllib.request.Request(url, headers=_auth_headers(token), method="GET")
+        target = dest / rel
+        target.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            with urllib.request.urlopen(req, timeout=300) as resp:
+                target.write_bytes(resp.read())
+        except urllib.error.HTTPError as e:
+            err = e.read().decode("utf-8", errors="replace")[:200]
+            raise ValueError(f"Download `{rel}` from `{repo_id}` failed ({e.code}). {err}") from e
     return dest
 
 
