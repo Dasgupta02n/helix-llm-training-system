@@ -850,3 +850,27 @@ class RiuSession(Base):
     last_synth_job_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class DoubleHelixTrainJob(Base):
+    """One Serverless QLoRA run. Gold is read from the user's Helix library."""
+
+    __tablename__ = "double_helix_train_jobs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    owner_user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), index=True)
+    tenant_id: Mapped[str] = mapped_column(ForeignKey("tenants.id"), index=True)
+    # queued | uploading | running | packaging | completed | failed | cancelled
+    status: Mapped[str] = mapped_column(String(40), default="queued", index=True)
+    base_model_id: Mapped[str] = mapped_column(String(200))
+    gold_count: Mapped[int] = mapped_column(Integer, default=0)
+    runpod_job_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    hf_dataset_repo: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    hf_model_repo: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    artifact_relpath: Mapped[str | None] = mapped_column(String(400), nullable=True)
+    progress_message: Mapped[str] = mapped_column(Text, default="")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    meta_json: Mapped[str] = mapped_column(Text, default="{}")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

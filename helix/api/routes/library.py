@@ -7,7 +7,7 @@ import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -733,4 +733,112 @@ def double_helix_package(
         headers={
             "Content-Disposition": 'attachment; filename="helix_double_helix_v1.zip"'
         },
+    )
+
+
+class DoubleHelixTrainRequest(BaseModel):
+    model_id: str | None = None
+    confirm: bool = False
+
+
+def _require_approved(user: m.User) -> None:
+    if not (user.admin_approved or user.is_superadmin):
+        raise HTTPException(403, "Double Helix is limited to approved accounts.")
+
+
+@router.post("/double-helix/train")
+def double_helix_train_start(
+    slug: str,
+    body: DoubleHelixTrainRequest,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Start QLoRA on gold already in this account. Does not replace data download."""
+    _require_approved(user)
+    tenant = _tenant_for(user, slug, db)
+    from helix.services.brief import get_active_project
+    from helix.services.double_helix_train import create_train_job, job_to_dict
+
+    model_id = body.model_id
+    if not model_id:
+        proj = get_active_project(db, tenant.id)
+        if proj and proj.agent_instructions and "MODEL:" in proj.agent_instructions:
+            model_id = proj.agent_instructions.split("MODEL:", 1)[1].split("\n", 1)[0].strip()
+    try:
+        job = create_train_job(
+            db,
+            owner_user_id=user.id,
+            tenant_id=tenant.id,
+            model_id=model_id,
+            confirm=bool(body.confirm),
+        )
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+    return {"ok": True, "job": job_to_dict(job)}
+
+
+@router.get("/double-helix/train")
+def double_helix_train_list(
+    slug: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    _require_approved(user)
+    tenant = _tenant_for(user, slug, db)
+    from helix.services.double_helix_train import (
+        job_to_dict,
+        latest_train_job,
+        tick_train_job,
+    )
+
+    job = latest_train_job(db, owner_user_id=user.id, tenant_id=tenant.id)
+    # Worker starts queued jobs. Status polls only advance running/packaging
+    # so two HTTP clients cannot double-submit to RunPod.
+    if job and job.status in {"running", "packaging"}:
+        job = tick_train_job(db, job)
+    return {"job": job_to_dict(job) if job else None}
+
+
+@router.get("/double-helix/train/{job_id}")
+def double_helix_train_status(
+    slug: str,
+    job_id: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    _require_approved(user)
+    tenant = _tenant_for(user, slug, db)
+    from helix.services.double_helix_train import job_to_dict, tick_train_job
+
+    job = db.query(m.DoubleHelixTrainJob).filter_by(id=job_id).first()
+    if not job or job.tenant_id != tenant.id or job.owner_user_id != user.id:
+        raise HTTPException(404, "Train job not found")
+    if job.status in {"running", "packaging"}:
+        job = tick_train_job(db, job)
+    return {"job": job_to_dict(job)}
+
+
+@router.get("/double-helix/train/{job_id}/download")
+def double_helix_train_download(
+    slug: str,
+    job_id: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    _require_approved(user)
+    tenant = _tenant_for(user, slug, db)
+    from helix.services.double_helix_train import artifact_file
+
+    job = db.query(m.DoubleHelixTrainJob).filter_by(id=job_id).first()
+    if not job or job.tenant_id != tenant.id or job.owner_user_id != user.id:
+        raise HTTPException(404, "Train job not found")
+    if job.status != "completed":
+        raise HTTPException(409, f"Train job is {job.status}, not ready to download.")
+    path = artifact_file(job)
+    if not path:
+        raise HTTPException(404, "Trained zip is not on disk yet.")
+    return FileResponse(
+        path,
+        media_type="application/zip",
+        filename=f"helix_trained_{job.id}.zip",
     )

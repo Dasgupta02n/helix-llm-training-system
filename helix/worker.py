@@ -398,6 +398,14 @@ def worker_loop(poll_seconds: float = 2.0) -> None:
     while not _stop.is_set():
         db = SessionLocal()
         try:
+            try:
+                from helix.services.double_helix_train import pick_train_job, tick_train_job
+
+                train_job = pick_train_job(db)
+                if train_job:
+                    tick_train_job(db, train_job)
+            except Exception:  # noqa: BLE001
+                logger.exception("Double Helix train tick failed")
             job = _pick_job(db)
             if not job:
                 db.close()

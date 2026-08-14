@@ -1,4 +1,5 @@
 .env
+mcp_payload.json
 __pycache__/
 *.py[cod]
 *.egg-info/

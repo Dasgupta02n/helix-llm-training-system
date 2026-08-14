@@ -16,22 +16,6 @@ RUNPOD_SERVERLESS_RUN = "https://api.runpod.ai/v2/{endpoint_id}/run"
 RUNPOD_SERVERLESS_STATUS = "https://api.runpod.ai/v2/{endpoint_id}/status/{job_id}"
 
 
-def compute_policy() -> dict[str, Any]:
-    return {
-        "backend": COMPUTE_BACKEND,
-        "label": "RunPod Serverless (pay per train job)",
-        "min_workers": 0,
-        "idle_charge": False,
-        "forbidden": sorted(FORBIDDEN_BACKENDS),
-        "note": (
-            "Helix always selects Serverless. Do not create a GPU Cloud pod "
-            "in the RunPod console — idle pods bill until you stop them. "
-            "A Serverless endpoint with min workers = 0 costs nothing until "
-            "Riu submits a QLoRA job."
-        ),
-    }
-
-
 def assert_serverless_only(backend: str | None = None) -> None:
     b = (backend or COMPUTE_BACKEND).strip().lower()
     if b in FORBIDDEN_BACKENDS or b != COMPUTE_BACKEND:
@@ -41,11 +25,113 @@ def assert_serverless_only(backend: str | None = None) -> None:
         )
 
 
-def runpod_configured() -> bool:
+def _settings_tuple() -> tuple[str, str, str]:
     from helix.config import get_settings
 
     s = get_settings()
-    return bool((getattr(s, "runpod_api_key", "") or "").strip())
+    key = (getattr(s, "runpod_api_key", "") or "").strip()
+    endpoint = (getattr(s, "runpod_serverless_endpoint_id", "") or "").strip()
+    hf = (getattr(s, "hf_token", "") or "").strip()
+    return key, endpoint, hf
+
+
+def runpod_configured() -> bool:
+    key, endpoint, _hf = _settings_tuple()
+    return bool(key and endpoint)
+
+
+def hf_token_configured() -> bool:
+    return bool(_settings_tuple()[2])
+
+
+def train_ready() -> bool:
+    key, endpoint, hf = _settings_tuple()
+    return bool(key and endpoint and hf)
+
+
+def compute_policy() -> dict[str, Any]:
+    ready = train_ready()
+    return {
+        "backend": COMPUTE_BACKEND,
+        "label": "RunPod Serverless (pay per train job)",
+        "min_workers": 0,
+        "idle_charge": False,
+        "forbidden": sorted(FORBIDDEN_BACKENDS),
+        "runpod_configured": runpod_configured(),
+        "hf_token_set": hf_token_configured(),
+        "train_ready": ready,
+        "estimated_usd_min": 15,
+        "estimated_usd_max": 50,
+        "note": (
+            "Helix always selects Serverless. Do not create a GPU Cloud pod "
+            "in the RunPod console — idle pods bill until you stop them. "
+            "A Serverless endpoint with min workers = 0 costs nothing until "
+            "Riu submits a QLoRA job."
+        ),
+    }
+
+
+def official_qlora_input(
+    *,
+    run_id: str,
+    base_model: str,
+    dataset_repo: str,
+    hub_model_id: str,
+    hf_token: str,
+    gold_count: int = 0,
+) -> dict[str, Any]:
+    """Payload the official runpod/llm-finetuning worker expects."""
+    val = 0.05 if int(gold_count or 0) >= 40 else 0.0
+    return {
+        "run_id": run_id,
+        "credentials": {
+            "wandb_api_key": "",
+            "hf_token": hf_token,
+        },
+        "args": {
+            "base_model": base_model,
+            "load_in_4bit": True,
+            "strict": False,
+            "datasets": [
+                {
+                    "path": dataset_repo,
+                    "type": "alpaca",
+                    "ds_type": "json",
+                    "data_files": "train_alpaca.jsonl",
+                }
+            ],
+            "dataset_prepared_path": "last_run_prepared",
+            "val_set_size": val,
+            "output_dir": "./outputs/qlora-out",
+            "adapter": "qlora",
+            "sequence_len": 2048,
+            "sample_packing": True,
+            "eval_sample_packing": False,
+            "pad_to_sequence_len": True,
+            "lora_r": 16,
+            "lora_alpha": 32,
+            "lora_dropout": 0.05,
+            "lora_target_linear": True,
+            "gradient_accumulation_steps": 4,
+            "micro_batch_size": 1,
+            "num_epochs": 1,
+            "optimizer": "adamw_8bit",
+            "lr_scheduler": "cosine",
+            "learning_rate": 0.0002,
+            "train_on_inputs": False,
+            "group_by_length": False,
+            "bf16": "auto",
+            "tf32": False,
+            "gradient_checkpointing": True,
+            "logging_steps": 10,
+            "flash_attention": True,
+            "warmup_steps": 10,
+            "saves_per_epoch": 1,
+            "weight_decay": 0,
+            "hub_model_id": hub_model_id,
+            "hub_strategy": "end",
+        },
+    }
 
 
 def submit_qlora_job(
@@ -54,14 +140,15 @@ def submit_qlora_job(
     dataset_uri: str | None = None,
     dataset_jsonl: str | None = None,
     hf_token: str | None = None,
+    run_id: str | None = None,
+    dataset_repo: str | None = None,
+    hub_model_id: str | None = None,
+    gold_count: int = 0,
 ) -> dict[str, Any]:
     """Queue a QLoRA train on the Serverless endpoint. Never opens a pod."""
     assert_serverless_only()
-    from helix.config import get_settings
-
-    s = get_settings()
-    key = (getattr(s, "runpod_api_key", "") or "").strip()
-    endpoint = (getattr(s, "runpod_serverless_endpoint_id", "") or "").strip()
+    key, endpoint, default_hf = _settings_tuple()
+    token = (hf_token or default_hf or "").strip()
     if not key:
         return {
             "ok": False,
@@ -78,20 +165,39 @@ def submit_qlora_job(
                 "put its ID in Hostinger env."
             ),
         }
+    if not token:
+        return {
+            "ok": False,
+            "backend": COMPUTE_BACKEND,
+            "error": "HF_TOKEN is not set on the server.",
+        }
+    repo = (dataset_repo or dataset_uri or "").strip()
+    if not repo:
+        return {
+            "ok": False,
+            "backend": COMPUTE_BACKEND,
+            "error": "dataset_repo is required (Hugging Face dataset of account gold).",
+        }
 
     import json
+    import uuid
     import urllib.request
 
+    rid = (run_id or f"helix-{uuid.uuid4().hex[:12]}").strip()
+    hub = (hub_model_id or "").strip() or f"helix-qlora-{rid}"
+    payload = official_qlora_input(
+        run_id=rid,
+        base_model=model_id,
+        dataset_repo=repo,
+        hub_model_id=hub,
+        hf_token=token,
+        gold_count=gold_count,
+    )
+    # dataset_jsonl is unused: official worker cannot take inline gold.
+    _ = dataset_jsonl
+
     url = RUNPOD_SERVERLESS_RUN.format(endpoint_id=endpoint)
-    body = {
-        "input": {
-            "base_model": model_id,
-            "adapter": "qlora",
-            "dataset_uri": dataset_uri,
-            "dataset_jsonl": dataset_jsonl,
-            "hf_token": hf_token or getattr(s, "hf_token", "") or "",
-        }
-    }
+    body = {"input": payload}
     req = urllib.request.Request(
         url,
         data=json.dumps(body).encode("utf-8"),
@@ -110,5 +216,35 @@ def submit_qlora_job(
         "ok": True,
         "backend": COMPUTE_BACKEND,
         "endpoint_id": endpoint,
+        "run_id": rid,
+        "hub_model_id": hub,
         "runpod": raw,
+        "runpod_job_id": (raw or {}).get("id") if isinstance(raw, dict) else None,
     }
+
+
+def poll_qlora_job(runpod_job_id: str) -> dict[str, Any]:
+    """Read Serverless job status. Never opens a pod."""
+    import json
+    import urllib.request
+
+    key, endpoint, _hf = _settings_tuple()
+    if not key or not endpoint or not (runpod_job_id or "").strip():
+        return {"ok": False, "error": "RunPod is not configured or job id is missing."}
+    url = RUNPOD_SERVERLESS_STATUS.format(
+        endpoint_id=endpoint, job_id=runpod_job_id.strip()
+    )
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={"Authorization": f"Bearer {key}", "Accept": "application/json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            raw = json.loads(resp.read().decode("utf-8", errors="replace"))
+    except Exception as e:  # noqa: BLE001
+        return {"ok": False, "error": str(e)[:500]}
+    status = ""
+    if isinstance(raw, dict):
+        status = str(raw.get("status") or raw.get("state") or "").upper()
+    return {"ok": True, "status": status, "runpod": raw}

@@ -68,6 +68,8 @@ greet → role → discover → example → edge_cases → own_data → material
 7) confirm → start_pipeline only after confirm (or start 10 if no corpus).
 8) offer_synth: ONLY after mining finishes. Ask if they want variations.
    Never emit start_synthesis during confirm. User must opt in later.
+9) After gold exists, two options: download data from My data, OR train with
+   Double Helix (emit start_double_helix_train only after they say confirm train).
 
 Risk: hiring/credit/medical/legal = high (stricter fairness, more edge cases).
 Captions/copy = low. Support/sales/HR = medium.
@@ -912,7 +914,33 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         extra_usd = round((extra / 1000.0) * GOLD_COST_CAP_USD_PER_1000, 2)
         yes = any(w in lower for w in ("yes", "yeah", "yep", "variations", "synth"))
         no = any(w in lower for w in ("no", "skip", "later", "not now"))
-        if yes and not no:
+        wants_train = (
+            "confirm train" in lower
+            or "train with double helix" in lower
+            or ("double helix" in lower and "confirm" in lower)
+        )
+        asks_train = ("train" in lower or "double helix" in lower) and not wants_train
+        if wants_train:
+            actions.append({"type": "start_double_helix_train"})
+            reply = (
+                "Starting Double Helix training on the gold already in your account "
+                "(no re-upload). GPU is RunPod Serverless, about **$15–50**. "
+                "When it finishes, download the trained zip from **My data**."
+            )
+            next_phase = "done"
+            progress = 100
+        elif asks_train:
+            reply = (
+                "Two options:\n\n"
+                "1. **Download** your gold from **My data** and train anywhere.\n"
+                "2. **Train with Double Helix** — Helix fetches gold from this account, "
+                "runs QLoRA on RunPod Serverless (~$15–50), then gives you a zip "
+                "(adapter + tokenizer + the gold used).\n\n"
+                "Say **confirm train** to start option 2, or open **My data**."
+            )
+            next_phase = "offer_synth"
+            progress = 96
+        elif yes and not no:
             actions.append({"type": "start_synthesis"})
             reply = (
                 f"Starting variations: about **{extra:,}** extra rows, "
@@ -933,8 +961,39 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             progress = 96
             if no:
                 next_phase = "done"
-                reply = "All set — no variations. Download gold anytime from **My data**."
+                reply = (
+                    "All set — no variations. From **My data** you can "
+                    "**download your gold** or **train with Double Helix** "
+                    "(Helix uses the gold already in your account)."
+                )
                 progress = 100
+    elif phase == "done":
+        wants_train = "confirm train" in lower or (
+            "double helix" in lower and "confirm" in lower
+        )
+        asks_train = ("train" in lower or "double helix" in lower) and not wants_train
+        if wants_train:
+            actions.append({"type": "start_double_helix_train"})
+            reply = (
+                "Starting Double Helix on gold already in your account. "
+                "Watch **My data** for the download link when training finishes."
+            )
+            next_phase = "done"
+            progress = 100
+        elif asks_train:
+            reply = (
+                "Download gold from **My data**, or say **confirm train** to "
+                "run Double Helix QLoRA (~$15–50) on that same account gold."
+            )
+            next_phase = "done"
+            progress = 100
+        else:
+            reply = (
+                "I'm here. Download gold from **My data**, say **confirm train** "
+                "for Double Helix, or **restart** for a new collection."
+            )
+            next_phase = "done"
+            progress = 100
     else:
         reply = (
             "I'm here. Tell me what you want to train, or say **restart** "
@@ -1378,6 +1437,19 @@ def execute_actions(
                 )
                 session.last_synth_job_id = r["job"]["id"]
                 results.append(r)
+            elif atype == "start_double_helix_train":
+                from helix.services.double_helix_train import create_train_job, job_to_dict
+
+                job = create_train_job(
+                    db,
+                    owner_user_id=user_id,
+                    tenant_id=tenant.id,
+                    model_id=str(state.get("recommended_base_model") or "") or None,
+                    confirm=True,
+                )
+                results.append(
+                    {"ok": True, "action": atype, "job": job_to_dict(job)}
+                )
             elif atype:
                 results.append({"ok": False, "action": atype, "error": "unknown action"})
         except Exception as exc:  # noqa: BLE001
@@ -1534,6 +1606,11 @@ def handle_user_message(
             reply += f"\n\nMining job **{r['job']['id']}** is queued."
         if r.get("ok") and r.get("action") == "start_synthesis" and r.get("job"):
             reply += f"\n\nSynthesis job **{r['job']['id']}** is queued."
+        if r.get("ok") and r.get("action") == "start_double_helix_train" and r.get("job"):
+            reply += (
+                f"\n\nDouble Helix train **{r['job']['id']}** is queued. "
+                "Download the trained zip from **My data** when it is ready."
+            )
         if not r.get("ok") and r.get("error"):
             if r.get("action") == "start_pipeline":
                 reply = f"{r.get('error')}\n\n{reply}"

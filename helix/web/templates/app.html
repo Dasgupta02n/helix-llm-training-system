@@ -303,13 +303,35 @@
             <button class="btn btn-secondary btn-sm" id="libraryMaterialsZipBtn" type="button">Upload materials zip</button>
             <button class="btn btn-ghost btn-sm" id="exportMaterialsBtn" type="button">Export materials</button>
             <button class="btn btn-ghost btn-sm" id="exportTrainableBtn" type="button">Export all trainable</button>
-            <label for="doubleHelixModel">Double Helix base (Apache-2.0 / MIT, ≤30B)</label>
-            <select id="doubleHelixModel"></select>
-            <p class="hint">Training GPU is <strong>RunPod Serverless only</strong> (pay per job). Helix never starts a pod.</p>
-            <button class="btn btn-secondary btn-sm" id="doubleHelixZipBtn" type="button">Download Double Helix zip (QLoRA)</button>
           </div>
           <p id="libraryMaterialsStatus" class="status-line"></p>
           <p class="hint" id="userUploadCountHint"></p>
+        </div>
+
+        <div class="pane pad" style="margin-bottom:1rem">
+          <h3 class="mt-0">Use your gold two ways</h3>
+          <p class="hint">
+            Gold already in this account is the source of truth. Download it and train anywhere,
+            or let Double Helix train on RunPod Serverless and then download the adapter zip.
+          </p>
+          <div class="flex" style="gap:8px;flex-wrap:wrap;align-items:center">
+            <label for="doubleHelixModel">Base model (Apache-2.0 / MIT, ≤30B)</label>
+            <select id="doubleHelixModel"></select>
+          </div>
+          <p class="hint">GPU is <strong>RunPod Serverless only</strong> (pay per job, min workers 0). Helix never starts a pod.</p>
+          <div class="flex" style="gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
+            <button class="btn btn-secondary btn-sm" id="doubleHelixZipBtn" type="button">1. Download my gold (zip)</button>
+            <button class="btn btn-primary btn-sm" id="doubleHelixTrainBtn" type="button">2. Train with Double Helix</button>
+          </div>
+          <label class="flex" style="align-items:center;gap:.5rem;font-weight:500;margin-top:10px">
+            <input id="doubleHelixTrainConfirm" type="checkbox" style="width:auto;min-height:auto;margin:0" />
+            Start a paid GPU job (~$15–50). Helix will fetch gold from this account — I will not re-upload.
+          </label>
+          <p id="doubleHelixTrainStatus" class="status-line"></p>
+          <p class="hint" id="doubleHelixTrainHint"></p>
+          <div id="doubleHelixTrainDownloadWrap" class="hidden" style="margin-top:8px">
+            <button class="btn btn-primary btn-sm" id="doubleHelixTrainDownloadBtn" type="button">Download trained model zip</button>
+          </div>
         </div>
 
         <div class="pane pad" style="margin-bottom:1rem">
@@ -429,7 +451,7 @@
           <div>
             <span class="page-kicker">Step 5</span>
             <h2>Download your training data</h2>
-            <p class="hint">Export pipeline dataset versions, or your permanent account library (gold + synthesized).</p>
+            <p class="hint">Export pipeline dataset versions, or your permanent account library (gold + synthesized). To train on RunPod from this gold, use <strong>My data → Train with Double Helix</strong>.</p>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" id="exportAllLibraryBtn" type="button">Download my full library</button>

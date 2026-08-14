@@ -304,6 +304,7 @@ function goTab(name) {
   }
   if (name === "library") {
     loadDoubleHelixModels().catch(() => {});
+    if (typeof loadDoubleHelixTrain === "function") loadDoubleHelixTrain().catch(() => {});
   }
 }
 
@@ -2165,6 +2166,42 @@ async function loadDoubleHelixModels() {
   }
 }
 
+let _dhTrainTimer = null;
+function renderDoubleHelixTrain(job) {
+  const statusEl = $("doubleHelixTrainStatus");
+  const hint = $("doubleHelixTrainHint");
+  const wrap = $("doubleHelixTrainDownloadWrap");
+  if (!statusEl) return;
+  if (!job) {
+    statusEl.textContent = "";
+    if (hint) hint.textContent = "";
+    if (wrap) wrap.classList.add("hidden");
+    return;
+  }
+  statusEl.textContent = `${job.status}: ${job.progress || ""}`;
+  statusEl.className = job.status === "failed" ? "status-line error" : "status-line";
+  if (hint) {
+    hint.textContent = job.error
+      ? job.error
+      : job.download_ready
+        ? "Training finished. The zip has the QLoRA adapter, tokenizer, and the gold used. Full merged 7B–30B weights are not included."
+        : "Helix is using gold already in this account. You can still download the data zip anytime.";
+  }
+  if (wrap) wrap.classList.toggle("hidden", !job.download_ready);
+  const active = ["queued", "uploading", "running", "packaging"].includes(job.status);
+  if (active && !_dhTrainTimer) {
+    _dhTrainTimer = setInterval(() => loadDoubleHelixTrain().catch(() => {}), 8000);
+  }
+  if (!active && _dhTrainTimer) {
+    clearInterval(_dhTrainTimer);
+    _dhTrainTimer = null;
+  }
+}
+async function loadDoubleHelixTrain() {
+  if (!state.tenantSlug) return;
+  const data = await api(`/api/t/${state.tenantSlug}/library/double-helix/train`);
+  renderDoubleHelixTrain(data.job);
+}
 if ($("doubleHelixZipBtn")) {
   $("doubleHelixZipBtn").onclick = async () => {
     try {
@@ -2184,9 +2221,55 @@ if ($("doubleHelixZipBtn")) {
       a.click();
       a.remove();
       URL.revokeObjectURL(url);
-      toast("Double Helix zip downloaded");
+      toast("Gold zip downloaded — train it anywhere");
     } catch (e) {
       toast(e.message || "Package failed", "err");
+    }
+  };
+}
+if ($("doubleHelixTrainBtn")) {
+  $("doubleHelixTrainBtn").onclick = async () => {
+    const box = $("doubleHelixTrainConfirm");
+    if (!box || !box.checked) {
+      toast("Tick the confirm box first — this starts a paid GPU job.", "err");
+      return;
+    }
+    try {
+      const mid = $("doubleHelixModel")?.value || "";
+      const data = await api(`/api/t/${state.tenantSlug}/library/double-helix/train`, {
+        method: "POST",
+        body: JSON.stringify({ model_id: mid, confirm: true }),
+      });
+      renderDoubleHelixTrain(data.job);
+      toast("Training queued from gold in your account");
+    } catch (e) {
+      toast(e.message || "Could not start training", "err");
+    }
+  };
+}
+if ($("doubleHelixTrainDownloadBtn")) {
+  $("doubleHelixTrainDownloadBtn").onclick = async () => {
+    try {
+      const data = await api(`/api/t/${state.tenantSlug}/library/double-helix/train`);
+      const job = data.job;
+      if (!job || !job.download_ready) throw new Error("Trained zip is not ready yet");
+      const res = await fetch(
+        `/api/t/${state.tenantSlug}/library/double-helix/train/${encodeURIComponent(job.id)}/download`,
+        { headers: { Authorization: `Bearer ${state.token}` } }
+      );
+      if (!res.ok) throw new Error(await res.text());
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `helix_trained_${job.id}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      toast("Trained zip downloaded");
+    } catch (e) {
+      toast(e.message || "Download failed", "err");
     }
   };
 }
