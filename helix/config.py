@@ -92,7 +92,8 @@ class Settings(BaseSettings):
     rate_limit_global_per_min: int = 180
     rate_limit_auth_per_min: int = 20
     rate_limit_riu_per_min: int = 30
-    max_request_body_bytes: int = 1_048_576  # 1 MiB
+    # Must be above gold/materials zip cap (25 MiB) plus multipart overhead.
+    max_request_body_bytes: int = 28 * 1024 * 1024
     trust_proxy_headers: bool = True  # Caddy / reverse proxy sets X-Forwarded-For
     # Comma-separated hostnames allowed in production (empty = skip TrustedHost)
     allowed_hosts: str = (

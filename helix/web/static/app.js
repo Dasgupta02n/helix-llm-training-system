@@ -302,7 +302,11 @@ function goTab(name) {
   if (name === "home") {
     loadJobs().catch(() => {});
   }
+  if (name === "download") {
+    loadDatasets().catch(() => {});
+  }
   if (name === "library") {
+    loadLibrary().catch(() => {});
     loadDoubleHelixModels().catch(() => {});
     if (typeof loadDoubleHelixTrain === "function") loadDoubleHelixTrain().catch(() => {});
     if (typeof loadDeclarations === "function") loadDeclarations().catch(() => {});
@@ -1983,13 +1987,22 @@ async function sendRiuMessage(text) {
       $("riuProgressBadge").textContent = `Setup ${data.progress ?? 0}%`;
     }
     const jobsStarted = (data.action_results || []).filter(
-      (r) => r.ok && (r.action === "start_pipeline" || r.action === "start_synthesis")
+      (r) =>
+        r.ok &&
+        (r.action === "start_pipeline" ||
+          r.action === "start_synthesis" ||
+          r.action === "start_double_helix_train")
     );
     if (jobsStarted.length) {
-      toast("Riu started a job — it keeps running if you leave");
+      const trained = jobsStarted.some((r) => r.action === "start_double_helix_train");
+      toast(
+        trained
+          ? "Riu queued Double Helix training — watch My data for the download"
+          : "Riu started a job — it keeps running if you leave"
+      );
       loadJobs().catch(() => {});
       startJobPolling();
-      // refresh plan/library views in background
+      if (typeof loadDoubleHelixTrain === "function") loadDoubleHelixTrain().catch(() => {});
       refreshAll().catch(() => {});
     } else if ((data.action_results || []).some((r) => r.ok && r.action === "save_plan")) {
       loadBrief().catch(() => {});

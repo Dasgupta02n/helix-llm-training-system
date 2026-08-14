@@ -158,7 +158,14 @@ def accept_declaration(
         email_status="pending",
     )
     db.add(row)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        existing = get_acceptance(db, email=email, train_job_id=train_job_id)
+        if existing:
+            return existing
+        raise
     db.refresh(row)
     _email_copy(db, row, name=user.full_name or "")
     return row

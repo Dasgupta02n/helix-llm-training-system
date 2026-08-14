@@ -1550,6 +1550,16 @@ def handle_user_message(
 
     # Never let the model launch a 5000-gold job the corpus gate would refuse
     actions = list(turn.get("actions") or [])
+    lower_msg = text.lower()
+    wants_confirm_train = "confirm train" in lower_msg or (
+        "double helix" in lower_msg and "confirm" in lower_msg
+    )
+    if wants_confirm_train and not any(
+        (a.get("type") if isinstance(a, dict) else "") == "start_double_helix_train"
+        for a in actions
+    ):
+        actions.append({"type": "start_double_helix_train"})
+        turn["actions"] = actions
     block = riu_start_block_reason(state)
     if block and not state.get("accept_exploratory"):
         actions = [a for a in actions if a.get("type") != "start_pipeline"]

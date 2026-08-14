@@ -90,7 +90,7 @@ services:
       ALLOWED_HOSTS: ${ALLOWED_HOSTS:-c7xai.in,www.c7xai.in,localhost,127.0.0.1,187.127.156.152}
       ENABLE_API_DOCS: ${ENABLE_API_DOCS:-false}
       HEALTH_VERBOSE: ${HEALTH_VERBOSE:-false}
-      MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-1048576}
+      MAX_REQUEST_BODY_BYTES: ${MAX_REQUEST_BODY_BYTES:-29360128}
     depends_on:
       db:
         condition: service_healthy
