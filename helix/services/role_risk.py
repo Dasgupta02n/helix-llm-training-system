@@ -9,8 +9,8 @@ from __future__ import annotations
 import re
 from typing import Any
 
-# Recommended Double Helix v1 base (P5). Named here so Riu can recommend now.
-RECOMMENDED_BASE_MODEL = "meta-llama/Llama-3.1-8B-Instruct"
+from helix.services.base_models import recommend_model
+
 RECOMMENDED_TRAINING = "QLoRA"
 
 _HIGH = (
@@ -68,18 +68,20 @@ def classify_role(text: str, *, domain: str = "", mission: str = "") -> dict[str
     else:
         edges, quality = 1, 3
 
+    rec = recommend_model(role_type=role_type, risk_level=risk)
     return {
         "role_type": role_type,
         "risk_level": risk,
         "edge_cases_required": edges,
         "quality_mode": quality,
-        "recommended_base_model": RECOMMENDED_BASE_MODEL,
+        "recommended_base_model": rec["id"],
+        "recommended_model_name": rec["name"],
         "recommended_training": RECOMMENDED_TRAINING,
         "strict_fairness": risk == "high",
         "summary": (
             f"{risk} risk ({role_type}): ask for {edges} edge case(s); "
-            f"quality mode {quality}; train later with {RECOMMENDED_TRAINING} "
-            f"on {RECOMMENDED_BASE_MODEL}."
+            f"quality mode {quality}; default later train {RECOMMENDED_TRAINING} "
+            f"on {rec['name']} ({rec['license']}). User may pick any Apache/MIT model ≤30B."
         ),
     }
 

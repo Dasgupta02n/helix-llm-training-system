@@ -674,16 +674,39 @@ def export_library(
     )
 
 
-@router.post("/double-helix/package")
-def double_helix_package(
+@router.get("/double-helix/models")
+def double_helix_models(
     slug: str,
     user: m.User = Depends(get_current_user),
     db: Session = Depends(get_db),
+) -> dict:
+    _tenant_for(user, slug, db)
+    from helix.services.base_models import public_models
+
+    return {
+        "max_params_b": 30,
+        "licenses": ["Apache-2.0", "MIT"],
+        "excluded": ["Llama (Meta Community License)", "Gemma (Gemma license)"],
+        "models": public_models(),
+    }
+
+
+@router.post("/double-helix/package")
+def double_helix_package(
+    slug: str,
+    model_id: str | None = Query(None),
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
 ):
-    """Zip chat-format gold + Llama 3.1 8B QLoRA notes. Admin-approved accounts only."""
+    """Zip chat-format gold + Apache/MIT model notes. Admin-approved accounts only."""
     if not (user.admin_approved or user.is_superadmin):
         raise HTTPException(403, "Double Helix packaging is limited to approved accounts.")
     tenant = _tenant_for(user, slug, db)
+    from helix.services.brief import get_active_project
+
+    proj = get_active_project(db, tenant.id)
+    if not model_id and proj and proj.agent_instructions and "MODEL:" in proj.agent_instructions:
+        model_id = proj.agent_instructions.split("MODEL:", 1)[1].split("\n", 1)[0].strip()
     rows = (
         db.query(m.GoldExample)
         .filter_by(
@@ -700,7 +723,7 @@ def double_helix_package(
     ]
     from helix.services.double_helix import build_package_zip
 
-    blob = build_package_zip(payload)
+    blob = build_package_zip(payload, model_id=model_id)
     return StreamingResponse(
         iter([blob]),
         media_type="application/zip",

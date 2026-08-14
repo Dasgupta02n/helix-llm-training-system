@@ -303,7 +303,9 @@
             <button class="btn btn-secondary btn-sm" id="libraryMaterialsZipBtn" type="button">Upload materials zip</button>
             <button class="btn btn-ghost btn-sm" id="exportMaterialsBtn" type="button">Export materials</button>
             <button class="btn btn-ghost btn-sm" id="exportTrainableBtn" type="button">Export all trainable</button>
-            <button class="btn btn-secondary btn-sm" id="doubleHelixZipBtn" type="button">Double Helix zip (Llama 3.1 8B QLoRA)</button>
+            <label for="doubleHelixModel">Double Helix base (Apache-2.0 / MIT, ≤30B)</label>
+            <select id="doubleHelixModel"></select>
+            <button class="btn btn-secondary btn-sm" id="doubleHelixZipBtn" type="button">Download Double Helix zip (QLoRA)</button>
           </div>
           <p id="libraryMaterialsStatus" class="status-line"></p>
           <p class="hint" id="userUploadCountHint"></p>

@@ -1,7 +1,6 @@
-"""Double Helix v1: package gold as QLoRA-ready files for Llama 3.1 8B.
+"""Double Helix v1: package gold as QLoRA-ready files for a chosen Apache/MIT model.
 
-Does not start a GPU job unless RUNPOD_API_KEY is configured. Always returns
-a zip the account owner can run locally (Ollama / vLLM notes included).
+Does not start a GPU job unless RUNPOD_API_KEY is configured.
 """
 
 from __future__ import annotations
@@ -11,15 +10,16 @@ import json
 import zipfile
 from typing import Any
 
+from helix.services.base_models import get_model, public_models, recommend_model
 from helix.services.library import gold_to_chat_messages
-from helix.services.role_risk import RECOMMENDED_BASE_MODEL, RECOMMENDED_TRAINING
+from helix.services.role_risk import RECOMMENDED_TRAINING
 
-LLAMA_LICENSE_NOTE = """Llama 3.1 Community License (Meta).
-You must accept Meta's license before downloading or fine-tuning Llama 3.1 8B weights:
-https://www.llama.com/llama3_1/license/
+LICENSE_NOTE = """This package is built for a base model licensed Apache-2.0 or MIT.
 
-Helix does not redistribute Meta weights. This zip contains YOUR gold data plus
-instructions. You are responsible for obtaining the base model legally.
+Helix does not redistribute base weights. Download the model from Hugging Face
+under that model's card license. You are responsible for complying with it.
+
+Llama / Gemma / other non-Apache-non-MIT bases are not offered in Double Helix.
 """
 
 USAGE_OWNERSHIP = """USAGE, OWNERSHIP, AND LIABILITY
@@ -28,36 +28,46 @@ USAGE_OWNERSHIP = """USAGE, OWNERSHIP, AND LIABILITY
 2. The fine-tuned adapter (if you train it) is yours to run locally.
 3. Helix is not liable for decisions made by a model you train — especially hiring,
    credit, medical, or other high-risk roles. Human review remains required.
-4. Training method for v1 is QLoRA only on {model}. No full-rank LoRA, no other bases.
+4. Training method for v1 is QLoRA only on the Apache-2.0 / MIT model you selected (≤30B).
 5. No payment is collected. Access is limited to admin-approved Helix accounts.
-""".format(model=RECOMMENDED_BASE_MODEL)
+"""
 
-README = """# Double Helix v1 package
 
-Base model: {model}
-Method: {method} only
+def _readme(model: dict[str, Any]) -> str:
+    return f"""# Double Helix v1 package
+
+Base model: {model['id']}
+Name: {model['name']}
+License: {model['license']}
+Size: {model['params_b']}B
+Method: {RECOMMENDED_TRAINING} only
+QLoRA VRAM hint: ~{model['vram_gb_qlora']} GB
 
 ## Files
 - data/train_chat.jsonl — chat-format gold (user/assistant)
-- LICENSE_LLAMA.txt
+- LICENSE.txt — Apache-2.0 / MIT reminder (see the model card for the exact text)
 - USAGE_AND_LIABILITY.txt
 
 ## Ollama (local)
-1. Obtain Llama 3.1 8B under Meta's license.
+1. Pull the base from Hugging Face under its Apache/MIT card.
 2. After you train a QLoRA adapter, convert/export per your trainer.
 3. `ollama create helix-custom -f Modelfile` then `ollama run helix-custom`
 
 ## vLLM
-Serve the merged or adapter-backed model you trained. Helix does not host GPUs
-unless you separately configure RunPod.
+Serve the merged or adapter-backed model you trained.
 
 ## RunPod
-If RUNPOD_API_KEY is set on the Helix server, operators can launch a QLoRA job.
-Otherwise use this zip on your own GPU.
-""".format(model=RECOMMENDED_BASE_MODEL, method=RECOMMENDED_TRAINING)
+If RUNPOD_API_KEY and HF_TOKEN are set on the Helix server, operators can launch
+a QLoRA job for this model. Otherwise use this zip on your own GPU.
+"""
 
 
-def build_package_zip(rows: list[dict[str, Any]]) -> bytes:
+def build_package_zip(
+    rows: list[dict[str, Any]],
+    *,
+    model_id: str | None = None,
+) -> bytes:
+    model = get_model(model_id or "") or recommend_model()
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         lines = []
@@ -68,16 +78,23 @@ def build_package_zip(rows: list[dict[str, Any]]) -> bytes:
             )
             lines.append(json.dumps(chat, ensure_ascii=False))
         zf.writestr("data/train_chat.jsonl", "\n".join(lines) + ("\n" if lines else ""))
-        zf.writestr("LICENSE_LLAMA.txt", LLAMA_LICENSE_NOTE)
+        zf.writestr("LICENSE.txt", LICENSE_NOTE)
         zf.writestr("USAGE_AND_LIABILITY.txt", USAGE_OWNERSHIP)
-        zf.writestr("README.md", README)
+        zf.writestr("README.md", _readme(model))
         zf.writestr(
             "meta.json",
             json.dumps(
                 {
-                    "base_model": RECOMMENDED_BASE_MODEL,
+                    "base_model": model["id"],
+                    "base_model_name": model["name"],
+                    "license": model["license"],
+                    "params_b": model["params_b"],
                     "training": RECOMMENDED_TRAINING,
                     "rows": len(rows),
+                    "catalog": [
+                        {"id": m["id"], "name": m["name"], "license": m["license"], "params_b": m["params_b"]}
+                        for m in public_models()
+                    ],
                     "runpod": False,
                 },
                 indent=2,

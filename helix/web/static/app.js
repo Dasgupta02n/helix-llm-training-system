@@ -302,6 +302,9 @@ function goTab(name) {
   if (name === "home") {
     loadJobs().catch(() => {});
   }
+  if (name === "library") {
+    loadDoubleHelixModels().catch(() => {});
+  }
 }
 
 // ── Auth screens ────────────────────────────────────────────────────
@@ -2144,10 +2147,30 @@ if ($("exportMaterialsBtn"))
   $("exportMaterialsBtn").onclick = () => exportLibrary("user_material");
 if ($("exportTrainableBtn"))
   $("exportTrainableBtn").onclick = () => exportLibrary("trainable");
+async function loadDoubleHelixModels() {
+  const sel = $("doubleHelixModel");
+  if (!sel || !state.tenantSlug) return;
+  try {
+    const data = await api(`/api/t/${state.tenantSlug}/library/double-helix/models`);
+    const cur = sel.value;
+    sel.innerHTML = (data.models || [])
+      .map(
+        (m) =>
+          `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)} · ${m.params_b}B · ${escapeHtml(m.license)}</option>`
+      )
+      .join("");
+    if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
+  } catch (_) {
+    /* ignore */
+  }
+}
+
 if ($("doubleHelixZipBtn")) {
   $("doubleHelixZipBtn").onclick = async () => {
     try {
-      const res = await fetch(`/api/t/${state.tenantSlug}/library/double-helix/package`, {
+      const mid = $("doubleHelixModel")?.value || "";
+      const q = mid ? `?model_id=${encodeURIComponent(mid)}` : "";
+      const res = await fetch(`/api/t/${state.tenantSlug}/library/double-helix/package${q}`, {
         method: "POST",
         headers: { Authorization: `Bearer ${state.token}` },
       });

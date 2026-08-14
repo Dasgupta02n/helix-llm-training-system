@@ -60,7 +60,8 @@ greet → role → discover → example → edge_cases → own_data → material
 4) edge_cases: Ask for the required number of TRICKY/outlier scenarios
    (high-risk roles: 3; medium: 2; low: 1). Do not skip this.
 5) own_data / materials: labeled zip then unlabeled materials (or skip).
-6) model_estimate: Recommend Llama 3.1 8B + QLoRA for later training.
+6) model_estimate: Offer Apache-2.0 / MIT instruct models up to 30B (never Llama).
+   Recommend one default from the catalog; let the user pick another. QLoRA only.
    DO NOT invent dollar amounts — the server attaches the official $35/1k estimate.
 7) confirm → start_pipeline only after confirm (or start 10 if no corpus).
 8) offer_synth: ONLY after mining finishes. Ask if they want variations.
@@ -98,7 +99,7 @@ You MUST reply with ONLY a JSON object (no markdown fences) of this shape:
     "role_type": "...",
     "edge_cases": [],
     "edge_cases_required": 2,
-    "recommended_base_model": "meta-llama/Llama-3.1-8B-Instruct",
+    "recommended_base_model": "Qwen/Qwen2.5-7B-Instruct",
     "has_own_data": false,
     "own_data_awaiting_upload": false,
     "has_materials": false,
@@ -504,6 +505,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         patch["edge_cases_required"] = risk["edge_cases_required"]
         patch["quality_mode"] = risk["quality_mode"]
         patch["recommended_base_model"] = risk["recommended_base_model"]
+        patch["recommended_model_name"] = risk.get("recommended_model_name") or ""
         patch["project_name"] = role_text[:120]
         patch["domain"] = role_text
         reply = (
@@ -531,6 +533,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
                     "edge_cases_required": risk["edge_cases_required"],
                     "quality_mode": risk["quality_mode"],
                     "recommended_base_model": risk["recommended_base_model"],
+                    "recommended_model_name": risk.get("recommended_model_name") or "",
                 }
             )
         reply = (
@@ -776,7 +779,14 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
                 f"• Your data: **{', '.join(data_bits)}**\n" if data_bits else ""
             )
             from helix.services.user_material_upload import format_official_estimate
+            from helix.services.base_models import format_model_menu, recommend_model
 
+            rec = recommend_model(
+                role_type=str(state.get("role_type") or ""),
+                risk_level=str(state.get("risk_level") or "medium"),
+            )
+            patch["recommended_base_model"] = rec["id"]
+            patch["recommended_model_name"] = rec["name"]
             reply = (
                 "Here’s the official setup summary — numbers come from the same "
                 "$35/1k + corpus rules as mining jobs, not a guess.\n\n"
@@ -784,30 +794,56 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
                 f"• Goal: {mission}\n"
                 f"• Topics: {', '.join(cats)}\n"
                 f"{data_line}"
-                f"{format_official_estimate(pricing)}\n"
+                f"{format_official_estimate(pricing)}\n\n"
+                f"Default later-train model: **{rec['name']}** ({rec['license']}, "
+                f"{rec['params_b']}B, QLoRA).\n\n"
+                f"{format_model_menu()}\n"
             )
             next_phase = "model_estimate"
             progress = 90
             actions.append({"type": "save_goals"})
             actions.append({"type": "save_plan"})
     elif phase in {"pricing", "model_estimate"}:
-        # Alias: same as materials→confirm path if LLM lands here
-        from helix.services.user_material_upload import estimate_setup_pricing
+        from helix.services.user_material_upload import (
+            estimate_setup_pricing,
+            format_official_estimate,
+        )
+        from helix.services.base_models import (
+            format_model_menu,
+            recommend_model,
+            resolve_user_model_choice,
+        )
 
         pricing = estimate_setup_pricing(state)
         patch["pricing_estimate"] = pricing
-        from helix.services.user_material_upload import format_official_estimate
-
-        model = state.get("recommended_base_model") or "meta-llama/Llama-3.1-8B-Instruct"
-        reply = (
-            f"Recommended later training stack: **{model}** with **QLoRA** "
-            "(Double Helix v1 — not billed now).\n\n"
-            "Official pricing (same meters as jobs):\n\n"
-            f"{format_official_estimate(pricing)}\n"
+        rec = recommend_model(
+            role_type=str(state.get("role_type") or ""),
+            risk_level=str(state.get("risk_level") or "medium"),
         )
-        next_phase = "confirm"
-        progress = 94
-        actions.append({"type": "save_goals"})
+        picked = resolve_user_model_choice(t)
+        keep = lower in {"ok", "okay", "default", "yes", "y", "keep", "that one"}
+        if picked or keep or wants_run:
+            chosen = picked or rec
+            patch["recommended_base_model"] = chosen["id"]
+            patch["recommended_model_name"] = chosen["name"]
+            reply = (
+                f"Locked **{chosen['name']}** (`{chosen['id']}`) · "
+                f"{chosen['license']} · {chosen['params_b']}B · QLoRA.\n\n"
+                f"{format_official_estimate(pricing)}\n"
+            )
+            next_phase = "confirm"
+            progress = 94
+            actions.append({"type": "save_goals"})
+        else:
+            patch["recommended_base_model"] = state.get("recommended_base_model") or rec["id"]
+            reply = (
+                f"Default: **{rec['name']}** ({rec['license']}). "
+                "Pick another Apache/MIT model ≤30B or say **ok**.\n\n"
+                f"{format_model_menu()}\n\n"
+                f"{format_official_estimate(pricing)}\n"
+            )
+            next_phase = "model_estimate"
+            progress = 92
     elif phase == "running":
         if wants_run:
             reply = (
@@ -1054,6 +1090,8 @@ def _apply_save_plan(
             f"ROLE_TYPE:{state.get('role_type') or ''}\n"
             + instructions
         )
+    if state.get("recommended_base_model"):
+        instructions = f"MODEL:{state.get('recommended_base_model')}\n" + instructions
 
     existing = (
         db.query(m.ResearchProject)

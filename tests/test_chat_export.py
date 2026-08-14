@@ -27,7 +27,7 @@ def test_double_helix_zip_contains_chat_and_license():
     zf = zipfile.ZipFile(BytesIO(blob))
     names = zf.namelist()
     assert "data/train_chat.jsonl" in names
-    assert "LICENSE_LLAMA.txt" in names
+    assert "LICENSE.txt" in names
     assert "USAGE_AND_LIABILITY.txt" in names
     line = zf.read("data/train_chat.jsonl").decode().strip()
     row = json.loads(line)
