@@ -2106,6 +2106,9 @@ def _budget_dict(tenant: m.Tenant | None) -> dict:
         "openrouter_usd": b["openrouter_usd"],
         "apify_usd": b["apify_usd"],
         "gold_cap_per_1000_usd": GOLD_COST_CAP_USD_PER_1000,
+        "user_charge_usd": b.get("user_charge_usd", b["spent_usd"]),
+        "provider_usd": b.get("provider_usd", 0.0),
+        "markup": b.get("markup", 2.0),
         # Friendly labels for UI
         "openrouter_label": "model",
         "apify_label": "gather",

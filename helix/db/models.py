@@ -38,6 +38,8 @@ class Tenant(Base):
     spent_usd: Mapped[float] = mapped_column(Float, default=0.0)
     openrouter_spent_usd: Mapped[float] = mapped_column(Float, default=0.0)
     apify_spent_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    compute_spent_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    other_spent_usd: Mapped[float] = mapped_column(Float, default=0.0)
     # Optional per-tenant OpenRouter key override
     openrouter_api_key: Mapped[str | None] = mapped_column(String(256), nullable=True)
     openrouter_model: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -487,6 +489,7 @@ class BatchJob(Base):
     # Accurate cost accounting (provider-billed when available)
     openrouter_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     apify_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    compute_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     # Spend-cap: high end of the per-row band, scaled to job target_gold
     target_gold: Mapped[int] = mapped_column(Integer, default=0)

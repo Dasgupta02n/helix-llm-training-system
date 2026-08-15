@@ -10,7 +10,11 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from helix.db import models as m
-from helix.services.cost_tracking import format_row_rate, gold_spend_cap_usd
+from helix.services.cost_tracking import (
+    format_row_rate,
+    gold_spend_cap_usd,
+    usage_from_provider_parts,
+)
 from helix.services.pipeline_modes import (
     MODE_META,
     clamp_batch_size,
@@ -96,6 +100,7 @@ def create_batch_job(
         spend_cap_override=False,
         openrouter_cost_usd=0.0,
         apify_cost_usd=0.0,
+        compute_cost_usd=0.0,
         cost_usd=0.0,
     )
     db.add(job)
@@ -169,22 +174,42 @@ def job_to_dict(job: m.BatchJob, events: list[m.BatchJobEvent] | None = None) ->
         "progress_pct": round(
             100.0 * job.completed_batches / max(job.total_batches, 1), 1
         ),
-        "openrouter_cost_usd": round(float(job.openrouter_cost_usd or 0.0), 6),
-        "apify_cost_usd": round(float(job.apify_cost_usd or 0.0), 6),
-        "cost_usd": round(float(job.cost_usd or 0.0), 6),
+        **(
+            lambda usage: {
+                "openrouter_cost_usd": usage["model_usd"],
+                "apify_cost_usd": usage["gather_usd"],
+                "compute_cost_usd": usage["compute_usd"],
+                "provider_cost_usd": usage["provider_usd"],
+                "user_charge_usd": usage["user_charge_usd"],
+                "cost_usd": usage["user_charge_usd"],
+                "markup": usage["markup"],
+                "cost_breakdown": {
+                    "provider_usd": usage["provider_usd"],
+                    "user_charge_usd": usage["user_charge_usd"],
+                    "markup": usage["markup"],
+                    "model_usd": usage["model_usd"],
+                    "gather_usd": usage["gather_usd"],
+                    "compute_usd": usage["compute_usd"],
+                    "total_usd": usage["user_charge_usd"],
+                    "spend_cap_usd": round(float(job.spend_cap_usd or 0.0), 6),
+                    "target_gold": int(job.target_gold or 0),
+                    "spend_cap_override": bool(
+                        getattr(job, "spend_cap_override", False)
+                    ),
+                },
+            }
+        )(
+            usage_from_provider_parts(
+                model_usd=float(job.openrouter_cost_usd or 0.0),
+                gather_usd=float(job.apify_cost_usd or 0.0),
+                compute_usd=float(getattr(job, "compute_cost_usd", 0.0) or 0.0),
+            )
+        ),
         "target_gold": int(job.target_gold or 0),
         "spend_cap_usd": round(float(job.spend_cap_usd or 0.0), 6),
         "spend_cap_override": bool(getattr(job, "spend_cap_override", False)),
         "needs_spend_consent": (job.status == "paused_spend_cap")
         and not bool(getattr(job, "spend_cap_override", False)),
-        "cost_breakdown": {
-            "openrouter_usd": round(float(job.openrouter_cost_usd or 0.0), 6),
-            "apify_usd": round(float(job.apify_cost_usd or 0.0), 6),
-            "total_usd": round(float(job.cost_usd or 0.0), 6),
-            "spend_cap_usd": round(float(job.spend_cap_usd or 0.0), 6),
-            "target_gold": int(job.target_gold or 0),
-            "spend_cap_override": bool(getattr(job, "spend_cap_override", False)),
-        },
         "config": config,
         "result_summary": summary,
         "error": public_activity_text(job.error) or job.error,

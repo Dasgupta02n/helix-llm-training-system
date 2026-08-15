@@ -422,7 +422,9 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
         "can_start_requested": can_start_requested,
         "first_job_units": first_job_units,
         "summary_lines": [
-            f"Helix gold rate **with your sources**: {format_row_rate()}. "
+            "Usage on your counter is **2 ×** what the underlying services bill "
+            "(model, gather, training compute, and any other metered service). "
+            f"Typical gold with sources still lands around {format_row_rate()}. "
             f"**{gold_target:,}** gold ≈ **${with_lo:,.0f}–${with_hi:,.0f}** "
             "if we can actually produce it.",
             f"First job: **{first_job_units}** units, spend cap **${first_job_cap:.2f}** "

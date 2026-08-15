@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 
 from helix.db.session import SessionLocal
 from helix.db import models as m
-from helix.services.cost_tracking import should_pause_for_spend_cap
+from helix.services.cost_tracking import should_pause_for_spend_cap, user_charge_usd
 from helix.services.pipeline_modes import run_pipeline_batch
 from helix.services.synthesis import run_synthesis
 
@@ -223,8 +223,7 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 "user_message": result.get("user_message"),
                 "job_user_message": (
                     f"Job so far: {total_gold} new gold across {batch_index} batch(es). "
-                    f"Cost ${job.cost_usd:.4f} "
-                    f"(model ${job.openrouter_cost_usd:.4f} + gather ${job.apify_cost_usd:.4f}) "
+                    f"Usage ${user_charge_usd(job.cost_usd):.4f} "
                     f"/ cap ${float(job.spend_cap_usd or 0):.4f}. "
                     f"This batch: {result.get('user_message') or f'{gold_new} gold'}."
                 ),
@@ -236,8 +235,9 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 job,
                 f"Batch {batch_index}/{job.total_batches} done (pipeline mode {job.quality_mode}): "
                 f"gold_new={gold_new} (job total={total_gold}), units~{items}, "
-                f"cost=${batch_cost:.4f} (model ${or_cost:.4f} + gather ${ap_cost:.4f}), "
-                f"job total ${job.cost_usd:.4f}/{float(job.spend_cap_usd or 0):.4f} cap, "
+                f"usage=${user_charge_usd(batch_cost):.4f}, "
+                f"job usage ${user_charge_usd(job.cost_usd):.4f}/"
+                f"{float(job.spend_cap_usd or 0):.4f} cap, "
                 f"{result.get('elapsed_seconds')}s. "
                 f"{result.get('user_message') or ''}",
                 level=level,
@@ -332,7 +332,7 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
         remaining_batches = max(0, job.total_batches - job.completed_batches)
         override = bool(getattr(job, "spend_cap_override", False))
         pause, pause_msg = should_pause_for_spend_cap(
-            cost_usd=float(job.cost_usd or 0.0),
+            cost_usd=user_charge_usd(float(job.cost_usd or 0.0)),
             gold_new=units_for_cap,
             target_gold=int(job.target_gold or (job.batch_size * job.total_batches)),
             completed_batches=job.completed_batches,
@@ -380,10 +380,8 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             total_gold = int(summ.get("total_gold_new") or 0)
             total_synth = int(summ.get("total_synth_new") or 0)
             cost_note = (
-                f" Cost ${float(job.cost_usd or 0):.4f} "
-                f"(model ${float(job.openrouter_cost_usd or 0):.4f} + "
-                f"gather ${float(job.apify_cost_usd or 0):.4f})"
-                f" / cap ${float(job.spend_cap_usd or 0):.4f}."
+                f" Usage ${user_charge_usd(float(job.cost_usd or 0)):.4f} "
+                f"/ cap ${float(job.spend_cap_usd or 0):.4f}."
             )
             if job.job_type == "pipeline":
                 if total_gold > 0:

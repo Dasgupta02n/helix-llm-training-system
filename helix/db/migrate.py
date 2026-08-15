@@ -94,7 +94,12 @@ def apply_migrations(engine: Engine) -> None:
         # Phase 0 cost tracking: split OpenRouter / Apify spend + job caps
         tenant_cols = _column_names(engine, "tenants")
         if tenant_cols:
-            for name in ("openrouter_spent_usd", "apify_spent_usd"):
+            for name in (
+                "openrouter_spent_usd",
+                "apify_spent_usd",
+                "compute_spent_usd",
+                "other_spent_usd",
+            ):
                 if name not in tenant_cols:
                     conn.execute(
                         text(f"ALTER TABLE tenants ADD COLUMN {name} FLOAT DEFAULT 0")
@@ -113,6 +118,7 @@ def apply_migrations(engine: Engine) -> None:
             bj_additions = {
                 "openrouter_cost_usd": "FLOAT DEFAULT 0",
                 "apify_cost_usd": "FLOAT DEFAULT 0",
+                "compute_cost_usd": "FLOAT DEFAULT 0",
                 "cost_usd": "FLOAT DEFAULT 0",
                 "target_gold": "INTEGER DEFAULT 0",
                 "spend_cap_usd": "FLOAT DEFAULT 0",

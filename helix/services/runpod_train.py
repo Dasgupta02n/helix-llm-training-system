@@ -246,4 +246,36 @@ def poll_qlora_job(runpod_job_id: str) -> dict[str, Any]:
     status = ""
     if isinstance(raw, dict):
         status = str(raw.get("status") or raw.get("state") or "").upper()
-    return {"ok": True, "status": status, "runpod": raw}
+    return {
+        "ok": True,
+        "status": status,
+        "runpod": raw,
+        "compute_cost_usd": extract_compute_cost_usd(raw),
+    }
+
+
+def extract_compute_cost_usd(raw: Any) -> float:
+    """Pull billed compute $ from a job payload, or estimate from execution time."""
+    if not isinstance(raw, dict):
+        return 0.0
+    for key in ("cost", "costUsd", "cost_usd", "totalCost", "total_cost"):
+        val = raw.get(key)
+        if val is None and isinstance(raw.get("output"), dict):
+            val = raw["output"].get(key)
+        try:
+            f = float(val)
+        except (TypeError, ValueError):
+            continue
+        if f >= 0:
+            return round(f, 6)
+    ms = raw.get("executionTime") or raw.get("executionTimeMs") or raw.get("execution_time")
+    try:
+        t = float(ms)
+    except (TypeError, ValueError):
+        return 0.0
+    # Values > 120 are almost always milliseconds.
+    seconds = t / 1000.0 if t > 120 else t
+    from helix.config import get_settings
+
+    rate = float(getattr(get_settings(), "compute_usd_per_second", 0.0) or 0.00076)
+    return round(max(0.0, seconds) * rate, 6)

@@ -26,6 +26,9 @@ SYNTH_COST_CAP_USD_PER_1000 = SYNTH_USD_MAX * 1000.0  # 200
 DOUBLE_HELIX_TRAINING_COST_MIN_USD = 15.0
 DOUBLE_HELIX_TRAINING_COST_MAX_USD = 50.0
 
+# User usage = (sum of billed service spend) × this factor.
+USER_COST_MARKUP = 2.0
+
 # Fallback token pricing (USD per 1M tokens) when provider omits usage.cost.
 # Prefer actual billed cost from OpenRouter / Apify whenever present.
 # Grok-class midpoints via OpenRouter (pay-as-you-go list, updated when models change).
@@ -75,6 +78,52 @@ def estimate_units_usd(
 
 def gold_rate_per_1000(*, no_corpus: bool = False, kind: Kind = "gold") -> float:
     return gold_rate_per_row(no_corpus=no_corpus, kind=kind) * 1000.0
+
+
+def user_charge_usd(provider_usd: float) -> float:
+    """What the usage counter shows: 2 × incurred service spend."""
+    return round(max(0.0, float(provider_usd or 0.0)) * USER_COST_MARKUP, 6)
+
+
+def provider_spend_total(
+    *,
+    model_usd: float = 0.0,
+    gather_usd: float = 0.0,
+    compute_usd: float = 0.0,
+    other_usd: float = 0.0,
+) -> float:
+    return round(
+        max(0.0, float(model_usd or 0.0))
+        + max(0.0, float(gather_usd or 0.0))
+        + max(0.0, float(compute_usd or 0.0))
+        + max(0.0, float(other_usd or 0.0)),
+        6,
+    )
+
+
+def usage_from_provider_parts(
+    *,
+    model_usd: float = 0.0,
+    gather_usd: float = 0.0,
+    compute_usd: float = 0.0,
+    other_usd: float = 0.0,
+) -> dict[str, float]:
+    provider = provider_spend_total(
+        model_usd=model_usd,
+        gather_usd=gather_usd,
+        compute_usd=compute_usd,
+        other_usd=other_usd,
+    )
+    user = user_charge_usd(provider)
+    return {
+        "provider_usd": provider,
+        "user_charge_usd": user,
+        "markup": USER_COST_MARKUP,
+        "model_usd": round(max(0.0, float(model_usd or 0.0)), 6),
+        "gather_usd": round(max(0.0, float(gather_usd or 0.0)), 6),
+        "compute_usd": round(max(0.0, float(compute_usd or 0.0)), 6),
+        "other_usd": round(max(0.0, float(other_usd or 0.0)), 6),
+    }
 
 
 def gold_spend_cap_usd(
@@ -278,24 +327,48 @@ def should_pause_for_spend_cap(
     return False, ""
 
 
-def record_openrouter_spend(tenant: Any, amount_usd: float) -> None:
-    """Attribute OpenRouter spend on tenant (total + split counters)."""
+def _add_provider(tenant: Any, field: str, amount_usd: float) -> float:
     amt = max(0.0, float(amount_usd or 0.0))
     if amt <= 0 or tenant is None:
-        return
-    tenant.spent_usd = float(tenant.spent_usd or 0.0) + amt
-    if hasattr(tenant, "openrouter_spent_usd"):
-        tenant.openrouter_spent_usd = float(tenant.openrouter_spent_usd or 0.0) + amt
+        return 0.0
+    if hasattr(tenant, field):
+        setattr(tenant, field, float(getattr(tenant, field) or 0.0) + amt)
+    return amt
+
+
+def record_openrouter_spend(tenant: Any, amount_usd: float) -> None:
+    """Record billed model spend (provider dollars). Usage counter is 2×."""
+    amt = _add_provider(tenant, "openrouter_spent_usd", amount_usd)
+    if amt and tenant is not None:
+        tenant.spent_usd = float(tenant.spent_usd or 0.0) + user_charge_usd(amt)
 
 
 def record_apify_spend(tenant: Any, amount_usd: float) -> None:
-    """Attribute Apify spend on tenant (total + split counters)."""
-    amt = max(0.0, float(amount_usd or 0.0))
-    if amt <= 0 or tenant is None:
-        return
-    tenant.spent_usd = float(tenant.spent_usd or 0.0) + amt
-    if hasattr(tenant, "apify_spent_usd"):
-        tenant.apify_spent_usd = float(tenant.apify_spent_usd or 0.0) + amt
+    """Record billed gather spend (provider dollars). Usage counter is 2×."""
+    amt = _add_provider(tenant, "apify_spent_usd", amount_usd)
+    if amt and tenant is not None:
+        tenant.spent_usd = float(tenant.spent_usd or 0.0) + user_charge_usd(amt)
+
+
+def record_compute_spend(tenant: Any, amount_usd: float) -> None:
+    """Record billed training-compute spend (provider dollars). Usage counter is 2×."""
+    amt = _add_provider(tenant, "compute_spent_usd", amount_usd)
+    if amt and tenant is not None:
+        tenant.spent_usd = float(tenant.spent_usd or 0.0) + user_charge_usd(amt)
+
+
+def record_other_spend(tenant: Any, amount_usd: float) -> None:
+    """Record any other billed service spend (storage, host, etc.)."""
+    amt = _add_provider(tenant, "other_spent_usd", amount_usd)
+    if amt and tenant is not None:
+        tenant.spent_usd = float(tenant.spent_usd or 0.0) + user_charge_usd(amt)
+
+
+def tenant_over_budget(tenant: Any) -> bool:
+    if tenant is None:
+        return False
+    b = tenant_cost_breakdown(tenant)
+    return b["spent_usd"] >= float(b["monthly_usd"] or 0.0) > 0
 
 
 def tenant_cost_breakdown(tenant: Any) -> dict[str, float]:
@@ -303,18 +376,33 @@ def tenant_cost_breakdown(tenant: Any) -> dict[str, float]:
         return {
             "openrouter_usd": 0.0,
             "apify_usd": 0.0,
+            "compute_usd": 0.0,
+            "other_usd": 0.0,
+            "provider_usd": 0.0,
             "spent_usd": 0.0,
+            "user_charge_usd": 0.0,
+            "markup": USER_COST_MARKUP,
             "monthly_usd": 0.0,
         }
     or_u = float(getattr(tenant, "openrouter_spent_usd", 0.0) or 0.0)
     ap_u = float(getattr(tenant, "apify_spent_usd", 0.0) or 0.0)
-    total = float(tenant.spent_usd or 0.0)
-    # Backfill: older tenants only had spent_usd from OpenRouter estimates
-    if or_u <= 0 and ap_u <= 0 and total > 0:
-        or_u = total
+    cp_u = float(getattr(tenant, "compute_spent_usd", 0.0) or 0.0)
+    ot_u = float(getattr(tenant, "other_spent_usd", 0.0) or 0.0)
+    stored = float(getattr(tenant, "spent_usd", 0.0) or 0.0)
+    # Backfill: older tenants only had spent_usd from model estimates
+    if or_u <= 0 and ap_u <= 0 and cp_u <= 0 and ot_u <= 0 and stored > 0:
+        or_u = stored
+    usage = usage_from_provider_parts(
+        model_usd=or_u, gather_usd=ap_u, compute_usd=cp_u, other_usd=ot_u
+    )
     return {
-        "openrouter_usd": round(or_u, 6),
-        "apify_usd": round(ap_u, 6),
-        "spent_usd": round(total, 6),
-        "monthly_usd": float(tenant.monthly_budget_usd or 0.0),
+        "openrouter_usd": usage["model_usd"],
+        "apify_usd": usage["gather_usd"],
+        "compute_usd": usage["compute_usd"],
+        "other_usd": usage["other_usd"],
+        "provider_usd": usage["provider_usd"],
+        "spent_usd": usage["user_charge_usd"],
+        "user_charge_usd": usage["user_charge_usd"],
+        "markup": USER_COST_MARKUP,
+        "monthly_usd": float(getattr(tenant, "monthly_budget_usd", 0.0) or 0.0),
     }

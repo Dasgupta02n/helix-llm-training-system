@@ -1087,9 +1087,10 @@ def run_pipeline_batch(
             f"(candidates={code_res.get('candidates_new', 0)}, "
             f"gather_hits={code_res.get('gather_results', 0)})."
         )
+    from helix.services.cost_tracking import user_charge_usd
+
     user_message += (
-        f" Cost: model ${openrouter_cost_usd:.4f} + gather ${apify_cost_usd:.4f} "
-        f"= ${total_cost:.4f}."
+        f" Usage ${user_charge_usd(total_cost):.4f}."
     )
 
     return {

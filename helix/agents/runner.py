@@ -42,8 +42,10 @@ def run_agent(
     tenant = db.query(m.Tenant).filter_by(id=tenant_id).first()
     if not tenant or not tenant.is_active:
         raise ValueError("Tenant not found or inactive")
-    if tenant.spent_usd >= tenant.monthly_budget_usd:
-        raise ValueError("Tenant monthly LLM budget exceeded")
+    from helix.services.cost_tracking import tenant_over_budget
+
+    if tenant_over_budget(tenant):
+        raise ValueError("This workspace has used its monthly budget.")
 
     client = get_llm_client_for_tenant(tenant)
     tools = tools_for_agent(agent_key)

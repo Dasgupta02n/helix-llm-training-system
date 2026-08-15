@@ -836,9 +836,13 @@ function _jobCostLine(j) {
   if (total == null && orC == null && apC == null) return "";
   const cap = j.spend_cap_usd != null ? j.spend_cap_usd : s.spend_cap_usd;
   const bits = [];
-  if (orC != null) bits.push(`model $${Number(orC).toFixed(4)}`);
-  if (apC != null) bits.push(`gather $${Number(apC).toFixed(4)}`);
-  if (total != null) bits.push(`total $${Number(total).toFixed(4)}`);
+  const usage =
+    j.user_charge_usd != null
+      ? j.user_charge_usd
+      : total != null
+        ? Number(total)
+        : null;
+  if (usage != null) bits.push(`usage $${Number(usage).toFixed(4)}`);
   if (cap != null && Number(cap) > 0) bits.push(`cap $${Number(cap).toFixed(4)}`);
   return bits.length
     ? `<div class="hint" style="margin-top:4px">Cost: ${bits.join(" · ")}</div>`
@@ -1014,11 +1018,9 @@ async function loadJobs() {
         const pct = Number(j.progress_pct) || 0;
         const updated = j.updated_at ? new Date(j.updated_at).toLocaleTimeString() : "—";
         const costBits = [];
-        if (j.openrouter_cost_usd != null)
-          costBits.push(`model $${Number(j.openrouter_cost_usd).toFixed(3)}`);
-        if (j.apify_cost_usd != null)
-          costBits.push(`gather $${Number(j.apify_cost_usd).toFixed(3)}`);
-        if (j.cost_usd != null) costBits.push(`Σ $${Number(j.cost_usd).toFixed(3)}`);
+        const usage =
+          j.user_charge_usd != null ? j.user_charge_usd : j.cost_usd;
+        if (usage != null) costBits.push(`usage $${Number(usage).toFixed(3)}`);
         if (j.spend_cap_usd != null && Number(j.spend_cap_usd) > 0)
           costBits.push(`cap $${Number(j.spend_cap_usd).toFixed(3)}`);
         return `<div class="job-card" data-job="${escapeHtml(j.id)}" data-updated="${escapeHtml(j.updated_at || "")}">
@@ -1522,9 +1524,7 @@ async function refreshDashboard() {
   const dash = await api(`/api/t/${state.tenantSlug}/dashboard`);
   const m = dash.metrics || {};
   const budget = m.budget || {};
-  const spent = budget.spent_usd || 0;
-  const orSpent = budget.openrouter_usd != null ? budget.openrouter_usd : spent;
-  const apSpent = budget.apify_usd != null ? budget.apify_usd : 0;
+  const spent = budget.user_charge_usd != null ? budget.user_charge_usd : budget.spent_usd || 0;
   const limit = budget.monthly_usd || 0;
   const openEsc = m.open_escalations ?? 0;
   const openCon = m.open_contradictions ?? 0;
@@ -1543,7 +1543,7 @@ async function refreshDashboard() {
     <div class="stat-card tone-ok">
       <div class="label">Usage this month (all-in)</div>
       <div class="value">$${Number(spent).toFixed(2)}</div>
-      <div class="sub">model $${Number(orSpent).toFixed(2)} · gather $${Number(apSpent).toFixed(2)} · budget $${Number(limit).toFixed(0)}</div>
+      <div class="sub">usage $${Number(spent).toFixed(2)} · budget $${Number(limit).toFixed(0)}</div>
     </div>
   `;
 

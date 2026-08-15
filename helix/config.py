@@ -110,6 +110,8 @@ class Settings(BaseSettings):
     runpod_api_key: str = ""
     runpod_serverless_endpoint_id: str = ""
     hf_token: str = ""
+    # Fallback when a compute job does not return a billed dollar amount.
+    compute_usd_per_second: float = 0.00076
 
     @property
     def is_production(self) -> bool:

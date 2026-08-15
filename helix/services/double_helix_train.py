@@ -455,7 +455,26 @@ def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
     db.commit()
 
 
-def _advance_running(job: m.DoubleHelixTrainJob) -> None:
+def _record_train_compute(db: Session, job: m.DoubleHelixTrainJob, polled: dict[str, Any]) -> None:
+    from helix.services.cost_tracking import record_compute_spend, user_charge_usd
+
+    cost = float(polled.get("compute_cost_usd") or 0.0)
+    if cost <= 0:
+        return
+    meta = _train_meta(job)
+    if float(meta.get("compute_cost_usd") or 0.0) > 0:
+        return
+    meta["compute_cost_usd"] = cost
+    job.meta_json = json.dumps(meta)
+    tenant = db.query(m.Tenant).filter_by(id=job.tenant_id).first()
+    record_compute_spend(tenant, cost)
+    append_train_activity(
+        job,
+        f"Compute billed ${cost:.4f} → usage ${user_charge_usd(cost):.4f}.",
+    )
+
+
+def _advance_running(db: Session, job: m.DoubleHelixTrainJob) -> None:
     polled = poll_qlora_job(job.runpod_job_id or "")
     if not polled.get("ok"):
         append_train_activity(
@@ -463,6 +482,8 @@ def _advance_running(job: m.DoubleHelixTrainJob) -> None:
         )
         return
     st = str(polled.get("status") or "").upper()
+    if st in {"COMPLETED", "COMPLETE", "SUCCESS", "FAILED", "CANCELLED", "CANCELED", "TIMED_OUT", "TIMEOUT"}:
+        _record_train_compute(db, job, polled)
     if st in {"COMPLETED", "COMPLETE", "SUCCESS"}:
         job.status = "packaging"
         append_train_activity(job, "Training finished. Packaging adapter + tokenizer…")
@@ -682,7 +703,7 @@ def tick_train_job(db: Session, job: m.DoubleHelixTrainJob) -> m.DoubleHelixTrai
                 job.status = "queued"
                 _advance_queued(db, job)
         elif job.status == "running":
-            _advance_running(job)
+            _advance_running(db, job)
             if job.status == "packaging":
                 db.commit()
                 _advance_packaging(db, job)

@@ -6,11 +6,15 @@ from types import SimpleNamespace
 
 from helix.services.cost_tracking import (
     GOLD_COST_CAP_USD_PER_1000,
+    USER_COST_MARKUP,
     apify_cost_from_run,
     estimate_token_cost_usd,
     gold_spend_cap_usd,
     openrouter_cost_from_usage,
     should_pause_for_spend_cap,
+    tenant_cost_breakdown,
+    usage_from_provider_parts,
+    user_charge_usd,
 )
 
 
@@ -124,3 +128,26 @@ def test_spend_cap_batch_trajectory_without_gold():
     )
     assert pause
     assert "batch" in msg.lower() or "trajectory" in msg.lower()
+
+
+def test_user_usage_is_double_provider_spend():
+    assert USER_COST_MARKUP == 2.0
+    assert user_charge_usd(0.80) == 1.60
+    u = usage_from_provider_parts(model_usd=0.75, gather_usd=0.05)
+    assert u["provider_usd"] == 0.80
+    assert u["user_charge_usd"] == 1.60
+
+
+def test_tenant_counter_shows_markup(monkeypatch):
+    tenant = SimpleNamespace(
+        openrouter_spent_usd=0.75,
+        apify_spent_usd=0.05,
+        compute_spent_usd=0.0,
+        other_spent_usd=0.0,
+        spent_usd=0.80,
+        monthly_budget_usd=2000.0,
+    )
+    b = tenant_cost_breakdown(tenant)
+    assert b["provider_usd"] == 0.80
+    assert b["spent_usd"] == 1.60
+    assert b["user_charge_usd"] == 1.60
