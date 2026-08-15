@@ -7,6 +7,7 @@ import {
   csvToList,
   escapeHtml,
   formatMetrics,
+  stripVendorNames,
   formatTargets,
   goTab,
   hooks,
@@ -155,7 +156,7 @@ async function refreshDashboard() {
                 : r.status;
           const badge =
             r.status === "completed" ? "ok" : r.status === "error" ? "err" : "warn";
-          const preview = (r.output_preview || r.error || "—").slice(0, 100);
+          const preview = stripVendorNames(r.output_preview || r.error || "—").slice(0, 100);
           return `<tr>
             <td><strong>${escapeHtml(title)}</strong></td>
             <td><span class="badge ${badge}">${escapeHtml(status)}</span></td>

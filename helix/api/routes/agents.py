@@ -9,6 +9,7 @@ from helix.api.deps import get_current_user
 from helix.api.schemas import AgentRunRequest, EscalationDecision, PipelineRunRequest
 from helix.db import models as m
 from helix.db.session import get_db
+from helix.services.live_status import public_activity_text
 from helix.tools.handlers import ToolContext, get_success_metrics, get_agent_health, get_unified_escalation_queue, route_human_decision
 
 router = APIRouter(prefix="/api/t/{slug}", tags=["agents"])
@@ -29,20 +30,36 @@ def _tenant_for(user: m.User, slug: str, db: Session) -> m.Tenant:
     return tenant
 
 
+def _public_provider(name: str | None) -> str | None:
+    if not name:
+        return name
+    mapped = {
+        "openrouter": "model",
+        "apify": "gather",
+        "runpod": "training",
+        "huggingface": "model storage",
+        "hf": "model storage",
+        "hostinger": "the server",
+        "resend": "email",
+    }
+    return mapped.get(str(name).strip().lower(), public_activity_text(name))
+
+
+def _public_agent(a) -> dict:
+    return {
+        "key": a.key,
+        "name": a.name,
+        "role": a.role,
+        "reports_to": a.reports_to,
+        "budget_tier": a.budget_tier,
+        "goal": public_activity_text(a.goal),
+        "tools": list(a.tools),
+    }
+
+
 @router.get("/agents")
 def agents_list() -> list[dict]:
-    return [
-        {
-            "key": a.key,
-            "name": a.name,
-            "role": a.role,
-            "reports_to": a.reports_to,
-            "budget_tier": a.budget_tier,
-            "goal": a.goal,
-            "tools": list(a.tools),
-        }
-        for a in list_agents()
-    ]
+    return [_public_agent(a) for a in list_agents()]
 
 
 @router.get("/agents/{agent_key}")
@@ -51,16 +68,9 @@ def agent_detail(agent_key: str) -> dict:
         a = get_agent(agent_key)
     except KeyError as e:
         raise HTTPException(404, str(e)) from e
-    return {
-        "key": a.key,
-        "name": a.name,
-        "role": a.role,
-        "reports_to": a.reports_to,
-        "budget_tier": a.budget_tier,
-        "goal": a.goal,
-        "tools": list(a.tools),
-        "system_prompt": a.system_prompt,
-    }
+    out = _public_agent(a)
+    out["system_prompt"] = public_activity_text(a.system_prompt)
+    return out
 
 
 @router.post("/agents/{agent_key}/run")
@@ -187,15 +197,15 @@ def list_runs(
             "agent": r.agent,
             "status": r.status,
             "trigger": r.trigger,
-            "provider": r.provider,
+            "provider": _public_provider(r.provider),
             "model": r.model,
             "cost_usd": r.cost_usd,
             "cost_source": getattr(r, "cost_source", None),
             "prompt_tokens": getattr(r, "prompt_tokens", 0) or 0,
             "completion_tokens": getattr(r, "completion_tokens", 0) or 0,
             "created_at": r.created_at.isoformat() if r.created_at else None,
-            "error": r.error,
-            "output_preview": (r.output_text or "")[:240],
+            "error": public_activity_text(r.error),
+            "output_preview": public_activity_text((r.output_text or "")[:240]),
         }
         for r in rows
     ]
@@ -217,16 +227,16 @@ def get_run(
         "agent": r.agent,
         "status": r.status,
         "trigger": r.trigger,
-        "input_message": r.input_message,
-        "output_text": r.output_text,
+        "input_message": public_activity_text(r.input_message),
+        "output_text": public_activity_text(r.output_text),
         "tool_trace_json": r.tool_trace_json,
-        "provider": r.provider,
+        "provider": _public_provider(r.provider),
         "model": r.model,
         "cost_usd": r.cost_usd,
         "cost_source": getattr(r, "cost_source", None),
         "prompt_tokens": getattr(r, "prompt_tokens", 0) or 0,
         "completion_tokens": getattr(r, "completion_tokens", 0) or 0,
-        "error": r.error,
+        "error": public_activity_text(r.error),
         "created_at": r.created_at.isoformat() if r.created_at else None,
         "finished_at": r.finished_at.isoformat() if r.finished_at else None,
     }
