@@ -619,6 +619,13 @@
   margin: 10px 0 16px;
 }
 .site-body .legal-doc .lead { color: var(--muted); }
+.site-body .gold-pitch .table-wrap {
+  overflow-x: auto;
+  margin: 1.2rem 0 1.6rem;
+}
+.site-body .gold-pitch .h180-table {
+  min-width: 640px;
+}
 .site-body .pricing-card.featured {
   outline: 1px solid var(--purple);
   border-color: var(--purple);

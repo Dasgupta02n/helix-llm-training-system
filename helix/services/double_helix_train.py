@@ -262,7 +262,7 @@ def create_train_job(
 ) -> m.DoubleHelixTrainJob:
     if not confirm:
         raise ValueError(
-            "Training starts a paid GPU job (~$15–50). "
+            "Training starts a paid GPU job (see the estimate for the model you pick). "
             "Send confirm=true after you accept that."
         )
     if not train_ready():

@@ -1,7 +1,7 @@
-"""Apache-2.0 / MIT instruct models ≤30B for Double Helix.
+"""Apache-2.0 / MIT instruct models ≤30B for C7X-IO.
 
 Llama is intentionally absent (Meta Community License is not Apache/MIT).
-This is first-party instruct checkpoints only — not every HF fine-tune.
+Short curated list — not every open checkpoint on the Hub.
 """
 
 from __future__ import annotations
@@ -9,52 +9,35 @@ from __future__ import annotations
 import re
 from typing import Any
 
+# Fallback GPU dollars/second used when a job does not return a billed amount.
+# Matches helix.config.compute_usd_per_second. Usage shown to the user is 2× this.
+_GPU_USD_PER_SEC = 0.00076
+_USAGE_MARKUP = 2.0
+
+# Qwen2.5-7B-Instruct: Apache-2.0 on the model card. Strong default for one role.
+DEFAULT_MODEL_ID = "Qwen/Qwen2.5-7B-Instruct"
+DEFAULT_REASON = (
+    "Recommended for a role-specific assistant: Apache-2.0, 7B, strong instruction "
+    "following. Small enough that a typical 1-epoch QLoRA stays in the "
+    "pay-per-job band below; larger than a 1.7B smoke-test model."
+)
+
 # QLoRA vRAM is a planning hint, not a hard scheduler.
+# Licenses checked 2026-08-16 against the official model cards:
+#   Qwen2.5-7B/14B Instruct → Apache-2.0 (3B and 72B are not)
+#   Mistral-7B-Instruct-v0.3 → Apache-2.0
+#   SmolLM2-1.7B-Instruct → Apache-2.0
 MODELS: list[dict[str, Any]] = [
     {
-        "id": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
-        "name": "SmolLM2 1.7B Instruct",
-        "params_b": 1.7,
-        "license": "Apache-2.0",
-        "family": "SmolLM",
-        "vram_gb_qlora": 8,
-        "good_for": ["captions", "copy", "tiny on-device"],
-    },
-    {
-        "id": "microsoft/Phi-3.5-mini-instruct",
-        "name": "Phi-3.5 Mini Instruct",
-        "params_b": 3.8,
-        "license": "MIT",
-        "family": "Phi",
-        "vram_gb_qlora": 10,
-        "good_for": ["captions", "faq", "fast iteration"],
-    },
-    {
-        "id": "Qwen/Qwen2.5-3B-Instruct",
-        "name": "Qwen2.5 3B Instruct",
-        "params_b": 3.0,
+        "id": DEFAULT_MODEL_ID,
+        "name": "Qwen2.5 7B Instruct",
+        "params_b": 7.6,
         "license": "Apache-2.0",
         "family": "Qwen",
-        "vram_gb_qlora": 10,
-        "good_for": ["faq", "copy", "multilingual small"],
-    },
-    {
-        "id": "ibm-granite/granite-3.1-2b-instruct",
-        "name": "Granite 3.1 2B Instruct",
-        "params_b": 2.0,
-        "license": "Apache-2.0",
-        "family": "Granite",
-        "vram_gb_qlora": 8,
-        "good_for": ["copy", "enterprise small"],
-    },
-    {
-        "id": "ibm-granite/granite-3.1-8b-instruct",
-        "name": "Granite 3.1 8B Instruct",
-        "params_b": 8.0,
-        "license": "Apache-2.0",
-        "family": "Granite",
         "vram_gb_qlora": 16,
-        "good_for": ["support", "hr", "enterprise"],
+        "best_for": "Default for a role-specific assistant — stronger general quality.",
+        "train_minutes": (90, 300),
+        "recommended": True,
     },
     {
         "id": "mistralai/Mistral-7B-Instruct-v0.3",
@@ -63,70 +46,9 @@ MODELS: list[dict[str, Any]] = [
         "license": "Apache-2.0",
         "family": "Mistral",
         "vram_gb_qlora": 16,
-        "good_for": ["support", "sales", "general"],
-    },
-    {
-        "id": "mistralai/Ministral-8B-Instruct-2410",
-        "name": "Ministral 8B Instruct",
-        "params_b": 8.0,
-        "license": "Apache-2.0",
-        "family": "Mistral",
-        "vram_gb_qlora": 16,
-        "good_for": ["support", "sales", "general"],
-    },
-    {
-        "id": "Qwen/Qwen2.5-7B-Instruct",
-        "name": "Qwen2.5 7B Instruct",
-        "params_b": 7.6,
-        "license": "Apache-2.0",
-        "family": "Qwen",
-        "vram_gb_qlora": 16,
-        "good_for": ["support", "sales", "multilingual"],
-    },
-    {
-        "id": "Qwen/Qwen3-8B",
-        "name": "Qwen3 8B",
-        "params_b": 8.0,
-        "license": "Apache-2.0",
-        "family": "Qwen",
-        "vram_gb_qlora": 16,
-        "good_for": ["support", "sales", "reasoning"],
-    },
-    {
-        "id": "allenai/OLMo-2-1124-7B-Instruct",
-        "name": "OLMo 2 7B Instruct",
-        "params_b": 7.0,
-        "license": "Apache-2.0",
-        "family": "OLMo",
-        "vram_gb_qlora": 16,
-        "good_for": ["research", "fully open stack"],
-    },
-    {
-        "id": "allenai/OLMo-2-1124-13B-Instruct",
-        "name": "OLMo 2 13B Instruct",
-        "params_b": 13.0,
-        "license": "Apache-2.0",
-        "family": "OLMo",
-        "vram_gb_qlora": 24,
-        "good_for": ["research", "fully open stack"],
-    },
-    {
-        "id": "microsoft/Phi-3-medium-4k-instruct",
-        "name": "Phi-3 Medium 14B Instruct",
-        "params_b": 14.0,
-        "license": "MIT",
-        "family": "Phi",
-        "vram_gb_qlora": 24,
-        "good_for": ["support", "education", "reasoning"],
-    },
-    {
-        "id": "microsoft/phi-4",
-        "name": "Phi-4 14B",
-        "params_b": 14.7,
-        "license": "MIT",
-        "family": "Phi",
-        "vram_gb_qlora": 24,
-        "good_for": ["education", "reasoning", "general"],
+        "best_for": "Same size class as the default; strong general 7B alternative.",
+        "train_minutes": (90, 300),
+        "recommended": False,
     },
     {
         "id": "Qwen/Qwen2.5-14B-Instruct",
@@ -135,36 +57,20 @@ MODELS: list[dict[str, Any]] = [
         "license": "Apache-2.0",
         "family": "Qwen",
         "vram_gb_qlora": 24,
-        "good_for": ["support", "sales", "multilingual"],
+        "best_for": "Stronger quality when you accept a longer, costlier GPU job.",
+        "train_minutes": (150, 420),
+        "recommended": False,
     },
     {
-        "id": "Qwen/Qwen3-14B",
-        "name": "Qwen3 14B",
-        "params_b": 14.8,
+        "id": "HuggingFaceTB/SmolLM2-1.7B-Instruct",
+        "name": "SmolLM2 1.7B Instruct",
+        "params_b": 1.7,
         "license": "Apache-2.0",
-        "family": "Qwen",
-        "vram_gb_qlora": 24,
-        "good_for": ["support", "hiring-assist", "reasoning"],
-    },
-    {
-        "id": "Qwen/Qwen2.5-32B-Instruct",
-        "name": "Qwen2.5 32B Instruct",
-        "params_b": 32.5,
-        "license": "Apache-2.0",
-        "family": "Qwen",
-        "vram_gb_qlora": 48,
-        "good_for": [],  # over 30B — excluded from public list
-        "hidden": True,
-    },
-    {
-        "id": "Qwen/Qwen3-30B-A3B",
-        "name": "Qwen3 30B-A3B (MoE, 3B active)",
-        "params_b": 30.0,
-        "license": "Apache-2.0",
-        "family": "Qwen",
-        "vram_gb_qlora": 40,
-        "good_for": ["general", "reasoning", "multilingual"],
-        "notes": "Mixture-of-experts: 30B total, ~3B active.",
+        "family": "SmolLM",
+        "vram_gb_qlora": 8,
+        "best_for": "Fast and cheap testing — too small to replace a real role.",
+        "train_minutes": (20, 120),
+        "recommended": False,
     },
 ]
 
@@ -172,14 +78,57 @@ MAX_PARAMS_B = 30.0
 ALLOWED_LICENSES = frozenset({"Apache-2.0", "MIT"})
 
 
+def _usd_band(minutes: tuple[int, int]) -> tuple[int, int]:
+    """User-facing usage = 2 × GPU dollars at the configured fallback rate.
+
+    Minutes include a conservative span (short gold → large gold, plus
+    queue/upload). Not an invoice. A billed job replaces this when it returns.
+    """
+    lo, hi = minutes
+    # 1.4× covers queue + Hub upload/download around the train loop.
+    pad = 1.4
+    raw_lo = lo * 60 * _GPU_USD_PER_SEC * _USAGE_MARKUP * pad
+    raw_hi = hi * 60 * _GPU_USD_PER_SEC * _USAGE_MARKUP * pad
+    return max(5, int(round(raw_lo / 5.0) * 5)), max(10, int(round(raw_hi / 5.0) * 5))
+
+
+def _enrich(m: dict[str, Any]) -> dict[str, Any]:
+    lo, hi = _usd_band(tuple(m.get("train_minutes") or (45, 240)))
+    out = dict(m)
+    out["train_usd_min"] = lo
+    out["train_usd_max"] = hi
+    out["recommended"] = bool(m.get("recommended")) or m["id"] == DEFAULT_MODEL_ID
+    out["best_for"] = m.get("best_for") or ""
+    return out
+
+
 def public_models() -> list[dict[str, Any]]:
-    return [
-        m
+    rows = [
+        _enrich(m)
         for m in MODELS
         if not m.get("hidden")
         and float(m["params_b"]) <= MAX_PARAMS_B
         and m["license"] in ALLOWED_LICENSES
     ]
+    rows.sort(key=lambda r: (0 if r["recommended"] else 1, r["params_b"]))
+    return rows
+
+
+def default_model() -> dict[str, Any]:
+    return get_model(DEFAULT_MODEL_ID) or public_models()[0]
+
+
+def catalog_payload() -> dict[str, Any]:
+    models = public_models()
+    rec = default_model()
+    return {
+        "max_params_b": MAX_PARAMS_B,
+        "licenses": sorted(ALLOWED_LICENSES),
+        "excluded": ["Llama (Meta Community License)", "Gemma (Gemma license)"],
+        "default_id": rec["id"],
+        "default_reason": DEFAULT_REASON,
+        "models": models,
+    }
 
 
 def get_model(model_id: str) -> dict[str, Any] | None:
@@ -191,32 +140,25 @@ def get_model(model_id: str) -> dict[str, Any] | None:
 
 
 def recommend_model(*, role_type: str = "", risk_level: str = "medium") -> dict[str, Any]:
-    """Pick a default; user can still choose any catalog model."""
-    catalog = public_models()
-    prefer_ids = {
-        "high": "Qwen/Qwen3-14B",
-        "medium": "Qwen/Qwen2.5-7B-Instruct",
-        "low": "microsoft/Phi-3.5-mini-instruct",
-    }
-    if role_type in {"caption", "copy"}:
-        want = "microsoft/Phi-3.5-mini-instruct"
-    elif role_type in {"hiring", "credit", "medical", "legal"}:
-        want = "Qwen/Qwen3-14B"
-    else:
-        want = prefer_ids.get(risk_level, "Qwen/Qwen2.5-7B-Instruct")
-    return get_model(want) or catalog[0]
+    """One default for a role-specific assistant. Catalog still offers 1.7B and 14B."""
+    del role_type, risk_level
+    return default_model()
 
 
 def format_model_menu() -> str:
+    rec = default_model()
     lines = [
-        "Apache-2.0 / MIT instruct models **up to 30B** (Llama is not listed — Meta’s license is not Apache/MIT):"
+        "Apache-2.0 / MIT instruct models **up to 30B** "
+        "(Llama is not listed — Meta’s license is not Apache/MIT):",
+        f"**Recommended default:** {rec['name']} — {DEFAULT_REASON}",
     ]
     for m in public_models():
+        tag = " **recommended**" if m.get("recommended") else ""
         lines.append(
-            f"- **{m['name']}** (`{m['id']}`) · {m['params_b']}B · {m['license']} · "
-            f"~{m['vram_gb_qlora']} GB VRAM for QLoRA"
+            f"- **{m['name']}**{tag} (`{m['id']}`) · {m['params_b']}B · {m['license']} · "
+            f"{m.get('best_for') or ''} · typical GPU job ~${m['train_usd_min']}–${m['train_usd_max']}"
         )
-    lines.append("Reply with the model name (or keep the recommended default).")
+    lines.append("Reply with the model name, or keep the recommended default.")
     return "\n".join(lines)
 
 
@@ -224,10 +166,6 @@ def resolve_user_model_choice(text: str) -> dict[str, Any] | None:
     blob = (text or "").strip().lower()
     if not blob:
         return None
-    if "phi-4" in blob or "phi4" in blob:
-        hit = get_model("microsoft/phi-4")
-        if hit:
-            return hit
     for m in public_models():
         if m["id"].lower() in blob or m["name"].lower() in blob:
             return m

@@ -598,7 +598,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
                     if "synth" in lower
                     else "Gold only — say **confirm train with synthetics** if you also want variations."
                 )
-                + " GPU is pay per run, about **$15–50**. "
+                + " GPU is pay per run — about **$10–40** for the default 7B. "
                 "When it finishes, download the trained zip from **My data**."
             )
             next_phase = "done"
@@ -608,7 +608,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
                 "Two options:\n\n"
                 "1. **Download** your gold from **My data** and train anywhere.\n"
                 "2. **Train with C7X-IO** — C7X fetches gold from this account, "
-                "runs QLoRA on pay-per-run GPU (~$15–50), then gives you a zip "
+                "runs QLoRA on pay-per-run GPU (~$10–40 for the default 7B), then gives you a zip "
                 "(adapter + tokenizer + the gold used).\n\n"
                 "Say **confirm train** to start option 2, or open **My data**."
             )
@@ -659,7 +659,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         elif asks_train:
             reply = (
                 "Download gold from **My data**, or say **confirm train** to "
-                "run C7X-IO QLoRA (~$15–50) on that same account gold."
+                "run C7X-IO QLoRA (~$10–40 for the default 7B) on that same account gold."
             )
             next_phase = "done"
             progress = 100

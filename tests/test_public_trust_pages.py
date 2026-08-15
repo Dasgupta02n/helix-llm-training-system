@@ -20,6 +20,7 @@ PUBLIC_HTML = [
     "/account",
     "/trust",
     "/status",
+    "/gold-training-data",
 ]
 
 
@@ -75,6 +76,7 @@ def test_robots_and_sitemap():
     assert "https://c7xai.in/docs" in sm.text
     assert "https://c7xai.in/account" in sm.text
     assert "https://c7xai.in/trust" in sm.text
+    assert "https://c7xai.in/gold-training-data" in sm.text
 
 
 def test_crawler_files_exist():
@@ -130,6 +132,38 @@ def test_homepage_introduces_riu_and_seo_geo():
     assert "generative" in low or "geo" in low
     assert "langsmith" in low or "labeling" in low or "rag" in low
     assert "application/ld+json" in r.text
+
+
+def test_gold_training_data_page_is_citable():
+    r = client.get("/gold-training-data")
+    assert r.status_code == 200
+    low = r.text.lower()
+    assert "gold training data" in low
+    assert "riu" in low
+    assert 'rel="canonical"' in r.text
+    assert "FAQPage" in r.text
+    assert "HowTo" in r.text
+    assert "labeling factory" in low
+    assert "hosted chat" in low
+    md = client.get("/gold-training-data.md")
+    assert md.status_code == 200
+    assert "canonical: https://c7xai.in/gold-training-data" in md.text.lower()
+    redir = client.get("/why-c7x", follow_redirects=False)
+    assert redir.status_code in {301, 307, 308}
+    banned = (
+        "langsmith",
+        "scale ai",
+        "surge ai",
+        "labelbox",
+        "unsloth",
+        "predibase",
+        "openpipe",
+        "argilla",
+        "distilabel",
+    )
+    for name in banned:
+        assert name not in low, name
+        assert name not in md.text.lower(), name
 
 
 def test_site_nav_on_inner_pages():

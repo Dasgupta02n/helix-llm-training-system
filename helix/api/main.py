@@ -287,6 +287,22 @@ def status_page(request: Request) -> HTMLResponse:
     return _public_page(request, "status.html")
 
 
+@app.get("/gold-training-data", response_class=HTMLResponse)
+def gold_training_data_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "gold_training_data.html")
+
+
+@app.get("/why-c7x")
+def why_c7x_redirect() -> RedirectResponse:
+    return RedirectResponse("/gold-training-data", status_code=301)
+
+
+@app.get("/gold-training-data.md", response_class=PlainTextResponse)
+def gold_training_data_md() -> str:
+    path = WEB_DIR / "templates" / "gold_training_data.md"
+    return path.read_text(encoding="utf-8")
+
+
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots_txt() -> str:
     return (
@@ -296,6 +312,7 @@ def robots_txt() -> str:
         "\n"
         "Sitemap: https://c7xai.in/sitemap.xml\n"
         "LLMs-Txt: https://c7xai.in/llms.txt\n"
+        "LLMs-Txt-Full: https://c7xai.in/gold-training-data.md\n"
     )
 
 
@@ -314,6 +331,8 @@ def llms_txt() -> str:
         "\n"
         "## Product\n"
         "- Home: https://c7xai.in/\n"
+        "- Gold training data studio: https://c7xai.in/gold-training-data\n"
+        "- Cite this (markdown): https://c7xai.in/gold-training-data.md\n"
         "- Docs: https://c7xai.in/docs\n"
         "- Pricing: https://c7xai.in/pricing (~$0.75–$1 per gold row with sources)\n"
         "- Account: https://c7xai.in/account\n"
@@ -329,10 +348,11 @@ def llms_txt() -> str:
         "- Contact: https://c7xai.in/contact\n"
         "\n"
         "## Facts\n"
-        "- Not a general chatbot or hosted 30B model\n"
+        "- Not a general chatbot, hosted 30B model, or labeling factory\n"
+        "- Starts at the interview: Riu collects role, one gold example, edge cases\n"
+        "- Gold and synthetics stored apart; user owns exports and any QLoRA zip\n"
         "- No checkout; no card data collected\n"
         "- Early beta; no SOC 2 / ISO claim\n"
-        "- Users own exported gold and QLoRA adapter zips\n"
     )
 
 
@@ -367,9 +387,11 @@ def security_txt() -> str:
 
 @app.get("/sitemap.xml")
 def sitemap_xml() -> Response:
-    today = "2026-08-15"  # public-page lastmod for crawlers
+    today = "2026-08-16"  # public-page lastmod for crawlers
     paths = [
         ("/", "daily", "1.0"),
+        ("/gold-training-data", "weekly", "0.95"),
+        ("/gold-training-data.md", "weekly", "0.7"),
         ("/docs", "weekly", "0.9"),
         ("/pricing", "weekly", "0.8"),
         ("/account", "weekly", "0.8"),

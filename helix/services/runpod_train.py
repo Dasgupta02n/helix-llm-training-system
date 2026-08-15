@@ -51,6 +51,9 @@ def train_ready() -> bool:
 
 def compute_policy() -> dict[str, Any]:
     ready = train_ready()
+    from helix.services.base_models import default_model
+
+    rec = default_model()
     return {
         "backend": "pay_per_run",
         "label": "Pay-per-run GPU (pay per train job)",
@@ -60,8 +63,9 @@ def compute_policy() -> dict[str, Any]:
         "gpu_configured": runpod_configured(),
         "storage_token_set": hf_token_configured(),
         "train_ready": ready,
-        "estimated_usd_min": 15,
-        "estimated_usd_max": 50,
+        "estimated_usd_min": rec["train_usd_min"],
+        "estimated_usd_max": rec["train_usd_max"],
+        "default_model_id": rec["id"],
         "note": (
             "C7X always uses pay-per-run GPU. Do not leave an always-on "
             "machine running — idle machines bill until you stop them. "

@@ -515,6 +515,26 @@ async function snapshotPool() {
   }
 }
 
+function _modelById(models, id) {
+  return (models || []).find((m) => m.id === id) || null;
+}
+
+function renderDoubleHelixModelHint(data) {
+  const sel = $("doubleHelixModel");
+  const hint = $("doubleHelixModelHint");
+  const cost = $("doubleHelixCostLabel");
+  if (!sel) return;
+  const picked = _modelById(data.models, sel.value) || _modelById(data.models, data.default_id);
+  if (!picked) return;
+  const band = `~$${picked.train_usd_min}–$${picked.train_usd_max}`;
+  if (cost) cost.textContent = `${band} for ${picked.name}`;
+  if (!hint) return;
+  const why = picked.recommended
+    ? `Recommended default — ${data.default_reason || picked.best_for || ""}`
+    : picked.best_for || "";
+  hint.textContent = `${why} Typical pay-per-job usage ${band} (2× billed GPU; not an invoice).`.trim();
+}
+
 async function loadDoubleHelixModels() {
   const sel = $("doubleHelixModel");
   if (!sel || !state.tenantSlug) return;
@@ -522,12 +542,27 @@ async function loadDoubleHelixModels() {
     const data = await api(`/api/t/${state.tenantSlug}/library/double-helix/models`);
     const cur = sel.value;
     sel.innerHTML = (data.models || [])
-      .map(
-        (m) =>
-          `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)} · ${m.params_b}B · ${escapeHtml(m.license)}</option>`
-      )
+      .map((m) => {
+        const rec = m.recommended ? " — recommended" : "";
+        const best = m.best_for ? ` — ${m.best_for}` : "";
+        return `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)} · ${m.params_b}B · ${escapeHtml(m.license)}${escapeHtml(rec)}${escapeHtml(best)}</option>`;
+      })
       .join("");
+    const prefer = data.default_id || "";
     if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
+    else if (prefer && [...sel.options].some((o) => o.value === prefer)) sel.value = prefer;
+    sel.dataset.catalog = JSON.stringify(data);
+    if (!sel.dataset.boundChange) {
+      sel.dataset.boundChange = "1";
+      sel.addEventListener("change", () => {
+        try {
+          renderDoubleHelixModelHint(JSON.parse(sel.dataset.catalog || "{}"));
+        } catch (_) {
+          /* ignore */
+        }
+      });
+    }
+    renderDoubleHelixModelHint(data);
   } catch (_) {
     /* ignore */
   }

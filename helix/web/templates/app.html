@@ -358,6 +358,7 @@
             <label for="doubleHelixModel">Base model (Apache-2.0 / MIT, ≤30B)</label>
             <select id="doubleHelixModel"></select>
           </div>
+          <p class="hint" id="doubleHelixModelHint"></p>
           <p class="hint">GPU is <strong>pay per job</strong> (idle when unused). C7X never leaves a machine running.</p>
           <div class="flex" style="gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
             <button class="btn btn-secondary btn-sm" id="doubleHelixZipBtn" type="button">1. Download my gold (zip)</button>
@@ -365,7 +366,7 @@
           </div>
           <label class="flex" style="align-items:center;gap:.5rem;font-weight:500;margin-top:10px">
             <input id="doubleHelixTrainConfirm" type="checkbox" style="width:auto;min-height:auto;margin:0" />
-            Start a paid GPU job (~$15–50). C7X will fetch gold from this account — I will not re-upload.
+            Start a paid GPU job (<span id="doubleHelixCostLabel">see estimate below</span>). C7X will fetch gold from this account — I will not re-upload.
           </label>
           <label class="flex" style="align-items:center;gap:.5rem;font-weight:500;margin-top:8px">
             <input id="doubleHelixIncludeSynth" type="checkbox" style="width:auto;min-height:auto;margin:0" />
