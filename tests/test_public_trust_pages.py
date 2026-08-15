@@ -118,3 +118,34 @@ def test_app_login_has_legal_links():
     assert r.status_code == 200
     assert 'href="/privacy"' in r.text
     assert 'href="/terms"' in r.text
+
+
+_VENDOR_NAMES = (
+    "apify",
+    "runpod",
+    "openrouter",
+    "hugging face",
+    "huggingface",
+    "hostinger",
+    "resend",
+)
+
+
+def test_public_and_app_html_hide_vendor_names():
+    from helix.services.pipeline_modes import MODE_META
+    from helix.services.runpod_train import compute_policy
+
+    for path in PUBLIC_HTML + ["/app"]:
+        r = client.get(path)
+        assert r.status_code == 200, path
+        low = r.text.lower()
+        for name in _VENDOR_NAMES:
+            assert name not in low, f"{path} still mentions {name}"
+    for mode in MODE_META.values():
+        blob = " ".join(str(mode.get(k) or "") for k in ("description", "label", "short", "cost")).lower()
+        for name in _VENDOR_NAMES:
+            assert name not in blob, f"MODE_META still mentions {name}"
+    policy = compute_policy()
+    blob = f"{policy.get('label')} {policy.get('note')}".lower()
+    for name in _VENDOR_NAMES:
+        assert name not in blob, f"compute_policy still mentions {name}"

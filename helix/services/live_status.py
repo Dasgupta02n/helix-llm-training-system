@@ -67,6 +67,7 @@ _VENDOR_SUBS = (
     (re.compile(r"\bHugging\s*Face\b", re.I), "model storage"),
     (re.compile(r"\bHuggingFace\b", re.I), "model storage"),
     (re.compile(r"\bHostinger\b", re.I), "the server"),
+    (re.compile(r"\bResend\b", re.I), "email"),
     (re.compile(r"\bHF Hub\b", re.I), "model storage"),
     (re.compile(r"\bOR \$", re.I), "model $"),
 )

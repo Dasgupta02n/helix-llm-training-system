@@ -66,7 +66,7 @@ def run_actor(
             json=run_input,
         )
         if resp.status_code >= 400:
-            raise RuntimeError(f"Apify run failed ({resp.status_code}): {resp.text[:500]}")
+            raise RuntimeError(f"Gather run failed ({resp.status_code}): {resp.text[:500]}")
         data = resp.json()
         # API wraps as { data: { ...run } }
         run = data.get("data") or data
@@ -75,13 +75,13 @@ def run_actor(
             return run
         if status in {"FAILED", "TIMED-OUT", "ABORTED", "TIMED_OUT"}:
             raise RuntimeError(
-                f"Apify actor {actor_id} ended with status={status}: "
+                f"Gather job ended with status={status}: "
                 f"{run.get('statusMessage') or ''}"
             )
         # Still running / ready — wait for finish
         run_id = run.get("id")
         if not run_id:
-            raise RuntimeError(f"Apify actor {actor_id} returned no run id (status={status})")
+            raise RuntimeError(f"Gather job returned no run id (status={status})")
         return wait_for_run(run_id, timeout_secs=timeout)
 
 
@@ -96,12 +96,12 @@ def wait_for_run(run_id: str, timeout_secs: int = 120) -> dict[str, Any]:
             headers=_headers(),
         )
         if resp.status_code >= 400:
-            raise RuntimeError(f"Apify wait failed: {resp.text[:400]}")
+            raise RuntimeError(f"Gather wait failed: {resp.text[:400]}")
         data = resp.json()
         run = data.get("data") or data
         if run.get("status") != "SUCCEEDED":
             raise RuntimeError(
-                f"Apify run {run_id} status={run.get('status')}: {run.get('statusMessage')}"
+                f"Gather run {run_id} status={run.get('status')}: {run.get('statusMessage')}"
             )
         return run
 
@@ -117,7 +117,7 @@ def fetch_dataset_items(dataset_id: str, limit: int = 50) -> list[dict[str, Any]
             headers=_headers(),
         )
         if resp.status_code >= 400:
-            raise RuntimeError(f"Apify dataset fetch failed: {resp.text[:400]}")
+            raise RuntimeError(f"Gather dataset fetch failed: {resp.text[:400]}")
         data = resp.json()
         if isinstance(data, list):
             return data

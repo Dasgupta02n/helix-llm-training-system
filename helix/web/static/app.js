@@ -195,12 +195,29 @@ async function api(path, opts = {}) {
   return data;
 }
 
+function stripVendorNames(s) {
+  return String(s || "")
+    .replace(/\(Apify\/code\)/gi, "")
+    .replace(/Apify\/code/gi, "the gather step")
+    .replace(/\bOpenRouter\b/gi, "the model")
+    .replace(/\bApify\b/gi, "gather")
+    .replace(/\bRunPod\b/gi, "training")
+    .replace(/\bHugging\s*Face\b/gi, "model storage")
+    .replace(/\bHuggingFace\b/gi, "model storage")
+    .replace(/\bHostinger\b/gi, "the server")
+    .replace(/\bResend\b/gi, "email")
+    .replace(/\bHF Hub\b/gi, "model storage")
+    .replace(/\bOR \$/gi, "model $")
+    .replace(/ {2,}/g, " ")
+    .trim();
+}
+
 function friendlyError(msg) {
-  const m = String(msg || "");
+  const m = stripVendorNames(msg);
   if (/not authenticated|invalid token|401/i.test(m)) return "Please sign in again.";
   if (/budget/i.test(m)) return "This workspace has used its monthly budget.";
   if (/No LLM key|OPENROUTER/i.test(m))
-    return "AI helpers need an OpenRouter key set up on the server.";
+    return "AI helpers need a model key set up on the server.";
   if (/already exists/i.test(m)) return "That name is already in use. Try another.";
   return m;
 }
@@ -331,7 +348,7 @@ function showDevLink(link) {
   if (!link) return;
   const box = $("devLinkBox");
   box.classList.remove("hidden");
-  box.innerHTML = `Email was not sent (no Resend key). <strong>Dev link:</strong><br><a href="${escapeHtml(link)}">${escapeHtml(link)}</a>`;
+  box.innerHTML = `Email was not sent (mail is not configured). <strong>Dev link:</strong><br><a href="${escapeHtml(link)}">${escapeHtml(link)}</a>`;
 }
 
 function setAuthMode(mode) {
@@ -949,7 +966,7 @@ async function loadJobs() {
         const ok = window.confirm(
           "This job is over the $35-per-1,000-gold spend trajectory.\n\n" +
             "Continue remaining batches anyway?\n" +
-            "You will be charged for further OpenRouter + Apify usage."
+            "You will be charged for further model + gather usage."
         );
         if (!ok) {
           toast("Still paused — no further spend until you continue or cancel");
@@ -1418,7 +1435,7 @@ async function refreshDashboard() {
     <div class="stat-card tone-ok">
       <div class="label">Usage this month (all-in)</div>
       <div class="value">$${Number(spent).toFixed(2)}</div>
-      <div class="sub">OpenRouter $${Number(orSpent).toFixed(2)} · Apify $${Number(apSpent).toFixed(2)} · budget $${Number(limit).toFixed(0)}</div>
+      <div class="sub">model $${Number(orSpent).toFixed(2)} · gather $${Number(apSpent).toFixed(2)} · budget $${Number(limit).toFixed(0)}</div>
     </div>
   `;
 

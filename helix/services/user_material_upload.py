@@ -417,7 +417,7 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
         "first_job_units": first_job_units,
         "summary_lines": [
             f"Helix rate: **${GOLD_COST_CAP_USD_PER_1000:.0f} per 1,000 gold** "
-            f"all-in (OpenRouter + Apify). "
+            f"all-in (model + gather). "
             f"**{gold_target:,}** gold ≈ **${target_mining_usd:,.2f}** if we can "
             f"actually produce it — not a lower guessed range.",
             f"First job: **{first_job_units}** units, spend cap **${first_job_cap:.2f}** "

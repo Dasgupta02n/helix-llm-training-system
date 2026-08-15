@@ -205,6 +205,6 @@ def send_password_link(
     result = send_set_password_email(db, user.email, user.full_name, link)
     return {
         "ok": True,
-        "message": "Password setup email sent." if result.get("ok") else "Email skipped (no Resend key).",
+        "message": "Password setup email sent." if result.get("ok") else "Email skipped (mail is not configured).",
         "dev_link": link if (result.get("skipped") and not settings.is_production) else None,
     }

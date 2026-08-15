@@ -87,7 +87,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--base",
         default=default_base,
-        help="Hugging Face id of the Apache/MIT base model",
+        help="Base model id of the Apache/MIT instruct model",
     )
     parser.add_argument("--prompt", default="", help="Optional one-shot generation")
     parser.add_argument("--max-new-tokens", type=int, default=256)

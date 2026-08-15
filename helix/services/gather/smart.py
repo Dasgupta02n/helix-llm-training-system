@@ -246,7 +246,7 @@ def gather_search(
     if not force_refresh and _recent_search_dup(db, tenant_id, source, search_q):
         job.status = "cached"
         job.from_cache = True
-        job.error = "Skipped Apify — same query within dedupe window"
+        job.error = "Skipped gather — same query within dedupe window"
         job.finished_at = _now()
         # Return existing gather items for this query if any
         existing = (
@@ -289,7 +289,7 @@ def gather_search(
             job.error = "APIFY_API_KEY not configured"
             job.finished_at = _now()
             db.commit()
-            raise RuntimeError("APIFY_API_KEY not configured — gathering requires Apify")
+            raise RuntimeError("Gathering is not configured on this server.")
         try:
             pages = 2 if deep else 1
             raw_items, meta = apify_client.search_web(

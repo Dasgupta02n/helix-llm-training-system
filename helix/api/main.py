@@ -35,7 +35,7 @@ app = FastAPI(
     title="Helix",
     description=(
         "Multi-tenant gold-data mining for LLM training — "
-        "user-owned gold/synthetic libraries, synthesis, Resend auth, OpenRouter."
+        "user-owned gold/synthetic libraries, synthesis, email auth, and mining jobs."
     ),
     version=__version__,
     docs_url="/api/docs" if _settings.docs_enabled else None,
@@ -191,7 +191,7 @@ def health() -> dict:
     else:
         payload["services"] = {
             "llm": s.llm_provider != "none",
-            "apify": s.apify_configured,
+            "gather": s.apify_configured,
         }
     return payload
 

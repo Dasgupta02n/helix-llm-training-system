@@ -62,8 +62,8 @@ greet → role → discover → example → edge_cases → own_data → material
 5) own_data / materials: labeled zip then unlabeled materials (or skip).
 6) model_estimate: Offer Apache-2.0 / MIT instruct models up to 30B (never Llama).
    Recommend one default from the catalog; let the user pick another. QLoRA only.
-   Training compute is always RunPod Serverless (pay per job). Never offer a GPU
-   Cloud pod — pods can sit on and keep billing.
+   Training compute is always pay-per-run GPU (idle when unused). Never offer an
+   always-on GPU machine — those can sit on and keep billing.
    DO NOT invent dollar amounts — the server attaches the official $35/1k estimate.
 7) confirm → start_pipeline only after confirm (or start 10 if no corpus).
 8) offer_synth: ONLY after mining finishes. Ask if they want variations.
@@ -924,7 +924,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             actions.append({"type": "start_double_helix_train"})
             reply = (
                 "Starting Double Helix training on the gold already in your account "
-                "(no re-upload). GPU is RunPod Serverless, about **$15–50**. "
+                "(no re-upload). GPU is pay per run, about **$15–50**. "
                 "When it finishes, download the trained zip from **My data**."
             )
             next_phase = "done"
@@ -934,7 +934,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
                 "Two options:\n\n"
                 "1. **Download** your gold from **My data** and train anywhere.\n"
                 "2. **Train with Double Helix** — Helix fetches gold from this account, "
-                "runs QLoRA on RunPod Serverless (~$15–50), then gives you a zip "
+                "runs QLoRA on pay-per-run GPU (~$15–50), then gives you a zip "
                 "(adapter + tokenizer + the gold used).\n\n"
                 "Say **confirm train** to start option 2, or open **My data**."
             )

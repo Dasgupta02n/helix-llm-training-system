@@ -52,4 +52,4 @@ def test_train_backend_is_serverless_never_pod():
         assert_serverless_only("pod")
         assert False, "pods must be rejected"
     except ValueError as e:
-        assert "serverless" in str(e).lower()
+        assert "pay-per-run" in str(e).lower() or "always-on" in str(e).lower()

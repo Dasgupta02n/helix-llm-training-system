@@ -88,6 +88,7 @@ def test_public_activity_strips_vendor_names():
     )
     assert "Hugging" not in public_activity_text("Uploading to Hugging Face…")
     assert "Hostinger" not in public_activity_text("Deploying on Hostinger")
+    assert "Resend" not in public_activity_text("Email skipped (no Resend key).")
 
 
 def test_train_activity_appended():

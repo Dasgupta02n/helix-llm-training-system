@@ -16,8 +16,8 @@ from helix.services.role_risk import RECOMMENDED_TRAINING
 
 LICENSE_NOTE = """This package is built for a base model licensed Apache-2.0 or MIT.
 
-Helix does not redistribute base weights. Download the model from Hugging Face
-under that model's card license. You are responsible for complying with it.
+Helix does not redistribute base weights. Download the model from its official
+card under that model's license. You are responsible for complying with it.
 
 Llama / Gemma / other non-Apache-non-MIT bases are not offered in Double Helix.
 """
@@ -49,17 +49,16 @@ QLoRA VRAM hint: ~{model['vram_gb_qlora']} GB
 - USAGE_AND_LIABILITY.txt
 
 ## Ollama (local)
-1. Pull the base from Hugging Face under its Apache/MIT card.
+1. Pull the base from its official Apache/MIT model card.
 2. After you train a QLoRA adapter, convert/export per your trainer.
 3. `ollama create helix-custom -f Modelfile` then `ollama run helix-custom`
 
 ## vLLM
 Serve the merged or adapter-backed model you trained.
 
-## RunPod (Serverless only)
-Helix/Riu always trains on **RunPod Serverless** (min workers = 0, pay per job).
-GPU Cloud pods are never used — they stay billed if left running.
-Set RUNPOD_API_KEY + RUNPOD_SERVERLESS_ENDPOINT_ID on the server.
+## Pay-per-run GPU
+Helix/Riu always trains on **pay-per-run GPU** (idle when unused).
+Always-on machines are never used — they stay billed if left running.
 """
 
 

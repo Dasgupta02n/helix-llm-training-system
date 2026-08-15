@@ -202,13 +202,12 @@ def create_train_job(
 ) -> m.DoubleHelixTrainJob:
     if not confirm:
         raise ValueError(
-            "Training starts a paid RunPod Serverless GPU job (~$15–50). "
+            "Training starts a paid GPU job (~$15–50). "
             "Send confirm=true after you accept that."
         )
     if not train_ready():
         raise ValueError(
-            "Double Helix train is not ready on this server "
-            "(needs RUNPOD_API_KEY, RUNPOD_SERVERLESS_ENDPOINT_ID, and HF_TOKEN)."
+            "Double Helix train is not ready on this server."
         )
     existing = (
         db.query(m.DoubleHelixTrainJob)
@@ -453,7 +452,7 @@ model = AutoModelForCausalLM.from_pretrained(base, device_map="auto")
 model = PeftModel.from_pretrained(model, "qlora")
 ```
 
-Private Hugging Face copies (your token):
+Private storage copies:
 - dataset: {job.hf_dataset_repo or "—"}
 - adapter: {job.hf_model_repo or "—"}
 """

@@ -44,7 +44,7 @@
   </p>
   <h3>Mining</h3>
   <p>
-    Jobs gather evidence (web search via Apify when configured), score relevance by domain, and promote
+    Jobs gather evidence (web search when configured), score relevance by domain, and promote
     candidates. Quality modes trade helper depth vs cost. Jobs continue after logout. Combined spend is
     capped at about <strong>$35 per 1,000 gold</strong> (scaled to job size); jobs pause for consent if
     trajectory would exceed the cap.
@@ -76,7 +76,7 @@
   <h3>Export</h3>
   <p>
     Download gold/synthetic sets and train anywhere. Or start <strong>Double Helix</strong>:
-    Helix fetches gold from your account, trains QLoRA on RunPod Serverless, then
+    Helix fetches gold from your account, trains QLoRA on pay-per-run GPU, then
     gives you a zip of the adapter, tokenizer, gold used, and <code>load_adapter.py</code>
     (not a full merged 30B dump). Downloading the trained zip requires accepting an
     ownership/liability declaration; a copy is emailed and kept even if you delete the account.
@@ -93,8 +93,8 @@
 
   <h2>Architecture (short)</h2>
   <ul>
-    <li><strong>Gather</strong> — Apify (or your corpus), never invented by the LLM.</li>
-    <li><strong>Judge / synthesize</strong> — configured LLM (e.g. OpenRouter) with hard quality gates.</li>
+    <li><strong>Gather</strong> — web search or your corpus, never invented by the LLM.</li>
+    <li><strong>Judge / synthesize</strong> — configured language model with hard quality gates.</li>
     <li><strong>Store</strong> — multi-tenant Postgres-backed libraries and job state.</li>
   </ul>
 

@@ -52,10 +52,10 @@ def hf_whoami(token: str) -> dict[str, Any]:
             data = json.loads(resp.read().decode("utf-8", errors="replace"))
     except urllib.error.HTTPError as e:
         body = e.read().decode("utf-8", errors="replace")[:300]
-        raise ValueError(f"Hugging Face login failed ({e.code}). Check that HF_TOKEN is valid.") from e
+        raise ValueError(f"Model storage login failed ({e.code}). Check that the storage token is valid.") from e
     name = (data.get("name") or data.get("fullname") or "").strip()
     if not name:
-        raise ValueError("Hugging Face token has no username (whoami returned empty).")
+        raise ValueError("Model storage token has no username.")
     data["name"] = name
     return data
 
@@ -86,8 +86,8 @@ def create_private_repo(token: str, *, name: str, repo_type: str) -> str:
         if e.code in {409, 400} and "already" in err.lower():
             return f"{owner}/{name}"
         raise ValueError(
-            f"Could not create Hugging Face {repo_type} `{owner}/{name}` ({e.code}). "
-            "The token needs write access."
+            f"Could not create private {repo_type} `{owner}/{name}` ({e.code}). "
+            "The storage token needs write access."
         ) from e
     repo_id = payload.get("name") or payload.get("id") or f"{owner}/{name}"
     if "/" not in str(repo_id):
@@ -152,7 +152,7 @@ def upload_text_files(
     except urllib.error.HTTPError as e:
         err = e.read().decode("utf-8", errors="replace")[:500]
         raise ValueError(
-            f"Hugging Face upload to `{repo_id}` failed ({e.code}). {err}"
+            f"Model storage upload to `{repo_id}` failed ({e.code}). {err}"
         ) from e
 
 
@@ -193,7 +193,7 @@ def download_repo_files(
     if wanted:
         paths = [p for p in paths if Path(p).name.lower() in wanted]
     if not paths:
-        raise ValueError(f"No matching files in Hugging Face repo `{repo_id}`.")
+        raise ValueError(f"No matching files in the trained-model repo `{repo_id}`.")
     prefix = "datasets/" if repo_type == "dataset" else ""
     for rel in paths:
         url = f"https://huggingface.co/{prefix}{repo_id}/resolve/main/{rel}"

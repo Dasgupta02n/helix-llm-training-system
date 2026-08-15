@@ -19,13 +19,13 @@
       <ul>
         <li>Workspace + research plan (any domain)</li>
         <li>Riu setup (labeled gold zip + unlabeled materials)</li>
-        <li>Mining jobs (Apify gather + quality gates)</li>
+        <li>Mining jobs (web gather + quality gates)</li>
         <li>Gold library, synthesis, exports</li>
         <li>Jobs that keep running after sign-out</li>
         <li>Spend-cap pause at ~$35 / 1,000 gold trajectory</li>
       </ul>
       <p class="hint">
-        Provider usage (OpenRouter + Apify) is metered in-app. Heavy use may be throttled so the beta stays stable.
+        Model and gather usage is metered in-app. Heavy use may be throttled so the beta stays stable.
       </p>
       <a class="btn btn-primary" href="/app">Open studio</a>
     </div>
@@ -46,10 +46,10 @@
 
   <h2>How we design cost (so you can audit us)</h2>
   <ul>
-    <li><strong>Mining target:</strong> about <strong>$35 all-in per 1,000 gold examples</strong> (OpenRouter + Apify combined).</li>
+    <li><strong>Mining target:</strong> about <strong>$35 all-in per 1,000 gold examples</strong> (model + gather combined).</li>
     <li><strong>Jobs:</strong> auto-pause if spend trajectory would exceed that ratio; you must confirm to continue past the cap.</li>
-    <li><strong>In-app meter:</strong> OpenRouter and Apify shown separately, using provider-billed amounts when available.</li>
-    <li><strong>Double Helix v1 (not charged by Helix):</strong> QLoRA on an Apache-2.0 or MIT instruct model you choose (up to 30B). GPU is <strong>RunPod Serverless only</strong> (pay per train; Helix never starts a pod). You can download your gold and train anywhere, or confirm a train here — Helix fetches gold from your account and then gives you a zip of the adapter + tokenizer. Designed around <strong>$15–50</strong> per train job.</li>
+    <li><strong>In-app meter:</strong> model and gather shown separately, using billed amounts when available.</li>
+    <li><strong>Double Helix v1 (not charged by Helix):</strong> QLoRA on an Apache-2.0 or MIT instruct model you choose (up to 30B). GPU is <strong>pay per train</strong> (idle when unused; Helix never leaves a machine running). You can download your gold and train anywhere, or confirm a train here — Helix fetches gold from your account and then gives you a zip of the adapter + tokenizer. Designed around <strong>$15–50</strong> per train job.</li>
   </ul>
 
   <h2>What you’re paying for (when paid plans land)</h2>

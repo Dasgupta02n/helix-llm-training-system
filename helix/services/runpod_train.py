@@ -20,8 +20,8 @@ def assert_serverless_only(backend: str | None = None) -> None:
     b = (backend or COMPUTE_BACKEND).strip().lower()
     if b in FORBIDDEN_BACKENDS or b != COMPUTE_BACKEND:
         raise ValueError(
-            "Double Helix trains only on RunPod Serverless. "
-            "GPU Cloud pods are not used (they can sit on and bill)."
+            "Double Helix trains only on pay-per-run GPU. "
+            "Always-on machines are not used (they can sit on and bill)."
         )
 
 
@@ -52,21 +52,21 @@ def train_ready() -> bool:
 def compute_policy() -> dict[str, Any]:
     ready = train_ready()
     return {
-        "backend": COMPUTE_BACKEND,
-        "label": "RunPod Serverless (pay per train job)",
+        "backend": "pay_per_run",
+        "label": "Pay-per-run GPU (pay per train job)",
         "min_workers": 0,
         "idle_charge": False,
         "forbidden": sorted(FORBIDDEN_BACKENDS),
-        "runpod_configured": runpod_configured(),
-        "hf_token_set": hf_token_configured(),
+        "gpu_configured": runpod_configured(),
+        "storage_token_set": hf_token_configured(),
         "train_ready": ready,
         "estimated_usd_min": 15,
         "estimated_usd_max": 50,
         "note": (
-            "Helix always selects Serverless. Do not create a GPU Cloud pod "
-            "in the RunPod console — idle pods bill until you stop them. "
-            "A Serverless endpoint with min workers = 0 costs nothing until "
-            "Riu submits a QLoRA job."
+            "Helix always uses pay-per-run GPU. Do not leave an always-on "
+            "machine running — idle machines bill until you stop them. "
+            "A job that idles at zero workers costs nothing until "
+            "Riu submits a QLoRA train."
         ),
     }
 
@@ -153,30 +153,29 @@ def submit_qlora_job(
         return {
             "ok": False,
             "backend": COMPUTE_BACKEND,
-            "error": "RUNPOD_API_KEY is not set on the server.",
+            "error": "Training credentials are not set on the server.",
         }
     if not endpoint:
         return {
             "ok": False,
             "backend": COMPUTE_BACKEND,
             "error": (
-                "RUNPOD_SERVERLESS_ENDPOINT_ID is not set. Create one Serverless "
-                "fine-tune endpoint with min workers = 0 (do not use a Pod) and "
-                "put its ID in Hostinger env."
+                "The training endpoint is not set. Configure pay-per-run GPU "
+                "(idle when unused) on the server."
             ),
         }
     if not token:
         return {
             "ok": False,
             "backend": COMPUTE_BACKEND,
-            "error": "HF_TOKEN is not set on the server.",
+            "error": "Model-storage credentials are not set on the server.",
         }
     repo = (dataset_repo or dataset_uri or "").strip()
     if not repo:
         return {
             "ok": False,
             "backend": COMPUTE_BACKEND,
-            "error": "dataset_repo is required (Hugging Face dataset of account gold).",
+            "error": "dataset_repo is required (exported gold from this account).",
         }
 
     import json
@@ -230,7 +229,7 @@ def poll_qlora_job(runpod_job_id: str) -> dict[str, Any]:
 
     key, endpoint, _hf = _settings_tuple()
     if not key or not endpoint or not (runpod_job_id or "").strip():
-        return {"ok": False, "error": "RunPod is not configured or job id is missing."}
+        return {"ok": False, "error": "Training is not configured or job id is missing."}
     url = RUNPOD_SERVERLESS_STATUS.format(
         endpoint_id=endpoint, job_id=runpod_job_id.strip()
     )

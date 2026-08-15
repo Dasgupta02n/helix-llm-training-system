@@ -488,7 +488,7 @@ def write_discovery_candidate(
     if not url and not gather_item_id:
         return {
             "ok": False,
-            "error": "Candidates must come from Apify gather results (url or gather_item_id required)",
+            "error": "Candidates must come from gather results (url or gather_item_id required)",
         }
     # Dedupe by URL
     if url:
@@ -564,7 +564,7 @@ def collect_full_evidence(ctx: ToolContext, candidate_id: str = "", **_: Any) ->
     if not row.url:
         return {
             "ok": False,
-            "error": "Candidate has no URL from Apify gather — cannot invent evidence",
+            "error": "Candidate has no URL from gather — cannot invent evidence",
             "complete": False,
         }
     gitem = (
@@ -585,7 +585,7 @@ def collect_full_evidence(ctx: ToolContext, candidate_id: str = "", **_: Any) ->
             "ok": False,
             "error": str(e),
             "complete": False,
-            "message": "Apify evidence fetch failed. Do NOT invent content.",
+            "message": "Evidence fetch failed. Do NOT invent content.",
         }
     content = out.get("content") or {}
     # fill identity from candidate if page lacks it
@@ -599,7 +599,7 @@ def collect_full_evidence(ctx: ToolContext, candidate_id: str = "", **_: Any) ->
         "complete": complete,
         "gatherer": out.get("gatherer"),
         "from_cache": out.get("from_cache", False),
-        "note": "Evidence from Apify/cache only.",
+        "note": "Evidence from gather/cache only.",
     }
 
 
@@ -2107,8 +2107,8 @@ def _budget_dict(tenant: m.Tenant | None) -> dict:
         "apify_usd": b["apify_usd"],
         "gold_cap_per_1000_usd": GOLD_COST_CAP_USD_PER_1000,
         # Friendly labels for UI
-        "openrouter_label": "OpenRouter (LLM)",
-        "apify_label": "Apify (gather)",
+        "openrouter_label": "model",
+        "apify_label": "gather",
     }
 
 
