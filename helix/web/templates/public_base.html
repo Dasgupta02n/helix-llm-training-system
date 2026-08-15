@@ -5,10 +5,56 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}Helix{% endblock %} — Training Data Studio</title>
   <meta name="description" content="{% block meta_description %}Helix is a no-code gold training-data studio for product and ops teams: plan in plain English, mine evidence, quality-gate gold examples, synthesize variants, and export fine-tune-ready datasets.{% endblock %}" />
+  <meta name="robots" content="index,follow,max-image-preview:large" />
+  <meta name="author" content="Sabyasachi Dasgupta, c7x AI" />
+  <meta name="publisher" content="c7x AI" />
   <meta name="theme-color" content="#100e11" />
   <link rel="canonical" href="{% block canonical %}https://c7xai.in/{% endblock %}" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="/static/favicon.svg" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Helix" />
+  <meta property="og:locale" content="en_US" />
+  <meta property="og:title" content="{{ self.title() }} — Training Data Studio" />
+  <meta property="og:description" content="{{ self.meta_description() }}" />
+  <meta property="og:url" content="{{ self.canonical() }}" />
+  <meta property="og:image" content="https://c7xai.in/static/site/hero.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="{{ self.title() }} — Training Data Studio" />
+  <meta name="twitter:description" content="{{ self.meta_description() }}" />
+  <meta name="twitter:image" content="https://c7xai.in/static/site/hero.jpg" />
   <link rel="stylesheet" href="/static/app.css?v={{ static_v }}" />
   <link rel="stylesheet" href="/static/site.css?v={{ static_v }}" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "c7x AI",
+    "alternateName": "Helix",
+    "url": "https://c7xai.in/",
+    "email": "dasgupta.02n@gmail.com",
+    "founder": { "@type": "Person", "name": "Sabyasachi Dasgupta" },
+    "logo": "https://c7xai.in/static/favicon.svg",
+    "sameAs": ["https://c7xai.in/about", "https://c7xai.in/contact"],
+    "contactPoint": {
+      "@type": "ContactPoint",
+      "email": "dasgupta.02n@gmail.com",
+      "contactType": "customer support"
+    }
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    "name": "Helix",
+    "url": "https://c7xai.in/",
+    "description": "Gold training-data studio for fine-tunes and evals.",
+    "publisher": { "@type": "Organization", "name": "c7x AI" },
+    "inLanguage": "en"
+  }
+  </script>
+  {% block extra_head %}{% endblock %}
 </head>
 <body class="site-body">
   <div class="landing-shell">
@@ -26,7 +72,8 @@
         <a href="/#riu">Riu</a>
         <a href="/docs">Docs</a>
         <a href="/pricing">Pricing</a>
-        <a href="/about">About</a>
+        <a href="/account">Account</a>
+        <a href="/trust">Trust</a>
         <a class="btn btn-primary btn-sm" href="/app">Talk to Riu</a>
       </nav>
     </header>
@@ -49,20 +96,30 @@
           <a href="/#seo-geo">SEO / GEO</a>
           <a href="/docs">Docs</a>
           <a href="/pricing">Pricing</a>
+          <a href="/account">Account</a>
           <a href="/app">Studio</a>
         </div>
         <div>
           <div class="site-footer-label">Company</div>
           <a href="/about">About</a>
           <a href="/contact">Contact</a>
+          <a href="/trust">Trust</a>
           <a href="/security">Security</a>
+          <a href="/status">Status</a>
         </div>
         <div>
           <div class="site-footer-label">Legal</div>
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
+          <a href="/llms.txt">llms.txt</a>
           <a href="mailto:dasgupta.02n@gmail.com">dasgupta.02n@gmail.com</a>
         </div>
+      </div>
+      <div class="site-trustbar" aria-label="Trust signals">
+        <span>HTTPS at the public edge</span>
+        <span>Named operator on every page</span>
+        <span>No card data collected</span>
+        <span>Workspace data stays in your account</span>
       </div>
       <div class="site-footer-bottom">
         <span>© 2026 c7x AI · Operated by Sabyasachi Dasgupta · c7xai.in</span>

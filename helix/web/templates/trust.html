@@ -1,0 +1,73 @@
+{% extends "public_base.html" %}
+{% block title %}Trust{% endblock %}
+{% block canonical %}https://c7xai.in/trust{% endblock %}
+{% block meta_description %}Helix trust center — who operates c7xai.in, how we handle data, security practices, legal pages, and how to report a problem. Honest beta claims only.{% endblock %}
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "Helix trust center",
+  "url": "https://c7xai.in/trust",
+  "about": "Security, privacy, operator identity, and legal pages for Helix."
+}
+</script>
+{% endblock %}
+{% block content %}
+<article class="legal-doc">
+  <p class="page-kicker">Trust center</p>
+  <h1>How to verify Helix</h1>
+  <p class="lead">
+    These pages exist so a person, a search crawler, or an AI overview can check
+    <strong>who we are, what we store, and what we do not claim</strong>.
+  </p>
+
+  <div class="trust-chips">
+    <span>Named operator</span>
+    <span>HTTPS</span>
+    <span>No SOC 2 claim</span>
+    <span>No card data</span>
+  </div>
+
+  <h2>Operator</h2>
+  <ul>
+    <li><strong>Site:</strong> <a href="https://c7xai.in">c7xai.in</a></li>
+    <li><strong>Product:</strong> Helix, a training-data studio by c7x AI</li>
+    <li><strong>Operator:</strong> Sabyasachi Dasgupta</li>
+    <li><strong>Contact:</strong> <a href="mailto:dasgupta.02n@gmail.com">dasgupta.02n@gmail.com</a></li>
+    <li><strong>About:</strong> <a href="/about">/about</a></li>
+  </ul>
+
+  <h2>Read these first</h2>
+  <ul>
+    <li><a href="/security">Security</a> — auth, isolation, what we do today, how to report a vulnerability.</li>
+    <li><a href="/privacy">Privacy</a> — account data, library content, processors, retention, deletion.</li>
+    <li><a href="/terms">Terms</a> — beta conditions, your content, liability for trained models.</li>
+    <li><a href="/account">Account</a> — profile, stored data, export, how signup works.</li>
+    <li><a href="/status">Status</a> — honest beta availability (no uptime SLA).</li>
+    <li><a href="/contact">Contact</a> — product, privacy, and security mailboxes.</li>
+  </ul>
+
+  <h2>What we do not claim</h2>
+  <ul>
+    <li>We do <strong>not</strong> publish SOC 2, ISO 27001, or HIPAA certification on this site.</li>
+    <li>We do <strong>not</strong> take credit cards. There is no payment processor in Helix today.</li>
+    <li>We do <strong>not</strong> host a public 30B model. You export data or a QLoRA adapter zip.</li>
+    <li>Beta software can fail. Do not store highly regulated personal data here yet.</li>
+  </ul>
+
+  <h2>For crawlers</h2>
+  <ul>
+    <li><a href="/robots.txt">robots.txt</a> and <a href="/sitemap.xml">sitemap.xml</a></li>
+    <li><a href="/llms.txt">llms.txt</a> — short machine-readable product summary</li>
+    <li><a href="/.well-known/security.txt">.well-known/security.txt</a> — vulnerability contact</li>
+    <li><a href="/humans.txt">humans.txt</a> — who built this</li>
+  </ul>
+
+  <p>
+    <a class="btn btn-primary" href="/app">Open studio</a>
+    <a class="btn btn-secondary" href="/security">Security</a>
+    <a class="btn btn-ghost" href="/contact">Contact</a>
+  </p>
+</article>
+{% endblock %}

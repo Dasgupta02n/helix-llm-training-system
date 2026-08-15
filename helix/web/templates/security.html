@@ -11,14 +11,24 @@
     SaaS beta. We do <strong>not</strong> currently claim SOC 2 / ISO certifications on this page.
   </p>
 
+  <div class="trust-chips">
+    <span>HTTPS</span>
+    <span>Hashed passwords</span>
+    <span>Workspace isolation</span>
+    <span>No card vault</span>
+  </div>
+
   <h2>What we do today</h2>
   <ul>
-    <li><strong>Transport</strong> — HTTPS at the public edge when TLS is configured for c7xai.in.</li>
-    <li><strong>Auth</strong> — password hashing, session/JWT-style access tokens, optional email verification and admin approval gates.</li>
-    <li><strong>Isolation</strong> — workspace/tenant scoping on library, jobs, and mining state.</li>
-    <li><strong>Abuse controls</strong> — request size limits and rate limiting on sensitive routes.</li>
-    <li><strong>Secrets</strong> — production requires a strong app secret; provider API keys via environment configuration, not client-side code.</li>
-    <li><strong>Gather vs invent</strong> — scrapes come from configured gather tools or your corpus; the LLM is instructed not to invent source content.</li>
+    <li><strong>Transport</strong> — HTTPS at the public edge for c7xai.in. Browsers should show a valid certificate.</li>
+    <li><strong>Auth</strong> — password hashing, short-lived access tokens, optional email verification and admin approval before login.</li>
+    <li><strong>Isolation</strong> — workspace/tenant scoping on library, jobs, and mining state. Another account cannot open your gold by URL.</li>
+    <li><strong>Abuse controls</strong> — request size limits and rate limiting on login, signup, and other sensitive routes.</li>
+    <li><strong>Browser headers</strong> — nosniff, frame deny, referrer policy, and a permissions policy on every response.</li>
+    <li><strong>Secrets</strong> — production requires a strong app secret. Service keys stay in server environment, not in the page.</li>
+    <li><strong>Payments</strong> — Helix does not collect card numbers. There is no checkout form.</li>
+    <li><strong>Gather vs invent</strong> — scrapes come from configured gather tools or your corpus; the model is instructed not to invent source content.</li>
+    <li><strong>Disclosure file</strong> — <a href="/.well-known/security.txt">/.well-known/security.txt</a></li>
   </ul>
 
   <h2>What you should assume</h2>

@@ -1,0 +1,36 @@
+{% extends "public_base.html" %}
+{% block title %}Status{% endblock %}
+{% block canonical %}https://c7xai.in/status{% endblock %}
+{% block meta_description %}Helix status — early beta on c7xai.in. No public uptime SLA. How we run the studio and where to report an outage.{% endblock %}
+{% block content %}
+<article class="legal-doc">
+  <p class="page-kicker">Status · Early beta</p>
+  <h1>Service status</h1>
+  <p class="lead">
+    Helix is an <strong>early beta</strong>. We do not publish a 99.9% uptime number or a status-vendor widget.
+    If the homepage and studio load, the product is up.
+  </p>
+
+  <h2>What “up” means here</h2>
+  <ul>
+    <li>Public pages (this site) are static HTML served with the app.</li>
+    <li>The studio at <a href="/app">/app</a> needs the API and database.</li>
+    <li>Mining and training jobs keep running after you sign out; they can still fail if a helper or GPU job errors.</li>
+  </ul>
+
+  <h2>If something is down</h2>
+  <p>
+    Email <a href="mailto:dasgupta.02n@gmail.com">dasgupta.02n@gmail.com</a> with the time, the page or job id,
+    and what you saw. We do not have an on-call SLA during beta.
+  </p>
+
+  <h2>Product version</h2>
+  <p>Currently shipping <strong>{{ version }}</strong>. Release notes live in the product, not a separate changelog yet.</p>
+
+  <p>
+    <a class="btn btn-primary" href="/">Home</a>
+    <a class="btn btn-secondary" href="/trust">Trust center</a>
+    <a class="btn btn-ghost" href="/contact">Contact</a>
+  </p>
+</article>
+{% endblock %}

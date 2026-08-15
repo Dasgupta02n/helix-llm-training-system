@@ -17,6 +17,9 @@ PUBLIC_HTML = [
     "/about",
     "/contact",
     "/security",
+    "/account",
+    "/trust",
+    "/status",
 ]
 
 
@@ -70,6 +73,38 @@ def test_robots_and_sitemap():
     assert "application/xml" in sm.headers.get("content-type", "")
     assert "https://c7xai.in/privacy" in sm.text
     assert "https://c7xai.in/docs" in sm.text
+    assert "https://c7xai.in/account" in sm.text
+    assert "https://c7xai.in/trust" in sm.text
+
+
+def test_crawler_files_exist():
+    robots = client.get("/robots.txt")
+    assert "llms.txt" in robots.text.lower() or "LLMs-Txt" in robots.text
+    llms = client.get("/llms.txt")
+    assert llms.status_code == 200
+    assert "helix" in llms.text.lower()
+    assert "training-data" in llms.text.lower() or "training data" in llms.text.lower()
+    sec = client.get("/.well-known/security.txt")
+    assert sec.status_code == 200
+    assert "Contact:" in sec.text
+    assert "dasgupta.02n@gmail.com" in sec.text
+    humans = client.get("/humans.txt")
+    assert humans.status_code == 200
+    assert "Sabyasachi" in humans.text
+
+
+def test_public_pages_have_social_and_canonical():
+    r = client.get("/trust")
+    assert r.status_code == 200
+    assert 'property="og:title"' in r.text
+    assert 'rel="canonical"' in r.text
+    assert 'application/ld+json' in r.text
+    acc = client.get("/account")
+    assert acc.status_code == 200
+    low = acc.text.lower()
+    assert "profile" in low
+    assert "create account" in low or "sign in" in low
+    assert "store" in low or "library" in low
 
 
 def test_homepage_has_trust_links_not_dead_docs():

@@ -560,6 +560,33 @@
   font-weight: 500;
 }
 .site-body .site-footer-bottom { color: #635f65; border-top-color: var(--line); }
+.site-body .site-trustbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  margin: 22px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 12px;
+  color: #7a757e;
+}
+.site-body .site-trustbar span::before {
+  content: "✓ ";
+  color: #9a7ad4;
+}
+.site-body .trust-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 28px;
+}
+.site-body .trust-chips span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
 .site-body .faq-list details { border-top: 1px solid var(--line); }
 .site-body .faq-list summary {
   color: var(--ink);

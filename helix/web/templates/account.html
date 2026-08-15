@@ -1,0 +1,68 @@
+{% extends "public_base.html" %}
+{% block title %}Account{% endblock %}
+{% block canonical %}https://c7xai.in/account{% endblock %}
+{% block meta_description %}Create a Helix account to keep a profile, store gold and materials in your library, export datasets, and train from data you already own. Email verification and admin approval apply during beta.{% endblock %}
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebPage",
+  "name": "Helix account",
+  "url": "https://c7xai.in/account",
+  "description": "Create a Helix account to store a profile and training data you own.",
+  "isPartOf": { "@type": "WebSite", "url": "https://c7xai.in/" }
+}
+</script>
+{% endblock %}
+{% block content %}
+<article class="legal-doc">
+  <p class="page-kicker">Account</p>
+  <h1>Your Helix account</h1>
+  <p class="lead">
+    An account is how Helix keeps <strong>your profile and your data</strong> — not a chat session.
+    Sign in from the studio to create a profile, store gold, and export files you own.
+  </p>
+
+  <div class="trust-chips" aria-label="Account facts">
+    <span>Named profile</span>
+    <span>Data stays in your library</span>
+    <span>Export anytime</span>
+    <span>No card on file</span>
+  </div>
+
+  <h2>What you can do</h2>
+  <ul>
+    <li><strong>Create a profile</strong> — name, work email, password. Change your name and password after you sign in.</li>
+    <li><strong>Store data</strong> — gold examples, materials, synthesized rows, and job history live in your account library until you archive or delete them.</li>
+    <li><strong>Use a workspace</strong> — each account gets a workspace so plans and libraries stay scoped to you.</li>
+    <li><strong>Export</strong> — download gold, materials, or a trainable package from <strong>My data</strong> and <strong>Download</strong>.</li>
+    <li><strong>Train later</strong> — Double Helix fetches gold already in this account. You do not re-upload.</li>
+  </ul>
+
+  <h2>How access works (beta)</h2>
+  <ol>
+    <li>Open the <a href="/app">studio</a> and choose <strong>Create account</strong>.</li>
+    <li>Confirm your email if verification is enabled.</li>
+    <li>Wait for admin approval if that gate is on. You get an email when the account is activated.</li>
+    <li>Sign in. Open <strong>Account</strong> in the studio to edit your profile and see what is stored.</li>
+  </ol>
+  <p>
+    Helix does not take payments. There is no checkout and no card data on this site.
+    See <a href="/pricing">Pricing</a> and <a href="/privacy">Privacy</a>.
+  </p>
+
+  <h2>What we store for you</h2>
+  <ul>
+    <li>Account fields: email, display name, password hash, verification and approval flags.</li>
+    <li>Workspace content you create: research plan, gold, synthesized rows, uploaded zips, job logs.</li>
+    <li>If you accept a trained-model declaration, that copy is emailed and kept (it cannot be deleted).</li>
+  </ul>
+  <p>You can delete the account from the studio Account tab. Email us if you need help: <a href="mailto:dasgupta.02n@gmail.com">dasgupta.02n@gmail.com</a>.</p>
+
+  <p>
+    <a class="btn btn-primary" href="/app">Create account / sign in</a>
+    <a class="btn btn-secondary" href="/privacy">Privacy</a>
+    <a class="btn btn-ghost" href="/security">Security</a>
+  </p>
+</article>
+{% endblock %}

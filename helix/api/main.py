@@ -262,6 +262,21 @@ def security_page(request: Request) -> HTMLResponse:
     return _public_page(request, "security.html")
 
 
+@app.get("/account", response_class=HTMLResponse)
+def account_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "account.html")
+
+
+@app.get("/trust", response_class=HTMLResponse)
+def trust_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "trust.html")
+
+
+@app.get("/status", response_class=HTMLResponse)
+def status_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "status.html")
+
+
 @app.get("/robots.txt", response_class=PlainTextResponse)
 def robots_txt() -> str:
     return (
@@ -270,25 +285,103 @@ def robots_txt() -> str:
         "Disallow: /api/\n"
         "\n"
         "Sitemap: https://c7xai.in/sitemap.xml\n"
+        "LLMs-Txt: https://c7xai.in/llms.txt\n"
+    )
+
+
+@app.get("/llms.txt", response_class=PlainTextResponse)
+def llms_txt() -> str:
+    return (
+        "# Helix (c7xai.in)\n"
+        "\n"
+        "> Helix is a gold training-data studio, not a chatbot. "
+        "Teams plan in plain English with Riu, mine evidence, quality-gate gold examples, "
+        "synthesize variants, and export files they own.\n"
+        "\n"
+        "Operator: Sabyasachi Dasgupta / c7x AI\n"
+        "Contact: dasgupta.02n@gmail.com\n"
+        "Product version: " + __version__ + "\n"
+        "\n"
+        "## Product\n"
+        "- Home: https://c7xai.in/\n"
+        "- Docs: https://c7xai.in/docs\n"
+        "- Pricing: https://c7xai.in/pricing (~$35 per 1,000 gold all-in mining target)\n"
+        "- Account: https://c7xai.in/account\n"
+        "- Studio: https://c7xai.in/app\n"
+        "\n"
+        "## Trust\n"
+        "- Trust center: https://c7xai.in/trust\n"
+        "- About: https://c7xai.in/about\n"
+        "- Security: https://c7xai.in/security\n"
+        "- Privacy: https://c7xai.in/privacy\n"
+        "- Terms: https://c7xai.in/terms\n"
+        "- Status: https://c7xai.in/status\n"
+        "- Contact: https://c7xai.in/contact\n"
+        "\n"
+        "## Facts\n"
+        "- Not a general chatbot or hosted 30B model\n"
+        "- No checkout; no card data collected\n"
+        "- Early beta; no SOC 2 / ISO claim\n"
+        "- Users own exported gold and QLoRA adapter zips\n"
+    )
+
+
+@app.get("/humans.txt", response_class=PlainTextResponse)
+def humans_txt() -> str:
+    return (
+        "/* TEAM */\n"
+        "Operator: Sabyasachi Dasgupta\n"
+        "Site: Helix / c7x AI\n"
+        "Contact: dasgupta.02n@gmail.com\n"
+        "Location: Building in public at c7xai.in\n"
+        "\n"
+        "/* SITE */\n"
+        "Standards: HTML, CSS, JSON-LD, llms.txt, security.txt\n"
+        "Software: Helix training-data studio\n"
+        "Last update: 2026-08-15\n"
+    )
+
+
+@app.get("/.well-known/security.txt", response_class=PlainTextResponse)
+@app.get("/security.txt", response_class=PlainTextResponse)
+def security_txt() -> str:
+    return (
+        "Contact: mailto:dasgupta.02n@gmail.com\n"
+        "Expires: 2027-08-15T00:00:00.000Z\n"
+        "Preferred-Languages: en\n"
+        "Canonical: https://c7xai.in/.well-known/security.txt\n"
+        "Policy: https://c7xai.in/security\n"
+        "Acknowledgments: https://c7xai.in/trust\n"
     )
 
 
 @app.get("/sitemap.xml")
 def sitemap_xml() -> Response:
+    today = "2026-08-15"
     paths = [
-        "/",
-        "/app",
-        "/docs",
-        "/pricing",
-        "/about",
-        "/contact",
-        "/privacy",
-        "/terms",
-        "/security",
+        ("/", "daily", "1.0"),
+        ("/docs", "weekly", "0.9"),
+        ("/pricing", "weekly", "0.8"),
+        ("/account", "weekly", "0.8"),
+        ("/trust", "weekly", "0.8"),
+        ("/about", "monthly", "0.7"),
+        ("/security", "monthly", "0.7"),
+        ("/privacy", "monthly", "0.6"),
+        ("/terms", "monthly", "0.6"),
+        ("/contact", "monthly", "0.6"),
+        ("/status", "weekly", "0.5"),
+        ("/app", "weekly", "0.5"),
     ]
     urls = "\n".join(
-        f"  <url><loc>https://c7xai.in{p}</loc><changefreq>weekly</changefreq></url>"
-        for p in paths
+        (
+            "  <url>"
+            f"<loc>https://c7xai.in{path}</loc>"
+            f"<lastmod>{today}</lastmod>"
+            f"<changefreq>{freq}</changefreq>"
+            f"<priority>{prio}</priority>"
+            "</url>"
+        )
+        for path, freq, prio in paths
     )
     body = (
         '<?xml version="1.0" encoding="UTF-8"?>\n'

@@ -388,6 +388,30 @@ select {
   display: flex;
   align-items: center;
   gap: 9px;
+  flex-wrap: wrap;
+}
+.user-chip-btn {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+.user-chip-btn:hover .user-meta strong { text-decoration: underline; }
+.account-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 860px) {
+  .account-grid { grid-template-columns: 1fr; }
 }
 .user-avatar {
   width: 26px;

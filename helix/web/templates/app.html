@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Helix — Training Data Studio</title>
   <meta name="theme-color" content="#f4f2ef" />
+  <meta name="robots" content="noindex,nofollow" />
+  <link rel="canonical" href="https://c7xai.in/app" />
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/static/app.css?v={{ static_v }}" />
 </head>
 <body>
@@ -113,16 +116,18 @@
         </button>
         <button class="nav-pill" data-tab="library" type="button">My data</button>
         <button class="nav-pill" data-tab="download" type="button">Download</button>
+        <button class="nav-pill" data-tab="account" type="button">Account</button>
       </nav>
 
       <div class="sidebar-foot">
-        <div class="user-avatar" id="userAvatar">A</div>
-        <div class="user-meta">
-          <strong id="userLabel">Signed in</strong>
-          <span id="userRole">Owner</span>
-        </div>
+        <button class="user-chip-btn" id="openAccountBtn" type="button" title="Open account">
+          <div class="user-avatar" id="userAvatar">A</div>
+          <div class="user-meta">
+            <strong id="userLabel">Signed in</strong>
+            <span id="userRole">Owner</span>
+          </div>
+        </button>
         <button class="btn btn-ghost btn-sm" id="logoutBtn" type="button">Sign out</button>
-        <button class="btn btn-ghost btn-sm" id="deleteAccountBtn" type="button">Delete account</button>
       </div>
       <!-- keep userChip for JS showApp toggles (hidden structural hook) -->
       <div id="userChip" class="hidden" aria-hidden="true"></div>
@@ -491,6 +496,53 @@
           <div style="margin-top:28px;border-top:2px solid var(--color-divider);padding-top:20px">
             <h3 class="mt-0">Saved versions</h3>
             <div id="datasetList"></div>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-account" class="tab-panel hidden">
+        <div class="page-head">
+          <div>
+            <span class="page-kicker">Your account</span>
+            <h2>Profile and stored data</h2>
+            <p class="hint">Edit how you appear, change your password, and see what this workspace keeps for you.</p>
+          </div>
+        </div>
+        <div class="page-body account-grid">
+          <div class="pane pad">
+            <h3 class="mt-0">Profile</h3>
+            <label for="accountName">Display name</label>
+            <input id="accountName" type="text" autocomplete="name" />
+            <label for="accountEmail">Email</label>
+            <input id="accountEmail" type="email" disabled />
+            <p class="hint" id="accountFlags"></p>
+            <button class="btn btn-primary btn-sm" id="accountSaveBtn" type="button">Save profile</button>
+            <p id="accountProfileStatus" class="status-line"></p>
+          </div>
+          <div class="pane pad">
+            <h3 class="mt-0">Password</h3>
+            <label for="accountCurrentPw">Current password</label>
+            <input id="accountCurrentPw" type="password" autocomplete="current-password" />
+            <label for="accountNewPw">New password</label>
+            <span class="field-help">At least 8 characters</span>
+            <input id="accountNewPw" type="password" autocomplete="new-password" />
+            <button class="btn btn-secondary btn-sm" id="accountPwBtn" type="button">Update password</button>
+            <p id="accountPwStatus" class="status-line"></p>
+          </div>
+          <div class="pane pad" style="grid-column:1 / -1">
+            <h3 class="mt-0">Stored in this workspace</h3>
+            <p class="hint">Gold, materials, and synthesized rows stay in your account until you archive or delete them.</p>
+            <div id="accountStoreStats" class="stat-row"></div>
+            <p class="hint" id="accountWorkspaceHint"></p>
+            <div class="flex" style="gap:8px;flex-wrap:wrap;margin-top:12px">
+              <button class="btn btn-secondary btn-sm" data-goto="library" type="button">Open My data</button>
+              <button class="btn btn-ghost btn-sm" data-goto="download" type="button">Download exports</button>
+            </div>
+          </div>
+          <div class="pane pad" style="grid-column:1 / -1">
+            <h3 class="mt-0">Danger zone</h3>
+            <p class="hint">Deleting the account removes your login. Signed trained-model declarations stay keyed to your email and cannot be deleted.</p>
+            <button class="btn btn-secondary btn-sm" data-delete-account type="button">Delete account</button>
           </div>
         </div>
       </section>
