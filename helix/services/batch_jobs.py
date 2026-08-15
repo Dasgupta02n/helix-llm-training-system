@@ -130,6 +130,13 @@ def job_to_dict(job: m.BatchJob, events: list[m.BatchJobEvent] | None = None) ->
         summary = json.loads(job.result_summary_json or "null")
     except json.JSONDecodeError:
         summary = None
+    from helix.services.live_status import heartbeat_fields
+
+    hb = heartbeat_fields(
+        job.updated_at,
+        running=job.status in {"pending", "running"},
+        started_at=job.started_at,
+    )
     return {
         "id": job.id,
         "job_type": job.job_type,
@@ -174,6 +181,7 @@ def job_to_dict(job: m.BatchJob, events: list[m.BatchJobEvent] | None = None) ->
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
         "updated_at": job.updated_at.isoformat() if job.updated_at else None,
         "survives_logout": True,
+        **hb,
         "events": [
             {
                 "batch_index": e.batch_index,
@@ -209,7 +217,24 @@ def list_user_jobs(
         .limit(limit)
         .all()
     )
-    return [job_to_dict(r) for r in rows]
+    ids = [r.id for r in rows]
+    by_job: dict[str, list] = {i: [] for i in ids}
+    if ids:
+        evs = (
+            db.query(m.BatchJobEvent)
+            .filter(m.BatchJobEvent.job_id.in_(ids))
+            .order_by(m.BatchJobEvent.created_at.desc())
+            .limit(max(24 * len(ids), 24))
+            .all()
+        )
+        for e in evs:
+            bucket = by_job.get(e.job_id)
+            if bucket is not None and len(bucket) < 16:
+                bucket.append(e)
+    out = []
+    for r in rows:
+        out.append(job_to_dict(r, list(reversed(by_job.get(r.id) or []))))
+    return out
 
 
 def get_job_detail(db: Session, job_id: str, owner_user_id: str) -> dict[str, Any] | None:

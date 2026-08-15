@@ -208,6 +208,7 @@ def run_synthesis(
     gold_ids: list[str] | None = None,
     max_golds: int | None = None,
     use_llm: bool = True,
+    progress_cb: Any | None = None,
 ) -> dict[str, Any]:
     """
     Create synthetic rows from the user's gold library.
@@ -281,7 +282,15 @@ def run_synthesis(
     created = 0
     errors: list[str] = []
 
-    for gold in golds:
+    def _progress(msg: str) -> None:
+        if progress_cb:
+            try:
+                progress_cb(msg)
+            except Exception:  # noqa: BLE001
+                pass
+
+    _progress(f"Synthesizing from {len(golds)} gold row(s) ({n_var} variation(s) each)…")
+    for i, gold in enumerate(golds, start=1):
         if created >= max_new:
             break
         need = min(n_var, max_new - created)
@@ -322,6 +331,10 @@ def run_synthesis(
         run.gold_processed += 1
         run.synthesized_count = created
         db.commit()
+        _progress(
+            f"Gold {i}/{len(golds)} done — {created} synthetic row(s) so far"
+            + (f" · last: {errors[-1][:80]}" if errors else "")
+        )
 
     run.status = "completed"
     run.finished_at = _now()

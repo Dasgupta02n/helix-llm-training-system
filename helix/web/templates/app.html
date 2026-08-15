@@ -262,6 +262,13 @@
           <div class="section-label">Jobs</div>
           <h3 class="mt-0">Mining &amp; synthesis</h3>
           <p class="hint" id="jobsLiveHint">Jobs Riu starts keep running after logout.</p>
+          <div id="liveProcessPanel" class="live-process hidden">
+            <div class="live-process-head">
+              <span id="liveProcessBadge" class="live-pill live-idle"><i class="live-dot"></i>Idle</span>
+              <strong id="liveProcessLabel">Nothing running</strong>
+            </div>
+            <ol id="liveProcessBody" class="live-log"></ol>
+          </div>
           <div id="jobsList"></div>
           <div class="section-label" style="margin-top:28px">Activity</div>
           <h3 class="mt-0">Recent helper runs</h3>
@@ -330,6 +337,8 @@
           </label>
           <p id="doubleHelixTrainStatus" class="status-line"></p>
           <p class="hint" id="doubleHelixTrainHint"></p>
+          <p id="doubleHelixLiveBadge" class="hint"></p>
+          <ol id="doubleHelixActivity" class="live-log"></ol>
           <div id="doubleHelixTrainDownloadWrap" class="hidden" style="margin-top:8px">
             <button class="btn btn-primary btn-sm" id="doubleHelixTrainDownloadBtn" type="button">Download trained model zip</button>
           </div>

@@ -32,6 +32,7 @@ from helix.services.hf_hub_io import (
     upload_text_files,
 )
 from helix.services.library import gold_to_chat_messages
+from helix.services.live_status import heartbeat_fields
 from helix.services.runpod_train import (
     poll_qlora_job,
     submit_qlora_job,
@@ -102,8 +103,41 @@ def build_dataset_texts(rows: list[dict[str, Any]]) -> tuple[str, str]:
     )
 
 
+def _activity(job: m.DoubleHelixTrainJob) -> list[dict[str, Any]]:
+    try:
+        meta = json.loads(job.meta_json or "{}")
+    except json.JSONDecodeError:
+        meta = {}
+    evs = meta.get("activity") or []
+    return evs if isinstance(evs, list) else []
+
+
+def append_train_activity(job: m.DoubleHelixTrainJob, message: str, *, level: str = "info") -> None:
+    meta: dict[str, Any]
+    try:
+        meta = json.loads(job.meta_json or "{}")
+    except json.JSONDecodeError:
+        meta = {}
+    evs = list(meta.get("activity") or [])
+    evs.append(
+        {
+            "message": message,
+            "level": level,
+            "created_at": _now().isoformat(),
+        }
+    )
+    meta["activity"] = evs[-40:]
+    job.meta_json = json.dumps(meta)
+    job.progress_message = message[:500]
+    job.updated_at = _now()
+
+
 def job_to_dict(job: m.DoubleHelixTrainJob) -> dict[str, Any]:
     download_ready = bool(job.status == "completed" and job.artifact_relpath)
+    running = job.status in ACTIVE_STATUSES
+    hb = heartbeat_fields(
+        job.updated_at, running=running, started_at=job.created_at
+    )
     return {
         "id": job.id,
         "status": job.status,
@@ -117,7 +151,10 @@ def job_to_dict(job: m.DoubleHelixTrainJob) -> dict[str, Any]:
         "estimated_usd_min": ESTIMATE_USD_MIN,
         "estimated_usd_max": ESTIMATE_USD_MAX,
         "created_at": job.created_at.isoformat() if job.created_at else None,
+        "updated_at": job.updated_at.isoformat() if job.updated_at else None,
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
+        "events": _activity(job)[-16:],
+        **hb,
     }
 
 
@@ -204,6 +241,16 @@ def create_train_job(
                 "base_model_name": model["name"],
                 "license": model["license"],
                 "params_b": model["params_b"],
+                "activity": [
+                    {
+                        "message": (
+                            f"Queued QLoRA on {model['name']} using {len(rows)} "
+                            "gold row(s) from this account."
+                        ),
+                        "level": "info",
+                        "created_at": _now().isoformat(),
+                    }
+                ],
             }
         ),
     )
@@ -216,9 +263,8 @@ def create_train_job(
 def _fail(job: m.DoubleHelixTrainJob, msg: str) -> None:
     job.status = "failed"
     job.error = msg[:2000]
-    job.progress_message = msg[:500]
+    append_train_activity(job, msg[:500], level="error")
     job.finished_at = _now()
-    job.updated_at = _now()
 
 
 def _hf_token() -> str:
@@ -233,9 +279,8 @@ def cancel_train_job(
     if job.status in {"completed", "failed", "cancelled"}:
         raise ValueError(f"Job is already {job.status}.")
     job.status = "cancelled"
-    job.progress_message = "Cancelled. No further RunPod submit or packaging."
+    append_train_activity(job, "Cancelled. No further RunPod submit or packaging.")
     job.finished_at = _now()
-    job.updated_at = _now()
     db.commit()
     db.refresh(job)
     return job
@@ -244,8 +289,7 @@ def cancel_train_job(
 def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
     if job.runpod_job_id:
         job.status = "running"
-        job.progress_message = "Resuming watch on the existing RunPod job."
-        job.updated_at = _now()
+        append_train_activity(job, "Resuming watch on the existing RunPod job.")
         return
     token = _hf_token()
     rows = load_trainable_gold(
@@ -256,8 +300,9 @@ def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
         return
     job.gold_count = len(rows)
     job.status = "uploading"
-    job.progress_message = f"Uploading {len(rows)} gold row(s) from your Helix account…"
-    job.updated_at = _now()
+    append_train_activity(
+        job, f"Uploading {len(rows)} gold row(s) from your Helix account to Hugging Face…"
+    )
     db.commit()
 
     slug = job.id.replace("_", "-")
@@ -281,7 +326,7 @@ def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
     )
     job.hf_dataset_repo = ds_repo
     job.hf_model_repo = md_repo
-    job.updated_at = _now()
+    append_train_activity(job, f"Gold uploaded as private dataset `{ds_repo}`. Submitting RunPod job…")
     db.commit()
 
     submitted = submit_qlora_job(
@@ -303,32 +348,48 @@ def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
         return
     job.runpod_job_id = str(rp_id)
     job.status = "running"
-    job.progress_message = (
-        "Training on RunPod Serverless (min workers 0). "
-        "This usually takes 20–90 minutes depending on model size."
+    append_train_activity(
+        job,
+        f"RunPod job {rp_id} queued (Serverless, min workers 0). "
+        "Usually 20–90 minutes depending on model size.",
     )
-    job.updated_at = _now()
     db.commit()
 
 
 def _advance_running(job: m.DoubleHelixTrainJob) -> None:
     polled = poll_qlora_job(job.runpod_job_id or "")
     if not polled.get("ok"):
-        job.progress_message = f"Waiting on RunPod… ({polled.get('error') or 'retry'})"
-        job.updated_at = _now()
+        append_train_activity(
+            job, f"Polling RunPod… ({polled.get('error') or 'retry'})"
+        )
         return
     st = str(polled.get("status") or "").upper()
     if st in {"COMPLETED", "COMPLETE", "SUCCESS"}:
         job.status = "packaging"
-        job.progress_message = "Training finished. Packaging adapter + tokenizer…"
-        job.updated_at = _now()
+        append_train_activity(job, "RunPod reported COMPLETED. Packaging adapter + tokenizer…")
         return
     if st in {"FAILED", "CANCELLED", "CANCELED", "TIMED_OUT", "TIMEOUT"}:
         _fail(job, f"RunPod job {st}. Check the Serverless logs for the worker error.")
         return
     pretty = st.replace("_", " ").title() or "Queued"
-    job.progress_message = f"RunPod: {pretty}."
+    evs = _activity(job)
+    last = (evs[-1]["message"] if evs else "") or ""
+    same = f"RunPod status: {pretty}" in last
     job.updated_at = _now()
+    if not same:
+        append_train_activity(job, f"RunPod status: {pretty} (still training).")
+    else:
+        # Heartbeat only — UI can see updated_at move without a new log line every poll.
+        try:
+            last_ts = evs[-1].get("created_at") if evs else None
+            if last_ts:
+                prev = datetime.fromisoformat(str(last_ts).replace("Z", "+00:00"))
+                if (_now() - prev).total_seconds() >= 20:
+                    append_train_activity(
+                        job, f"Heartbeat — RunPod still {pretty}."
+                    )
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def build_trained_zip(
@@ -435,6 +496,8 @@ def _advance_packaging(db: Session, job: m.DoubleHelixTrainJob) -> None:
         return
     tmp = Path(tempfile.mkdtemp(prefix=f"helix-{job.id}-"))
     try:
+        append_train_activity(job, f"Downloading adapter files from `{repo}`…")
+        db.commit()
         adapter_dir = tmp / "adapter"
         download_repo_files(token, repo_id=repo, dest=adapter_dir, repo_type="model")
         adapters = collect_named_files(adapter_dir, ADAPTER_NAMES)
@@ -474,11 +537,11 @@ def _advance_packaging(db: Session, job: m.DoubleHelixTrainJob) -> None:
         dest.write_bytes(blob)
         job.artifact_relpath = rel
         job.status = "completed"
-        job.progress_message = (
-            "Ready. Download the zip of QLoRA adapter, tokenizer, and the gold used."
+        append_train_activity(
+            job,
+            "Ready. Download the zip of QLoRA adapter, tokenizer, and the gold used.",
         )
         job.finished_at = _now()
-        job.updated_at = _now()
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
 

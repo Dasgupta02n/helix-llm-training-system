@@ -116,6 +116,7 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
     db.commit()
 
     batch_index = job.completed_batches + 1
+    hb_stop = _start_job_heartbeat(job.id)
     t0 = time.time()
     try:
         config = json.loads(job.config_json or "{}")
@@ -129,6 +130,7 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                     f"Batch {batch_index}/{job.total_batches}: {msg}"
                 )
                 job.updated_at = _now()
+                _log(db, job, job.progress_message)
                 try:
                     db.commit()
                 except Exception:  # noqa: BLE001
@@ -208,6 +210,17 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             # synthesis: modes 1–2 use LLM when available; 3–4 use templates (low tokens)
             use_llm = job.quality_mode in (1, 2)
             vars_per = int(config.get("variations_per_gold") or 4)
+            def _synth_progress(msg: str) -> None:
+                job.progress_message = (
+                    f"Batch {batch_index}/{job.total_batches}: {msg}"
+                )
+                job.updated_at = _now()
+                _log(db, job, job.progress_message)
+                try:
+                    db.commit()
+                except Exception:  # noqa: BLE001
+                    db.rollback()
+
             result = run_synthesis(
                 db,
                 owner_user_id=job.owner_user_id,
@@ -216,6 +229,7 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 parameters=config.get("parameters"),
                 max_golds=job.batch_size,
                 use_llm=use_llm,
+                progress_cb=_synth_progress,
             )
             items = int(result.get("synthesized_count") or 0)
             or_cost = float(result.get("openrouter_cost_usd") or result.get("cost_usd") or 0.0)
@@ -391,6 +405,41 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
         job.updated_at = _now()
         _log(db, job, f"Error: {e}", level="error")
         db.commit()
+    finally:
+        hb_stop.set()
+
+
+def _start_job_heartbeat(job_id: str) -> threading.Event:
+    """Bump updated_at while a long gather/judge is blocking so the UI is not silent."""
+    stop = threading.Event()
+
+    def _run() -> None:
+        last_note = 0.0
+        while not stop.wait(8.0):
+            sdb = SessionLocal()
+            try:
+                row = sdb.query(m.BatchJob).filter_by(id=job_id).first()
+                if not row or row.status != "running":
+                    break
+                row.updated_at = _now()
+                if time.time() - last_note >= 15:
+                    _log(
+                        sdb,
+                        row,
+                        f"Heartbeat — still working on: {row.progress_message or 'current step'}",
+                    )
+                    last_note = time.time()
+                sdb.commit()
+            except Exception:  # noqa: BLE001
+                try:
+                    sdb.rollback()
+                except Exception:  # noqa: BLE001
+                    pass
+            finally:
+                sdb.close()
+
+    threading.Thread(target=_run, name=f"helix-hb-{job_id[-6:]}", daemon=True).start()
+    return stop
 
 
 def worker_loop(poll_seconds: float = 2.0) -> None:

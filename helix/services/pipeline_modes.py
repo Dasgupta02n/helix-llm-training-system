@@ -991,6 +991,11 @@ def run_pipeline_batch(
     items += int(code_res.get("items_processed") or 0)
     zero_evidence = bool(code_res.get("zero_evidence"))
     warnings.extend(code_res.get("warnings") or [])
+    _progress(
+        f"Gather finished — {items} item(s)"
+        + ("; no new evidence this pass" if zero_evidence else "")
+        + "."
+    )
 
     agents = mode_llm_agents(quality_mode)
     brief = _brief_dict(db, tenant_id)
@@ -1027,6 +1032,10 @@ def run_pipeline_batch(
                 }
             )
             items += 1
+            _progress(
+                f"Helper {key} finished ({r.get('status') or 'ok'})"
+                + (f" · ${agent_cost:.4f}" if agent_cost else "")
+            )
         except Exception as e:  # noqa: BLE001
             results.append({"agent": key, "status": "error", "error": str(e)})
             warnings.append(f"{key}: {e}")
@@ -1036,6 +1045,7 @@ def run_pipeline_batch(
     # Authoritative count: actual library delta (includes agent-promoted gold too)
     gold_after = _user_gold_count(db, owner_user_id, tenant_id)
     gold_new = max(0, gold_after - gold_before)
+    _progress(f"Library check — {gold_new} new gold this batch (total in account {gold_after}).")
     # Prefer DB delta; fall back to code path counter if owner missing
     if owner_user_id is None:
         gold_new = int(code_res.get("gold_new") or 0)

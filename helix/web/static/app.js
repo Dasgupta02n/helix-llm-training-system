@@ -721,7 +721,7 @@ function _jobCostLine(j) {
 }
 
 function _jobRenderKey(j) {
-  // Force re-render whenever any live counter changes
+  const lastEv = (j.events && j.events.length) ? j.events[j.events.length - 1].message : "";
   return [
     j.id,
     j.status,
@@ -730,9 +730,112 @@ function _jobRenderKey(j) {
     j.progress_pct,
     j.progress_message,
     j.updated_at,
+    j.live_state,
     j.eta_seconds,
+    lastEv,
     JSON.stringify(j.result_summary || {}),
   ].join("|");
+}
+
+function _fmtClock(iso) {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleTimeString();
+  } catch {
+    return "";
+  }
+}
+
+function _livePill(j) {
+  const st = j.live_state || "idle";
+  const cls =
+    st === "live" ? "live-ok" : st === "quiet" ? "live-quiet" : st === "stale" ? "live-stale" : "live-idle";
+  return `<span class="live-pill ${cls}"><i class="live-dot"></i>${escapeHtml(j.live_label || st)}</span>`;
+}
+
+function _activityHtml(events) {
+  const evs = (events || []).slice(-14).reverse();
+  if (!evs.length) return "";
+  return `<ol class="live-log">${evs
+    .map(
+      (e) =>
+        `<li class="${escapeHtml(e.level || "info")}"><time>${escapeHtml(
+          _fmtClock(e.created_at)
+        )}</time>${escapeHtml(e.message || "")}</li>`
+    )
+    .join("")}</ol>`;
+}
+
+function renderLiveProcessPanel(jobs, train) {
+  const panel = $("liveProcessPanel");
+  const body = $("liveProcessBody");
+  const badge = $("liveProcessBadge");
+  const label = $("liveProcessLabel");
+  if (!panel || !body) return;
+  const runningJobs = (jobs || []).filter((j) =>
+    ["pending", "running", "paused_spend_cap"].includes(j.status)
+  );
+  const trainActive =
+    train && ["queued", "uploading", "running", "packaging"].includes(train.status);
+  if (!runningJobs.length && !trainActive) {
+    panel.classList.add("hidden");
+    return;
+  }
+  panel.classList.remove("hidden");
+  const sources = [];
+  runningJobs.forEach((j) => {
+    sources.push({
+      kind: j.job_type === "synthesis" ? "Synthesis" : "Mining",
+      ...j,
+    });
+  });
+  if (trainActive) {
+    sources.push({
+      kind: "Double Helix train",
+      progress_message: train.progress,
+      ...train,
+    });
+  }
+  const worst =
+    sources.some((s) => s.live_state === "stale")
+      ? "stale"
+      : sources.some((s) => s.live_state === "quiet")
+        ? "quiet"
+        : "live";
+  const cls =
+    worst === "live" ? "live-ok" : worst === "quiet" ? "live-quiet" : "live-stale";
+  if (badge) {
+    badge.className = `live-pill ${cls}`;
+    badge.innerHTML = `<i class="live-dot"></i>${
+      worst === "live" ? "Live" : worst === "quiet" ? "Working" : "Check this"
+    }`;
+  }
+  if (label) {
+    label.textContent = sources
+      .map((s) => `${s.kind}: ${s.progress_message || s.progress || s.status}`)
+      .join(" · ");
+  }
+  const merged = [];
+  sources.forEach((s) => {
+    (s.events || []).forEach((e) => {
+      merged.push({
+        ...e,
+        message: `[${s.kind}] ${e.message || ""}`,
+      });
+    });
+  });
+  merged.sort((a, b) => String(a.created_at || "").localeCompare(String(b.created_at || "")));
+  const evs = merged.slice(-14).reverse();
+  body.innerHTML = evs.length
+    ? evs
+        .map(
+          (e) =>
+            `<li class="${escapeHtml(e.level || "info")}"><time>${escapeHtml(
+              _fmtClock(e.created_at)
+            )}</time>${escapeHtml(e.message || "")}</li>`
+        )
+        .join("")
+    : "<li>Waiting for the first step…</li>";
 }
 
 async function loadJobs() {
@@ -742,25 +845,32 @@ async function loadJobs() {
   try {
     const data = await api(`/api/t/${state.tenantSlug}/jobs`);
     const jobs = data.jobs || [];
-    const active = (data.active || []).length;
+    let train = null;
+    try {
+      const t = await api(`/api/t/${state.tenantSlug}/library/double-helix/train`);
+      train = t.job || null;
+    } catch (_) {
+      train = null;
+    }
+    renderLiveProcessPanel(jobs, train);
+    const active = (data.active || []).length + (train && ["queued", "uploading", "running", "packaging"].includes(train.status) ? 1 : 0);
     if ($("jobsLiveHint")) {
       $("jobsLiveHint").textContent = active
-        ? `${active} job(s) running — live counters (no-cache poll every 2s)`
+        ? `${active} process(es) live — real steps + heartbeat (poll 2s). A frozen bar without a new log line means wait; a red pill means it may be stuck.`
         : "No active jobs";
     }
     if (!jobs.length) {
       $("jobsList").innerHTML = `<div class="empty"><div class="icon">⏱️</div>No jobs yet. Ask Riu to start collecting, or start synthesis from My data.</div>`;
-      state._jobsRenderKey = "";
+      state._jobsRenderKey = train ? _jobRenderKey(train) : "";
       return;
     }
-    const renderKey = jobs.map(_jobRenderKey).join("||");
+    const renderKey = jobs.map(_jobRenderKey).join("||") + (train ? `||T:${_jobRenderKey(train)}` : "");
     // Still re-render if anything moved; skip only exact same snapshot
     if (state._jobsRenderKey === renderKey && $("jobsList").children.length) {
       return;
     }
     state._jobsRenderKey = renderKey;
 
-    // Visual progress: while a batch is running, show partial credit so UI doesn't freeze at 0%
     $("jobsList").innerHTML = jobs
       .map((j) => {
         const badge =
@@ -776,14 +886,7 @@ async function loadJobs() {
         const statusLabel =
           j.status === "paused_spend_cap" ? "paused (spend cap)" : j.status;
         const typeLabel = j.job_type === "synthesis" ? "Synthesis" : "Mining";
-        let pct = Number(j.progress_pct) || 0;
-        if (j.status === "running" && pct < 100) {
-          // mid-batch pulse based on updated_at recency so bar moves during long gathers
-          const tick = (Date.now() / 1000) % 1;
-          const partial =
-            ((j.completed_batches + 0.2 + 0.6 * tick) / Math.max(j.total_batches, 1)) * 100;
-          pct = Math.max(pct, Math.min(99, Math.round(partial * 10) / 10));
-        }
+        const pct = Number(j.progress_pct) || 0;
         const updated = j.updated_at ? new Date(j.updated_at).toLocaleTimeString() : "—";
         const costBits = [];
         if (j.openrouter_cost_usd != null)
@@ -799,6 +902,7 @@ async function loadJobs() {
               <strong>${typeLabel}</strong>
               <span class="badge ${badge}">${escapeHtml(statusLabel)}</span>
               <span class="badge">Q${j.quality_mode}</span>
+              ${j.status === "running" || j.status === "pending" ? _livePill(j) : ""}
             </div>
             <div class="flex" style="gap:6px;flex-wrap:wrap">
               ${
@@ -821,6 +925,7 @@ async function loadJobs() {
             ${costBits.length ? ` · ${costBits.join(" · ")}` : ""}
           </p>
           <p class="hint mb-0 job-progress-msg"><strong>${escapeHtml(j.progress_message || "…")}</strong></p>
+          ${_activityHtml(j.events)}
           ${_jobResultBanner(j)}
         </div>`;
       })
@@ -881,6 +986,7 @@ function startJobPolling() {
     loadJobs().catch(() => {});
     if ($("tab-library") && !$("tab-library").classList.contains("hidden")) {
       loadLibrary({ settings: false }).catch(() => {});
+      if (typeof loadDoubleHelixTrain === "function") loadDoubleHelixTrain().catch(() => {});
     }
   }, 2000);
 }
@@ -2204,10 +2310,24 @@ function renderDoubleHelixTrain(job) {
     if (hint) hint.textContent = "";
     if (wrap) wrap.classList.add("hidden");
     if ($("doubleHelixTrainCancelBtn")) $("doubleHelixTrainCancelBtn").classList.add("hidden");
+    if ($("doubleHelixLiveBadge")) $("doubleHelixLiveBadge").innerHTML = "";
+    if ($("doubleHelixActivity")) $("doubleHelixActivity").innerHTML = "";
     return;
   }
   statusEl.textContent = `${job.status}: ${job.progress || ""}`;
   statusEl.className = job.status === "failed" ? "status-line error" : "status-line";
+  if ($("doubleHelixLiveBadge")) {
+    $("doubleHelixLiveBadge").innerHTML = _livePill(job);
+  }
+  if ($("doubleHelixActivity")) {
+    const html = _activityHtml(job.events);
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    const ol = tmp.querySelector("ol");
+    $("doubleHelixActivity").innerHTML = ol
+      ? ol.innerHTML
+      : "<li>No steps yet. A heartbeat will appear once training starts.</li>";
+  }
   if (hint) {
     hint.textContent = job.error
       ? job.error
@@ -2225,7 +2345,7 @@ function renderDoubleHelixTrain(job) {
   }
   const active = ["queued", "uploading", "running", "packaging"].includes(job.status);
   if (active && !_dhTrainTimer) {
-    _dhTrainTimer = setInterval(() => loadDoubleHelixTrain().catch(() => {}), 8000);
+    _dhTrainTimer = setInterval(() => loadDoubleHelixTrain().catch(() => {}), 2000);
   }
   if (!active && _dhTrainTimer) {
     clearInterval(_dhTrainTimer);
