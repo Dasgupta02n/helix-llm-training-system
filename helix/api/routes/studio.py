@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import PlainTextResponse, StreamingResponse
+from fastapi.responses import PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -17,6 +17,12 @@ from helix.api.deps import get_current_user
 from helix.db import models as m
 from helix.db.session import get_db
 from helix.services.brief import get_active_project, project_to_dict, schema_to_dict
+from helix.services.library_export import (
+    load_pack_manifest,
+    pack_filename,
+    save_session_pack,
+    zip_saved_pack,
+)
 
 router = APIRouter(prefix="/api/t/{slug}", tags=["studio"])
 
@@ -402,17 +408,25 @@ def list_datasets(
             manifest = json.loads(r.manifest_json or "{}")
         except json.JSONDecodeError:
             manifest = {}
-        count = (
-            db.query(m.TrainingExample)
-            .filter_by(tenant_id=tenant.id, dataset_version=r.version)
-            .count()
-        )
+        pack = load_pack_manifest(r)
+        if pack:
+            counts = pack.get("counts") or {}
+            count = sum(int(counts.get(k) or 0) for k in counts)
+            manifest = pack
+        else:
+            count = (
+                db.query(m.TrainingExample)
+                .filter_by(tenant_id=tenant.id, dataset_version=r.version)
+                .count()
+            )
         out.append(
             {
                 "id": r.id,
                 "version": r.version,
                 "manifest": manifest,
                 "example_count": count,
+                "pack": pack is not None,
+                "counts": (pack or {}).get("counts") if pack else None,
                 "created_at": r.created_at.isoformat() if r.created_at else None,
             }
         )
@@ -429,6 +443,24 @@ def export_dataset(
     db: Session = Depends(get_db),
 ):
     tenant = _tenant_for(user, slug, db)
+    existing = (
+        db.query(m.DatasetVersion)
+        .filter_by(tenant_id=tenant.id, version=version)
+        .first()
+    )
+    if existing and load_pack_manifest(existing):
+        try:
+            raw, _meta = zip_saved_pack(
+                db, user_id=user.id, tenant=tenant, version=version, fmt=format
+            )
+        except ValueError as e:
+            raise HTTPException(404, str(e)) from e
+        name = pack_filename(slug, version)
+        return Response(
+            content=raw,
+            media_type="application/zip",
+            headers={"Content-Disposition": f'attachment; filename="{name}"'},
+        )
     q = db.query(m.TrainingExample).filter_by(
         tenant_id=tenant.id,
         dataset_version=version,
@@ -499,50 +531,9 @@ def snapshot_approved_pool(
     user: m.User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Create a dataset version from currently approved non-benchmark examples."""
+    """Save the current Riu session pack (gold + synth + corpus) under a name."""
     tenant = _tenant_for(user, slug, db)
-    if not re.match(r"^[a-zA-Z0-9_.-]+$", version):
-        raise HTTPException(400, "Invalid version name")
-    if (
-        db.query(m.DatasetVersion)
-        .filter_by(tenant_id=tenant.id, version=version)
-        .first()
-    ):
-        raise HTTPException(400, "Version already exists")
-
-    rows = (
-        db.query(m.TrainingExample)
-        .filter_by(
-            tenant_id=tenant.id,
-            review_status="approved",
-            reserved_for_benchmark=False,
-        )
-        .all()
-    )
-    by_topic: dict[str, int] = {}
-    by_split: dict[str, int] = {}
-    for r in rows:
-        r.dataset_version = version
-        by_topic[r.topic] = by_topic.get(r.topic, 0) + 1
-        sp = r.split or "unassigned"
-        by_split[sp] = by_split.get(sp, 0) + 1
-
-    manifest = {
-        "version": version,
-        "count": len(rows),
-        "by_topic": by_topic,
-        "by_split": by_split,
-        "created_by": user.email,
-        "source": "approved_pool_snapshot",
-    }
-    did = _uid("ds_")
-    db.add(
-        m.DatasetVersion(
-            id=did,
-            tenant_id=tenant.id,
-            version=version,
-            manifest_json=json.dumps(manifest),
-        )
-    )
-    db.commit()
-    return {"ok": True, "id": did, "version": version, "count": len(rows), "manifest": manifest}
+    try:
+        return save_session_pack(db, user=user, tenant=tenant, version=version)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e

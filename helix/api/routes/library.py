@@ -7,7 +7,7 @@ import re
 from typing import Any
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse, PlainTextResponse, StreamingResponse
+from fastapi.responses import FileResponse, PlainTextResponse, Response, StreamingResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -36,6 +36,11 @@ from helix.services.library import (
     scope_to_dict,
     synthetic_to_dict,
     update_scope,
+)
+from helix.services.library_export import (
+    pack_filename,
+    pack_for_user,
+    zip_saved_pack,
 )
 from helix.services.synthesis import run_synthesis
 from helix.services.user_gold_upload import (
@@ -671,6 +676,62 @@ def export_library(
         headers={
             "Content-Disposition": f'attachment; filename="{fname}.jsonl"'
         },
+    )
+
+
+@router.get("/export-zip")
+def export_library_zip(
+    slug: str,
+    scope: str = Query("library", pattern="^(library|session)$"),
+    format: str = Query("jsonl", pattern="^(jsonl|chat)$"),
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """One zip: gold, synthetic, structured corpus, unstructured corpus as separate files."""
+    tenant = _tenant_for(user, slug, db)
+    raw, meta = pack_for_user(
+        db,
+        user_id=user.id,
+        tenant_id=tenant.id,
+        tenant_slug=tenant.slug,
+        scope=scope,
+        fmt=format,
+    )
+    label = "session" if scope == "session" else "library"
+    name = pack_filename(slug, label)
+    headers = {
+        "Content-Disposition": f'attachment; filename="{name}"',
+        "X-Helix-Pack-Counts": json.dumps(meta.get("counts") or {}),
+    }
+    if meta.get("empty_reason"):
+        headers["X-Helix-Pack-Empty"] = meta["empty_reason"]
+    return Response(content=raw, media_type="application/zip", headers=headers)
+
+
+@router.get("/snapshots/{version}/download")
+def download_library_snapshot(
+    slug: str,
+    version: str,
+    format: str = Query("jsonl", pattern="^(jsonl|chat)$"),
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    tenant = _tenant_for(user, slug, db)
+    try:
+        raw, _meta = zip_saved_pack(
+            db,
+            user_id=user.id,
+            tenant=tenant,
+            version=version,
+            fmt=format,
+        )
+    except ValueError as e:
+        raise HTTPException(404, str(e)) from e
+    name = pack_filename(slug, version)
+    return Response(
+        content=raw,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{name}"'},
     )
 
 

@@ -291,23 +291,67 @@ async function synthesize() {
   }
 }
 
+function _exportFormat() {
+  return $("exportChatFormat") && $("exportChatFormat").checked ? "chat" : "jsonl";
+}
+
+function _saveBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function _filenameFromDisposition(header, fallback) {
+  const m = String(header || "").match(/filename="([^"]+)"/i);
+  return (m && m[1]) || fallback;
+}
+
+async function downloadLibraryZip({ scope = "library", version = "" } = {}) {
+  if (!state.tenantSlug) throw new Error("Pick a workspace first");
+  const format = _exportFormat();
+  let path;
+  if (version) {
+    path = `/api/t/${state.tenantSlug}/library/snapshots/${encodeURIComponent(version)}/download?format=${encodeURIComponent(format)}`;
+  } else {
+    path = `/api/t/${state.tenantSlug}/library/export-zip?scope=${encodeURIComponent(scope)}&format=${encodeURIComponent(format)}`;
+  }
+  const res = await fetch(path, { headers: { Authorization: `Bearer ${state.token}` } });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(friendlyError(t || res.statusText));
+  }
+  const blob = await res.blob();
+  const name = _filenameFromDisposition(
+    res.headers.get("content-disposition"),
+    `helix_${state.tenantSlug}_${version || scope}.zip`
+  );
+  _saveBlob(blob, name);
+  const empty = res.headers.get("X-Helix-Pack-Empty");
+  if (empty) toast(empty, "err");
+  else toast("Zip downloaded — gold, synthetics, and corpus are separate files");
+  return blob;
+}
+
 async function exportLibrary(kind, fmt) {
   try {
-    const format = fmt || ($("exportChatFormat") && $("exportChatFormat").checked ? "chat" : "jsonl");
+    if (kind === "all" || kind === "gold" || kind === "synthetic") {
+      const pick = ($("exportSavePick") && $("exportSavePick").value) || "";
+      await downloadLibraryZip({ scope: "library", version: pick });
+      return;
+    }
+    const format = fmt || _exportFormat();
     const res = await fetch(
       `/api/t/${state.tenantSlug}/library/export?kind=${encodeURIComponent(kind)}&format=${encodeURIComponent(format)}`,
       { headers: { Authorization: `Bearer ${state.token}` } }
     );
     if (!res.ok) throw new Error("Download failed");
     const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `helix_${state.tenantSlug}_${kind}.${format === "json" ? "json" : "jsonl"}`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    _saveBlob(blob, `helix_${state.tenantSlug}_${kind}.${format === "json" ? "json" : "jsonl"}`);
     toast("Download started");
   } catch (e) {
     toast(e.message, "err");
@@ -374,68 +418,70 @@ function updateRiuUploadPanel(session) {
 }
 
 async function loadDatasets() {
+  if (!$("datasetList") || !state.tenantSlug) return;
   const rows = await api(`/api/t/${state.tenantSlug}/datasets`);
   if (!rows.length) {
     $("datasetList").innerHTML = `
       <div class="empty">
         <div class="icon">📦</div>
-        No saved versions yet. When you have approved examples, name a version and click “Save current examples”.
+        No named session packs yet. Generate gold this chat, then “Save current examples”.
       </div>`;
+    _fillExportSavePick([]);
     return;
   }
   $("datasetList").innerHTML = `<div class="table-wrap"><table class="table">
-    <thead><tr><th>Version</th><th>Examples</th><th>Saved</th><th></th></tr></thead>
+    <thead><tr><th>Name</th><th>In this pack</th><th>Saved</th><th></th></tr></thead>
     <tbody>
       ${rows
-        .map(
-          (r) => `<tr>
+        .map((r) => {
+          const c = r.counts || {};
+          const bits = r.pack
+            ? [
+                `${c.gold || 0} gold`,
+                `${c.synthetic || 0} synth`,
+                `${c.structured || 0} labeled`,
+                `${c.unstructured || 0} materials`,
+              ].join(" · ")
+            : `${r.example_count} examples`;
+          return `<tr>
         <td><strong>${escapeHtml(r.version)}</strong></td>
-        <td>${r.example_count}</td>
+        <td>${escapeHtml(bits)}</td>
         <td>${escapeHtml((r.created_at || "").replace("T", " ").slice(0, 16))}</td>
         <td class="flex">
-          <button class="btn btn-primary btn-sm" data-dl="${escapeHtml(r.version)}" type="button">Download</button>
+          <button class="btn btn-primary btn-sm" data-dl="${escapeHtml(r.version)}" type="button">Download zip</button>
         </td>
-      </tr>`
-        )
+      </tr>`;
+        })
         .join("")}
     </tbody>
   </table></div>`;
   $("datasetList").querySelectorAll("button[data-dl]").forEach((btn) => {
-    btn.onclick = () => downloadExport(btn.dataset.dl, "jsonl");
+    btn.onclick = () =>
+      downloadLibraryZip({ version: btn.dataset.dl }).catch((e) => toast(e.message, "err"));
   });
+  _fillExportSavePick(rows);
+}
+
+function _fillExportSavePick(rows) {
+  const sel = $("exportSavePick");
+  if (!sel) return;
+  const cur = sel.value;
+  const packs = (rows || []).filter((r) => r.pack || r.manifest?.kind === "library_pack");
+  sel.innerHTML =
+    `<option value="">Everything so far</option>` +
+    packs
+      .map((r) => `<option value="${escapeHtml(r.version)}">${escapeHtml(r.version)}</option>`)
+      .join("");
+  if (cur && [...sel.options].some((o) => o.value === cur)) sel.value = cur;
 }
 
 async function downloadExport(version, format) {
-  $("exportStatus").textContent = "Preparing your file…";
+  $("exportStatus").textContent = "Preparing your zip…";
   $("exportStatus").className = "status-line";
   try {
-    const res = await fetch(
-      `/api/t/${state.tenantSlug}/datasets/${encodeURIComponent(version)}/export?format=${format}`,
-      { headers: { Authorization: `Bearer ${state.token}` } }
-    );
-    if (!res.ok) {
-      const t = await res.text();
-      throw new Error(friendlyError(t || res.statusText));
-    }
-    const blob = await res.blob();
-    if (blob.size === 0) {
-      $("exportStatus").textContent =
-        "This file is empty — no approved examples yet. Run helpers and approve examples first.";
-      $("exportStatus").className = "status-line error";
-      toast("No examples to download yet", "err");
-      return;
-    }
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `helix_${state.tenantSlug}_${version}.jsonl`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-    $("exportStatus").textContent = "Download started.";
+    await downloadLibraryZip({ version });
+    $("exportStatus").textContent = "Zip downloaded.";
     $("exportStatus").className = "status-line ok";
-    toast("Download started");
   } catch (e) {
     $("exportStatus").textContent = e.message;
     $("exportStatus").className = "status-line error";
@@ -454,9 +500,13 @@ async function snapshotPool() {
       `/api/t/${state.tenantSlug}/datasets/snapshot?version=${encodeURIComponent(version)}`,
       { method: "POST" }
     );
-    $("exportStatus").textContent = `Saved “${r.version}” with ${r.count} examples.`;
-    $("exportStatus").className = "status-line ok";
-    toast(`Saved ${r.count} examples as ${r.version}`);
+    const c = r.counts || {};
+    const bits = `${c.gold || 0} gold · ${c.synthetic || 0} synth · ${c.structured || 0} labeled · ${c.unstructured || 0} materials`;
+    $("exportStatus").textContent = r.empty_reason
+      ? r.empty_reason
+      : `Saved “${r.version}” — ${bits}.`;
+    $("exportStatus").className = r.empty_reason ? "status-line error" : "status-line ok";
+    toast(r.empty_reason || `Saved this session as ${r.version}`);
     await loadDatasets();
   } catch (e) {
     $("exportStatus").textContent = e.message;
@@ -759,7 +809,9 @@ export function bindLibraryEvents() {
   if ($("synthesizeBtn")) $("synthesizeBtn").onclick = synthesize;
   if ($("exportGoldBtn")) $("exportGoldBtn").onclick = () => exportLibrary("gold");
   if ($("exportSynthBtn")) $("exportSynthBtn").onclick = () => exportLibrary("synthetic");
-  if ($("exportAllLibraryBtn")) $("exportAllLibraryBtn").onclick = () => exportLibrary("all");
+  if ($("exportAllLibraryBtn"))
+    $("exportAllLibraryBtn").onclick = () =>
+      downloadLibraryZip({ scope: "library" }).catch((e) => toast(e.message, "err"));
   if ($("exportUserUploadBtn"))
     $("exportUserUploadBtn").onclick = () => exportLibrary("user_upload");
   if ($("exportMaterialsBtn"))
@@ -767,7 +819,27 @@ export function bindLibraryEvents() {
   if ($("exportTrainableBtn"))
     $("exportTrainableBtn").onclick = () => exportLibrary("trainable");
   if ($("snapshotBtn")) $("snapshotBtn").onclick = snapshotPool;
-  if ($("exportPoolBtn")) $("exportPoolBtn").onclick = () => downloadExport("approved-pool", "jsonl");
+  if ($("exportPoolBtn"))
+    $("exportPoolBtn").onclick = () => {
+      if ($("exportStatus")) {
+        $("exportStatus").textContent = "Preparing this session’s zip…";
+        $("exportStatus").className = "status-line";
+      }
+      downloadLibraryZip({ scope: "session" })
+        .then(() => {
+          if ($("exportStatus")) {
+            $("exportStatus").textContent = "Session zip downloaded.";
+            $("exportStatus").className = "status-line ok";
+          }
+        })
+        .catch((e) => {
+          if ($("exportStatus")) {
+            $("exportStatus").textContent = e.message;
+            $("exportStatus").className = "status-line error";
+          }
+          toast(e.message, "err");
+        });
+    };
   if ($("doubleHelixZipBtn")) {
     $("doubleHelixZipBtn").onclick = async () => {
       try {

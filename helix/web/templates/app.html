@@ -457,11 +457,15 @@
               <h3 class="mt-0 mb-0">Gold in your account</h3>
               <button class="btn btn-ghost btn-sm" id="exportGoldBtn" type="button">Export gold</button>
             </div>
+            <label for="exportSavePick">Pack to export</label>
+            <select id="exportSavePick" aria-label="Choose everything so far or a named save">
+              <option value="">Everything so far</option>
+            </select>
             <label class="flex" style="align-items:center;gap:.5rem;font-weight:500">
               <input id="exportChatFormat" type="checkbox" checked style="width:auto;min-height:auto;margin:0" />
-              LoRA/QLoRA chat-format JSONL (user/assistant messages)
+              Chat-format rows inside the zip (user/assistant messages)
             </label>
-            <p class="hint">Real-world verified / curated examples you own.</p>
+            <p class="hint">Export gold or Export synthetic downloads one zip: gold, synthetics, labeled uploads, and converted materials as separate files. Pick a named save, or leave “Everything so far”.</p>
             <div id="goldList"></div>
           </div>
           <div class="pane pad border-l">
@@ -481,7 +485,7 @@
           <div>
             <span class="page-kicker">Step 5</span>
             <h2>Download your training data</h2>
-            <p class="hint">Export pipeline dataset versions, or your permanent account library (gold + synthesized). To train from this gold, use <strong>My data → Train with Double Helix</strong>.</p>
+            <p class="hint">Every download is one zip with separate files: gold, synthetics, labeled corpus, and converted materials. Full library is everything in this account. Quick download is this Riu chat only. To train, use <strong>My data → Train with Double Helix</strong>.</p>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" id="exportAllLibraryBtn" type="button">Download my full library</button>
@@ -491,19 +495,20 @@
         <div class="page-body">
           <div class="form-row" style="align-items:end">
             <div>
-              <label for="snapshotVersion">Name this version</label>
-              <span class="field-help">e.g. March pack or version_1</span>
-              <input id="snapshotVersion" placeholder="version_1" />
+              <label for="snapshotVersion">Name this session pack</label>
+              <span class="field-help">e.g. support_v1 or march_pack</span>
+              <input id="snapshotVersion" placeholder="support_v1" />
             </div>
             <div class="flex" style="padding-bottom:14px">
               <button class="btn btn-primary" id="snapshotBtn" type="button">Save current examples</button>
               <button class="btn btn-secondary" id="exportPoolBtn" type="button">Quick download</button>
             </div>
           </div>
+          <p class="hint">Save current examples stores this chat’s gold + synthetics + corpus under that name. Quick download gets the same rows as a zip without saving.</p>
           <p id="exportStatus" class="status-line"></p>
 
           <div style="margin-top:28px;border-top:2px solid var(--color-divider);padding-top:20px">
-            <h3 class="mt-0">Saved versions</h3>
+            <h3 class="mt-0">Saved session packs</h3>
             <div id="datasetList"></div>
           </div>
         </div>
