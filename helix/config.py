@@ -6,6 +6,7 @@ import os
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -18,11 +19,21 @@ class Settings(BaseSettings):
         env_file=str(ROOT / ".env"),
         env_file_encoding="utf-8",
         extra="ignore",
+        populate_by_name=True,
     )
 
-    helix_env: str = "local"
-    helix_secret_key: str = "dev-secret-change-me-in-production"
-    helix_base_url: str = "http://localhost:8000"
+    helix_env: str = Field(
+        default="local",
+        validation_alias=AliasChoices("C7X_ENV", "HELIX_ENV"),
+    )
+    helix_secret_key: str = Field(
+        default="dev-secret-change-me-in-production",
+        validation_alias=AliasChoices("C7X_SECRET_KEY", "HELIX_SECRET_KEY"),
+    )
+    helix_base_url: str = Field(
+        default="http://localhost:8000",
+        validation_alias=AliasChoices("C7X_BASE_URL", "HELIX_BASE_URL"),
+    )
 
     database_url: str = f"sqlite:///{DATA_DIR / 'helix.db'}"
 
@@ -52,10 +63,21 @@ class Settings(BaseSettings):
     bootstrap_admin_email: str = "admin@example.com"
     bootstrap_admin_password: str = "admin12345"
 
-    # Resend (transactional email)
+    # Resend — transactional account email only (verify / reset / invites)
     resend_api_key: str = ""
     resend_from_email: str = "C7X <onboarding@resend.dev>"
     resend_reply_to: str = ""
+
+    # Hostinger Agentic Mail — Riu's inbox. Not the hosting/VPS token.
+    hostinger_mail_api_token: str = ""
+    hostinger_mail_mailbox_id: str = ""
+    hostinger_mail_webhook_secret: str = ""
+    # Alias for HOSTINGER_MAIL_API_TOKEN if you prefer this name.
+    riu_mailbox_api_key: str = ""
+    riu_mailbox_address: str = "Riu <hello@c7xai.in>"
+    riu_mailbox_from_email: str = ""
+    # Comma-separated addresses or @domain; empty = accept all (sandboxed, no auto-run).
+    riu_mailbox_allowed_senders: str = ""
 
     # Auth policy
     require_email_verification: bool = True
@@ -164,6 +186,14 @@ class Settings(BaseSettings):
     @property
     def apify_configured(self) -> bool:
         return bool(self.apify_key)
+
+    @property
+    def mailbox_allowed_senders_list(self) -> list[str]:
+        return [
+            s.strip().lower()
+            for s in (self.riu_mailbox_allowed_senders or "").split(",")
+            if s.strip()
+        ]
 
 
 @lru_cache

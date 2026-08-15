@@ -208,6 +208,22 @@
                 <p class="hint mb-0">Nothing yet — start the chat.</p>
               </div>
             </div>
+            <div class="side-rail-block hidden" id="riuMailboxBlock">
+              <div class="side-rail-title">Riu mailbox</div>
+              <p class="hint mb-0" id="riuMailboxAddr">Not configured</p>
+              <div id="riuMailboxList" class="riu-mailbox-list"></div>
+              <div id="riuMailboxRead" class="riu-mailbox-read hidden"></div>
+              <form id="riuMailboxReply" class="riu-mailbox-reply hidden">
+                <label class="sr-only" for="riuMailboxReplyBody">Reply</label>
+                <textarea id="riuMailboxReplyBody" rows="3" placeholder="Reply as Riu…"></textarea>
+                <div class="flex" style="gap:8px;margin-top:8px;flex-wrap:wrap">
+                  <button class="btn btn-primary btn-sm" type="submit">Send reply</button>
+                </div>
+              </form>
+              <div class="flex" style="gap:8px;margin-top:8px">
+                <button class="btn btn-ghost btn-sm" id="riuMailboxRefreshBtn" type="button">Refresh inbox</button>
+              </div>
+            </div>
             <div class="side-rail-block">
               <div class="side-rail-title">Shortcuts</div>
               <div class="flex" style="flex-direction:column;align-items:stretch;gap:8px">

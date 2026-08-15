@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from helix.api.deps import get_current_user
 from helix.db import models as m
 from helix.db.session import get_db
+from helix.services import mailbox as mailbox_svc
 from helix.services import riu as riu_service
 from helix.services.user_gold_upload import MAX_ZIP_BYTES, import_zip_as_gold
 from helix.services.user_material_upload import import_material_zip_as_trainable
@@ -265,3 +266,110 @@ async def riu_upload_materials_zip(
         **out,
         "session": riu_service.session_to_dict(session),
     }
+
+
+def _require_mailbox(user: m.User) -> None:
+    if not mailbox_svc.can_use_riu_mailbox(user):
+        raise HTTPException(403, "Riu's mailbox is for C7X operators.")
+
+
+class MailboxSendIn(BaseModel):
+    to: str = Field(min_length=3, max_length=320)
+    subject: str = Field(min_length=1, max_length=500)
+    body: str = Field(min_length=1, max_length=20000)
+
+
+class MailboxReplyIn(BaseModel):
+    body: str = Field(min_length=1, max_length=20000)
+
+
+@router.get("/mailbox")
+def riu_mailbox_list(
+    slug: str,
+    unread: bool = False,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    _tenant_for(user, slug, db)
+    _require_mailbox(user)
+    rows = mailbox_svc.list_messages(db, unread_only=unread)
+    unread_n = (
+        db.query(m.MailboxMessage)
+        .filter_by(direction="inbound", status="unread")
+        .count()
+    )
+    return {
+        **mailbox_svc.mailbox_status(),
+        "unread": unread_n,
+        "messages": [mailbox_svc.message_to_dict(r) for r in rows],
+    }
+
+
+@router.post("/mailbox/sync")
+def riu_mailbox_sync(
+    slug: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    _tenant_for(user, slug, db)
+    _require_mailbox(user)
+    return mailbox_svc.sync_remote_inbox(db)
+
+
+@router.get("/mailbox/{message_id}")
+def riu_mailbox_get(
+    slug: str,
+    message_id: str,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    _tenant_for(user, slug, db)
+    _require_mailbox(user)
+    row = mailbox_svc.get_message(db, message_id)
+    if not row:
+        raise HTTPException(404, "Message not found")
+    row = mailbox_svc.hydrate_if_needed(db, row)
+    mailbox_svc.mark_read(db, row)
+    return mailbox_svc.message_to_dict(row, include_body=True)
+
+
+@router.post("/mailbox/send")
+def riu_mailbox_send(
+    slug: str,
+    body: MailboxSendIn,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    _tenant_for(user, slug, db)
+    _require_mailbox(user)
+    result = mailbox_svc.send_agent_email(
+        db,
+        to=body.to,
+        subject=body.subject,
+        body=body.body,
+        user_id=user.id,
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "Send failed")
+    return result
+
+
+@router.post("/mailbox/{message_id}/reply")
+def riu_mailbox_reply(
+    slug: str,
+    message_id: str,
+    body: MailboxReplyIn,
+    user: m.User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    _tenant_for(user, slug, db)
+    _require_mailbox(user)
+    row = mailbox_svc.get_message(db, message_id)
+    if not row:
+        raise HTTPException(404, "Message not found")
+    result = mailbox_svc.reply_to_message(
+        db, row=row, body=body.body, user_id=user.id
+    )
+    if not result.get("ok"):
+        raise HTTPException(400, result.get("error") or "Reply failed")
+    return result

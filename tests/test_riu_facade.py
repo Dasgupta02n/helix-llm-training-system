@@ -8,6 +8,8 @@ def test_facade_reexports_public_and_test_helpers():
     assert riu.handle_user_message is riu_actions.handle_user_message
     assert riu._heuristic_turn is riu_actions._heuristic_turn
     assert riu._wants_run is riu_actions._wants_run
+    assert riu._wants_mailbox_list is riu_actions._wants_mailbox_list
+    assert riu._wants_send_mail is riu_actions._wants_send_mail
     assert riu.official_estimate_for_state is riu_estimate.official_estimate_for_state
     assert riu.riu_start_block_reason is riu_estimate.riu_start_block_reason
     assert riu.create_session is riu_session.create_session

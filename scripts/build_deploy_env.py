@@ -13,7 +13,7 @@ load_dotenv(ROOT / ".env", override=True)
 out = ROOT / "data" / "hostinger_deploy.env"
 out.parent.mkdir(exist_ok=True)
 
-sk = os.getenv("HELIX_SECRET_KEY") or ""
+sk = os.getenv("C7X_SECRET_KEY") or os.getenv("HELIX_SECRET_KEY") or ""
 if not sk or sk.startswith("dev-secret") or "change-me" in sk:
     sk = secrets.token_urlsafe(48)
 pw = os.getenv("POSTGRES_PASSWORD") or secrets.token_urlsafe(24)
@@ -30,14 +30,20 @@ lines = {
     "OPENROUTER_BASE_URL": os.getenv("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1"),
     "OPENROUTER_MODEL": os.getenv("OPENROUTER_MODEL", "x-ai/grok-4.5"),
     "OPENROUTER_SITE_URL": "https://c7xai.in",
-    "OPENROUTER_SITE_NAME": "Helix",
+    "OPENROUTER_SITE_NAME": os.getenv("OPENROUTER_SITE_NAME", "C7X"),
     "APIFY_API_KEY": os.getenv("APIFY_API_KEY") or os.getenv("APIFY_TOKEN", ""),
     "APIFY_MAX_RESULTS_PER_SEARCH": os.getenv("APIFY_MAX_RESULTS_PER_SEARCH", "10"),
     "APIFY_DEDUPE_HOURS": os.getenv("APIFY_DEDUPE_HOURS", "48"),
     "APIFY_CACHE_HOURS": os.getenv("APIFY_CACHE_HOURS", "24"),
     "APIFY_FAIL_CLOSED": "true",
     "RESEND_API_KEY": os.getenv("RESEND_API_KEY", ""),
-    "RESEND_FROM_EMAIL": os.getenv("RESEND_FROM_EMAIL", "Helix <onboarding@resend.dev>"),
+    "RESEND_FROM_EMAIL": os.getenv("RESEND_FROM_EMAIL", "C7X <noreply@c7xai.in>"),
+    "HOSTINGER_MAIL_API_TOKEN": os.getenv("HOSTINGER_MAIL_API_TOKEN", "")
+    or os.getenv("RIU_MAILBOX_API_KEY", ""),
+    "HOSTINGER_MAIL_MAILBOX_ID": os.getenv("HOSTINGER_MAIL_MAILBOX_ID", ""),
+    "HOSTINGER_MAIL_WEBHOOK_SECRET": os.getenv("HOSTINGER_MAIL_WEBHOOK_SECRET", ""),
+    "RIU_MAILBOX_ADDRESS": os.getenv("RIU_MAILBOX_ADDRESS", "Riu <riu@c7xai.in>"),
+    "RIU_MAILBOX_FROM_EMAIL": os.getenv("RIU_MAILBOX_FROM_EMAIL", ""),
     "BOOTSTRAP_ADMIN_EMAIL": "admin@c7xai.in",
     "BOOTSTRAP_ADMIN_PASSWORD": admin_pw,
     "ALLOW_PUBLIC_SIGNUP": "true",

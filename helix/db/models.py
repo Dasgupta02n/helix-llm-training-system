@@ -101,6 +101,36 @@ class EmailLog(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class MailboxMessage(Base):
+    """Riu's agentic mailbox (Hostinger Mail inbound + agent outbound)."""
+
+    __tablename__ = "mailbox_messages"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True)
+    direction: Mapped[str] = mapped_column(String(16), index=True)  # inbound|outbound
+    provider_email_id: Mapped[str | None] = mapped_column(
+        String(80), unique=True, nullable=True
+    )
+    rfc_message_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    in_reply_to: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    from_email: Mapped[str] = mapped_column(String(320), default="")
+    to_emails: Mapped[str] = mapped_column(Text, default="[]")
+    cc_emails: Mapped[str] = mapped_column(Text, default="[]")
+    subject: Mapped[str] = mapped_column(String(500), default="")
+    text_body: Mapped[str] = mapped_column(Text, default="")
+    html_body: Mapped[str] = mapped_column(Text, default="")
+    attachments_json: Mapped[str] = mapped_column(Text, default="[]")
+    status: Mapped[str] = mapped_column(String(24), default="unread", index=True)
+    received_for: Mapped[str] = mapped_column(Text, default="[]")
+    thread_key: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    allowlisted: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_by_user_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    riu_session_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class Membership(Base):
     __tablename__ = "memberships"
     __table_args__ = (UniqueConstraint("user_id", "tenant_id", name="uq_user_tenant"),)

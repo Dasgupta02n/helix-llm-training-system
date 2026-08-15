@@ -150,6 +150,15 @@ async function sendRiuMessage(text) {
       if (typeof hooks.refreshers.library === "function") hooks.refreshers.library().catch(() => {});
     }
     $("riuStatus").textContent = data.used_llm ? "Riu (AI) replied" : "Riu replied";
+    if (
+      (data.action_results || []).some((r) =>
+        ["list_mailbox", "read_mail", "send_mail", "reply_mail", "draft_mail"].includes(
+          r.action
+        )
+      )
+    ) {
+      loadMailbox().catch(() => {});
+    }
   } catch (e) {
     $("riuTyping")?.remove();
     $("riuStatus").textContent = e.message;
@@ -220,9 +229,117 @@ export function bindRiuEvents() {
       sendRiuMessage(q).catch((e) => toast(e.message, "err"));
     });
   });
+  if ($("riuMailboxRefreshBtn")) {
+    $("riuMailboxRefreshBtn").onclick = () =>
+      syncMailbox().catch((e) => toast(e.message, "err"));
+  }
+  if ($("riuMailboxReply")) {
+    $("riuMailboxReply").addEventListener("submit", (e) => {
+      e.preventDefault();
+      sendMailboxReply($("riuMailboxReplyBody")?.value || "").catch((err) =>
+        toast(err.message, "err")
+      );
+    });
+  }
 }
 
-hooks.onTab.riu = () => loadRiuSession().catch((e) => toast(e.message, "err"));
+let mailboxSelectedId = "";
+
+function mailboxVisible() {
+  return !!(state.me && state.me.is_superadmin);
+}
+
+function renderMailboxList(data) {
+  const block = $("riuMailboxBlock");
+  const list = $("riuMailboxList");
+  const addr = $("riuMailboxAddr");
+  if (!block || !list) return;
+  if (!mailboxVisible()) {
+    block.classList.add("hidden");
+    return;
+  }
+  block.classList.remove("hidden");
+  if (addr) {
+    const unread = data.unread || 0;
+    addr.textContent = `${data.address || "Riu mailbox"} · ${unread} unread`;
+  }
+  const msgs = data.messages || [];
+  if (!msgs.length) {
+    list.innerHTML = `<p class="hint mb-0">No mail yet. Ask Riu to check the inbox.</p>`;
+    return;
+  }
+  list.innerHTML = msgs
+    .slice(0, 12)
+    .map((m) => {
+      const unread = m.status === "unread" ? " unread" : "";
+      return `<button type="button" class="riu-mail-item${unread}" data-mail-id="${escapeHtml(
+        m.id
+      )}">
+        <strong>${escapeHtml(m.subject || "(no subject)")}</strong>
+        <span>${escapeHtml(m.from || "—")} · ${escapeHtml(m.status || "")}</span>
+      </button>`;
+    })
+    .join("");
+  list.querySelectorAll("[data-mail-id]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      openMailboxMessage(btn.getAttribute("data-mail-id") || "").catch((e) =>
+        toast(e.message, "err")
+      );
+    });
+  });
+}
+
+async function loadMailbox() {
+  if (!state.tenantSlug || !mailboxVisible() || !$("riuMailboxBlock")) return;
+  const data = await api(`/api/t/${state.tenantSlug}/riu/mailbox`);
+  renderMailboxList(data);
+  return data;
+}
+
+async function openMailboxMessage(id) {
+  if (!state.tenantSlug || !id) return;
+  mailboxSelectedId = id;
+  const msg = await api(`/api/t/${state.tenantSlug}/riu/mailbox/${id}`);
+  const pane = $("riuMailboxRead");
+  const form = $("riuMailboxReply");
+  if (pane) {
+    pane.classList.remove("hidden");
+    const body = msg.text || "(no text body)";
+    pane.innerHTML = `<div class="riu-mail-body">
+      <strong>${escapeHtml(msg.subject || "(no subject)")}</strong>
+      <p class="hint mb-0">${escapeHtml(msg.from || "—")} → ${escapeHtml(
+        (msg.to || []).join(", ")
+      )}</p>
+      <p>${renderMarkdownLite(body)}</p>
+    </div>`;
+  }
+  if (form && msg.direction === "inbound") form.classList.remove("hidden");
+  loadMailbox().catch(() => {});
+}
+
+async function sendMailboxReply(text) {
+  if (!state.tenantSlug || !mailboxSelectedId) throw new Error("Pick a message first");
+  const body = (text || "").trim();
+  if (!body) return;
+  await api(`/api/t/${state.tenantSlug}/riu/mailbox/${mailboxSelectedId}/reply`, {
+    method: "POST",
+    body: JSON.stringify({ body }),
+  });
+  if ($("riuMailboxReplyBody")) $("riuMailboxReplyBody").value = "";
+  toast("Reply sent");
+  await loadMailbox();
+}
+
+async function syncMailbox() {
+  if (!state.tenantSlug || !mailboxVisible()) return;
+  await api(`/api/t/${state.tenantSlug}/riu/mailbox/sync`, { method: "POST" });
+  await loadMailbox();
+}
+
+hooks.onTab.riu = () => {
+  loadRiuSession().catch((e) => toast(e.message, "err"));
+  loadMailbox().catch(() => {});
+};
 hooks.applyRiuSession = (session) => {
   renderRiuMessages(session.messages || []);
   renderRiuState(session.state || {});
