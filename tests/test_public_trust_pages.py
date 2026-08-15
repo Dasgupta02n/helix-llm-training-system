@@ -125,7 +125,7 @@ def test_homepage_introduces_riu_and_seo_geo():
     assert r.status_code == 200
     low = r.text.lower()
     assert 'id="riu"' in r.text
-    assert "meet riu" in low or "riu is" in low
+    assert "meet riu" in low or "riu is" in low or "riu, the setup" in low
     assert 'id="seo-geo"' in r.text
     assert "generative" in low or "geo" in low
     assert "langsmith" in low or "labeling" in low or "rag" in low

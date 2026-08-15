@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Helix">
-  <rect width="64" height="64" rx="14" fill="#8827dd"/>
-  <text x="32" y="44" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="700" fill="#ffffff">H</text>
+  <rect width="64" height="64" fill="#0C0B09"/>
+  <path d="M22 8c0 16 20 8 20 24s-20 8-20 24" fill="none" stroke="#E8CE7A" stroke-width="3"/>
+  <path d="M42 8c0 16-20 8-20 24s20 8 20 24" fill="none" stroke="#F0E5C8" stroke-width="3" opacity=".5"/>
 </svg>

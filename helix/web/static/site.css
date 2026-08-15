@@ -1,33 +1,25 @@
-/* Helix public site — Primora-inspired: near-black, purple CTA, serif display */
-@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600;1,6..72,400;1,6..72,500&display=swap");
+/* Helix public site — Helix 180 gold / warm-black. Tokens live in helix180.css */
+@import url("/static/helix180.css");
 
 .site-body {
-  --bg: #100e11;
-  --bg-2: #161318;
-  --card: #18151c;
-  --ink: #efedf0;
-  --muted: #a09aa8;
-  --line: #2a262e;
-  --purple: #8827dd;
-  --purple-2: #a14ef0;
-  --blue: #2d40ea;
-  --dot: #e8a23a;
+  --bg: var(--hx-bg);
+  --bg-2: var(--hx-bg-2);
+  --card: #18140f;
+  --ink: var(--hx-ink);
+  --muted: var(--hx-muted);
+  --line: var(--hx-line);
+  --purple: var(--hx-gold);
+  --purple-2: var(--hx-gold-2);
+  --blue: var(--hx-gold-4);
+  --dot: var(--hx-gold);
   --shadow: none;
   --r: 8px;
   color-scheme: dark;
   background: var(--bg);
   color: var(--ink);
-  font-family: Inter, system-ui, sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
-
-.site-body ::selection {
-  background: rgba(136, 39, 221, 0.35);
-  color: #fff;
-}
-
-.site-body a { color: #c9b4ff; }
-.site-body a:hover { color: #fff; }
 .site-body .hint { color: var(--muted); }
 
 .site-body .page-kicker {

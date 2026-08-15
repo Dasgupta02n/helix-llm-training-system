@@ -1,8 +1,8 @@
 /* Helix — Ink console UI (Modernist design system)
    Source: UI mockups "Helix Restyle" / modernist design system */
 
-@import url("https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&display=swap");
 @import url("/static/modernist.css");
+@import url("/static/helix180.css");
 
 :root {
   --sidebar-w: 236px;
@@ -13,9 +13,9 @@
   --muted-ink: color-mix(in srgb, var(--color-text) 55%, transparent);
   --line: var(--color-divider);
   --line-soft: color-mix(in srgb, var(--color-text) 18%, transparent);
-  --ok: #2f7a4b;
-  --warn: #9a6b12;
-  --err: #ae1800;
+  --ok: #8fbf9a;
+  --warn: #e8ce7a;
+  --err: #e07060;
 }
 
 /* ── Base overrides (app shell) ─────────────────────── */
@@ -58,12 +58,15 @@ a:hover { color: var(--color-accent-700); }
 }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-primary {
-  background: var(--ac);
-  color: var(--paper);
-  border-color: var(--ac);
+  background: var(--hx-grad, var(--ac));
+  color: #0c0b09;
+  border-color: transparent;
+  font-family: var(--font-mono, var(--font-heading));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
-.btn-primary:hover:not(:disabled) { background: var(--color-accent-600); border-color: var(--color-accent-600); }
-.btn-primary:active:not(:disabled) { background: var(--color-accent-700); }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.06); }
+.btn-primary:active:not(:disabled) { filter: brightness(0.95); }
 .btn-secondary {
   border-color: var(--line);
   background: transparent;
@@ -1586,4 +1589,57 @@ select {
   background: rgba(0,0,0,.04);
   padding: 12px 14px;
   border-radius: 8px;
+}
+
+/* Helix 180 — studio chrome on warm black */
+.sidebar,
+.auth-shell {
+  background: #0c0b09 !important;
+  color: #f0e5c8 !important;
+}
+.sidebar {
+  border-right: 1px solid rgba(201, 162, 39, 0.28);
+}
+.sidebar-brand,
+.sidebar-workspace,
+.sidebar-foot {
+  border-color: rgba(201, 162, 39, 0.28) !important;
+}
+.sidebar-brand .brand-mark {
+  background: none !important;
+  width: 15px;
+  height: 22px;
+  padding: 0;
+}
+.sidebar-brand .brand-text strong,
+.sidebar-brand .brand-text span,
+.sidebar .ws-label,
+.sidebar .nav-pill,
+.user-meta strong,
+.user-meta span {
+  color: #f0e5c8 !important;
+}
+.nav-pill.active {
+  color: #c9a227 !important;
+  border-color: rgba(201, 162, 39, 0.45);
+}
+.app-shell,
+.auth-shell,
+.tab-panel {
+  background: #0c0b09;
+  color: #f0e5c8;
+}
+.pane,
+.job-card,
+.stat-card,
+.modal-card,
+input,
+textarea,
+select {
+  background: #141210;
+  color: #f0e5c8;
+  border-color: rgba(201, 162, 39, 0.28);
+}
+.declaration-text {
+  background: rgba(201, 162, 39, 0.06);
 }

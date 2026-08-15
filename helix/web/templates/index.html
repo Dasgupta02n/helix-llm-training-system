@@ -1,6 +1,6 @@
 {% extends "public_base.html" %}
 {% block title %}Helix{% endblock %}
-{% block meta_description %}Helix is a gold training-data studio—not a chatbot, prompt tool, or labeling factory. Mine domain-specific gold examples, quality-gate them, and export fine-tune-ready datasets. Meet Riu, your setup guide. Built for SEO and GEO: models that answer from your domain, not generic web text.{% endblock %}
+{% block meta_description %}A model that holds the role, not a prompt that describes it. Helix builds gold training data for one role, assimilates it into an open model, and returns weights you deploy inside your own environment.{% endblock %}
 {% block canonical %}https://c7xai.in/{% endblock %}
 {% block main_class %}public-home{% endblock %}
 {% block content %}
@@ -12,7 +12,7 @@
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Web",
   "url": "https://c7xai.in/",
-  "description": "No-code gold training-data studio: plan in plain English with Riu, mine evidence, quality-gate gold examples, synthesize variants, and export fine-tune-ready datasets.",
+  "description": "Gold training-data studio and Double Helix fine-tune: a worker for one role, deployed inside your perimeter.",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free during public beta for approved accounts" },
   "publisher": { "@type": "Organization", "name": "c7x AI", "url": "https://c7xai.in/about" }
 }
@@ -22,372 +22,286 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    {"@type": "Question", "name": "Is Helix a chatbot?", "acceptedAnswer": {"@type": "Answer", "text": "No. Riu is a setup guide. Helix is a dataset studio that produces gold training files you own."}},
-    {"@type": "Question", "name": "How is Helix different from ChatGPT, LangSmith, or Scale?", "acceptedAnswer": {"@type": "Answer", "text": "Chat tools generate answers. Prompt/eval platforms debug live agents. Labeling factories annotate at enterprise scale. Helix mines and quality-gates the gold dataset you need before you fine-tune."}},
-    {"@type": "Question", "name": "What is GEO?", "acceptedAnswer": {"@type": "Answer", "text": "Generative Engine Optimization: making your domain the source AI systems cite. Helix gold trains models on your facts and voice so they win search and AI-overview answers."}},
-    {"@type": "Question", "name": "Who is Riu?", "acceptedAnswer": {"@type": "Answer", "text": "Riu is Helix’s conversational setup guide. She interviews you, collects labeled and unlabeled data, shows a pricing estimate, and starts mining only after you confirm."}}
+    {"@type": "Question", "name": "Is Helix a chatbot?", "acceptedAnswer": {"@type": "Answer", "text": "No. Riu is a setup guide. Helix is not another chat box — it produces a gold library and a pinned worker you own."}},
+    {"@type": "Question", "name": "How is Helix different from ChatGPT, LangSmith, or Scale?", "acceptedAnswer": {"@type": "Answer", "text": "Chat tools generate answers. Prompt and eval platforms debug live agents. Labeling factories annotate at enterprise scale. RAG retrieves documents for one call. Helix writes the role into weights."}},
+    {"@type": "Question", "name": "What is GEO?", "acceptedAnswer": {"@type": "Answer", "text": "Generative Engine Optimization: making your domain the source AI systems cite. A Helix worker answers from trained judgment, not generic web text."}},
+    {"@type": "Question", "name": "Who is Riu?", "acceptedAnswer": {"@type": "Answer", "text": "Riu is Helix’s setup interview. She is the only way a plan gets created."}}
   ]
 }
 </script>
 
-<section class="hx-hero landing-hero">
-  <div class="hx-hero-lines" aria-hidden="true"></div>
-  <div class="hx-hero-inner">
-    <div class="page-kicker">Training data studio · Early beta</div>
-    <h1>Gold that lasts</h1>
-    <p class="lead">
-      Not another chat box. Helix turns domain knowledge into durable
-      <strong>training data</strong> — mined, quality-gated, and exported as files you own.
-    </p>
-    <div class="hx-hero-actions">
-      <a class="btn btn-primary btn-lg" href="/app">Talk to Riu</a>
-      <a class="btn btn-secondary btn-lg" href="/docs">Read the framework</a>
-    </div>
-  </div>
-</section>
+<div class="h180">
+  <div class="h180-cursor" data-cursor></div>
 
-<div class="hx-marquee" aria-hidden="true">
-  <div class="hx-marquee-track">
-    <span>not another chat box</span><span>mine · gate · export</span>
-    <span>you own the files</span><span>~$0.75–$1 / gold row</span>
-    <span>SEO + GEO</span><span>Talk to Riu</span>
-    <span>not another chat box</span><span>mine · gate · export</span>
-    <span>you own the files</span><span>~$0.75–$1 / gold row</span>
-    <span>SEO + GEO</span><span>Talk to Riu</span>
-  </div>
-</div>
-
-<section class="hx-learn">
-  <div>
-    <p class="page-kicker">The work that lasts</p>
-    <h2>What we’ve learned matters most</h2>
-  </div>
-  <a class="btn btn-secondary" href="/docs">Read the framework</a>
-</section>
-
-<section class="hx-stats-wrap" id="impact" aria-label="Product facts">
-  <p class="page-kicker">Impact</p>
-  <h2>When a dataset becomes measurable gold.</h2>
-  <div class="hx-stats">
-    <div><b>~$0.75–$1 / row</b><span>Gold with your sources. Jobs pause if they would overshoot.</span></div>
-    <div><b>You own it</b><span>Gold JSONL you download. Not a chat session.</span></div>
-    <div><b>Plan-scoped</b><span>HR stays HR. Food stays food. No cross-domain gold.</span></div>
-    <div><b>Riu first</b><span>Interview, estimate, confirm — then the studio works.</span></div>
-  </div>
-</section>
-
-<section class="hx-manifesto">
-  <h2>
-    Helix works with product and ops teams to turn domain knowledge into gold
-    training files — so the model you ship actually knows your product.
-  </h2>
-  <div class="flex">
-    <a class="btn btn-primary" href="/app">Talk to Riu</a>
-  </div>
-</section>
-
-<section class="hx-who" id="who">
-  <div class="hx-who-head">
-    <p class="page-kicker">Who we work with</p>
-    <h2>Teams who need gold, not another chat UI</h2>
-  </div>
-  <div class="hx-who-grid">
-    <article class="hx-who-card">
-      <div class="who-n">01</div>
-      <h3>Solving a real problem</h3>
-      <p>You need a dataset for a real product or policy — not another demo chatbot.</p>
-    </article>
-    <article class="hx-who-card">
-      <div class="who-n">02</div>
-      <h3>Early momentum</h3>
-      <p>FAQs, scripts, rulebooks, or a live domain already exist. Something to mine from.</p>
-    </article>
-    <article class="hx-who-card">
-      <div class="who-n">03</div>
-      <h3>Consistency</h3>
-      <p>You will review the library and keep the plan scoped — not dump a website once.</p>
-    </article>
-    <article class="hx-who-card">
-      <div class="who-n">04</div>
-      <h3>Building with intent</h3>
-      <p>A clear domain, formats, and quality bar before any mining job starts.</p>
-    </article>
-    <article class="hx-who-card">
-      <div class="who-n">05</div>
-      <h3>Open mind</h3>
-      <p>Willing to reject junk gold and change the plan when the domain shifts.</p>
-    </article>
-    <article class="hx-who-card">
-      <div class="who-n">06</div>
-      <h3>Endurance</h3>
-      <p>Training data that lasts past one prompt session — files you keep.</p>
-    </article>
-  </div>
-</section>
-
-<section class="landing-decision" id="different">
-  <h2>Why Helix is not like anything you already have</h2>
-  <p class="section-lead">
-    If you already have a chatbot, a RAG stack, or a prompt dashboard, you still do not have
-    <strong>owned gold training data</strong>. That is the job Helix does—and the job those tools skip.
-  </p>
-  <div class="compare-wrap">
-    <table class="compare-table">
-      <thead>
-        <tr>
-          <th scope="col">What teams buy today</th>
-          <th scope="col">What it actually does</th>
-          <th scope="col">What Helix does instead</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <th scope="row">ChatGPT, Claude, generic chat UIs</th>
-          <td>Answers in a box. Forgets your policy tomorrow. You do not own a dataset.</td>
-          <td>Produces <strong>gold Q&amp;A files you keep</strong>—for fine-tunes, evals, and Double Helix later.</td>
-        </tr>
-        <tr>
-          <th scope="row">Prompt / eval consoles (LangSmith, Braintrust, etc.)</th>
-          <td>Debug a live agent. Great after you already have a product.</td>
-          <td>Builds the <strong>offline training set first</strong>—before you ship or fine-tune.</td>
-        </tr>
-        <tr>
-          <th scope="row">Enterprise labeling (Scale, Labelbox)</th>
-          <td>Huge annotation programs. Slow, expensive, vendor-run.</td>
-          <td>Product/ops mines and gates gold <strong>without a labeling factory</strong>.</td>
-        </tr>
-        <tr>
-          <th scope="row">RAG / knowledge bases</th>
-          <td>Retrieves docs at runtime. The model never learns your voice.</td>
-          <td>Turns docs + web evidence into <strong>trainable pairs</strong> the model can internalize.</td>
-        </tr>
-        <tr>
-          <th scope="row">Fine-tune UIs that assume you have JSONL</th>
-          <td>Train if you already have clean data. Most teams do not.</td>
-          <td>Helix <strong>creates that JSONL</strong>—mined, gated, and exportable.</td>
-        </tr>
-        <tr>
-          <th scope="row">Raw scrapers / “just dump the website”</th>
-          <td>Noisy text. Models refuse, echo, or mix domains.</td>
-          <td>Hard quality gates reject junk. Plan-scoped mining. Spend cap you can audit.</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-  <p class="hint" style="margin-top:16px;max-width:62ch">
-    Use Helix for the dataset. Train and evaluate wherever you want. We are not competing with your chat UI—
-    we are the reason that UI finally sounds like your company.
-  </p>
-</section>
-
-<div class="landing-features" id="how">
-  <div class="card">
-    <div class="feature-icon">1</div>
-    <h3>Plan in plain English</h3>
-    <p class="hint mb-0">Talk to Riu — she is the only setup path. Domain, mission, categories, tone—any vertical.</p>
-  </div>
-  <div class="card">
-    <div class="feature-icon">2</div>
-    <h3>Mine + quality-gate gold</h3>
-    <p class="hint mb-0">Web gather and/or your corpus. Helpers judge; hard gates reject refuse/echo junk.</p>
-  </div>
-  <div class="card">
-    <div class="feature-icon">3</div>
-    <h3>Synthesize &amp; export</h3>
-    <p class="hint mb-0">Controlled variants, library that keeps forever, download training files for your trainer.</p>
-  </div>
-</div>
-
-<section class="landing-decision riu-intro" id="riu">
-  <p class="page-kicker">Meet Riu</p>
-  <h2>Riu is your studio guide—not another chatbot to train</h2>
-  <p class="section-lead">
-    Riu (pronounced <em>ree-oo</em>) is Helix’s conversational operator. She does not answer customer tickets.
-    She interviews <strong>you</strong>, configures the studio, estimates cost, and starts mining
-    only after you say so.
-  </p>
-  <div class="riu-intro-grid">
-    <div class="riu-portrait card">
-      <div class="riu-mark" aria-hidden="true">R</div>
-      <h3>Who she is</h3>
-      <p class="hint">
-        A plain-English setup agent inside Helix. No jargon. One or two questions at a time.
-        She remembers your plan, formats, goals, and uploads across the session.
-      </p>
-      <p class="hint mb-0">
-        When work starts, mining jobs keep running after you log out. Riu is the front door—not the model you ship.
-      </p>
-    </div>
-    <div class="card">
-      <h3>What she asks</h3>
-      <ol class="riu-steps">
-        <li>What <strong>role</strong> will the AI perform?</li>
-        <li>One <strong>perfect example</strong>, then 1–3 <strong>edge cases</strong> (more if the role is high-risk).</li>
-        <li>Official <strong>per-row</strong> estimate. Confirm — then mining starts.</li>
-        <li>After gold is ready: optional <strong>variations</strong> (you opt in).</li>
-      </ol>
-      <div class="riu-example hint" style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px">
-        <strong>Example exchange</strong>
-        <p class="mb-0"><em>You:</em> Screen CVs for a backend role.</p>
-        <p class="mb-0"><em>Riu:</em> High-risk hiring role — I need 3 edge cases and a human-review quality bar. Give me one perfect score request and ideal reply.</p>
-        <p class="mb-0"><em>You:</em> I have no corpus. I want 5000 gold.</p>
-        <p class="mb-0"><em>Riu:</em> 5,000 gold with your sources is about $3,750–$5,000. Web-only starts at 10 examples (~$20–$30), then review. Type start 10.</p>
+  <section class="h180-hero">
+    <div class="h180-wave" aria-hidden="true">
+      <div style="animation:hxDrift 12s ease-in-out infinite alternate">
+        <svg viewBox="0 0 900 260" aria-hidden="true">
+          <polyline points="0,130 75,218 150,130 225,42 300,130 375,218 450,130 525,42 600,130 675,218 750,130 825,42 900,130" fill="none" stroke="#C9A227" stroke-width="1.4" stroke-linejoin="round"/>
+          <polyline points="0,130 75,42 150,130 225,218 300,130 375,42 450,130 525,218 600,130 675,42 750,130 825,218 900,130" fill="none" stroke="#F0E5C8" stroke-width="1.4" stroke-linejoin="round" opacity=".4"/>
+        </svg>
       </div>
     </div>
-  </div>
-  <div class="flex" style="margin-top:18px;flex-wrap:wrap;gap:10px">
-    <a class="btn btn-primary" href="/app">Talk to Riu in the studio</a>
-    <a class="btn btn-secondary" href="/docs">Riu in the docs</a>
-  </div>
-</section>
-
-<section class="landing-decision" id="seo-geo">
-  <p class="page-kicker">SEO · GEO</p>
-  <h2>Gold data that wins search and generative answers</h2>
-  <p class="section-lead">
-    <strong>SEO</strong> is how people find you in search. <strong>GEO</strong> (generative engine optimization)
-    is how AI systems—ChatGPT, Perplexity, Google AI Overviews—choose <em>whose</em> facts to cite.
-    Generic chatbots and RAG dumps do not train a model on your domain. Helix does.
-  </p>
-  <div class="landing-decision-grid">
-    <div class="card">
-      <h3>For search (SEO)</h3>
-      <ul class="hint">
-        <li>Domain-specific Q&amp;A your site and help center can actually publish</li>
-        <li>Consistent voice and facts—not scraped marketing paste</li>
-        <li>Datasets you own and version, so content teams and models stay aligned</li>
-      </ul>
+    <div class="hx-kicker">
+      <span class="dot"></span>
+      <span>Custom LLM workers</span>
+      <span class="hx-rule"></span>
+      <span style="color:rgba(240,229,200,.55)">Trained on your data, run inside your perimeter</span>
     </div>
-    <div class="card">
-      <h3>For AI answers (GEO)</h3>
-      <ul class="hint">
-        <li>Fine-tunes that internalize <strong>your</strong> policies, scripts, and formulas</li>
-        <li>Quality gates so models do not refuse, echo, or mix another brand’s domain</li>
-        <li>Labeled + unlabeled materials in one gold format—ready for Double Helix</li>
-      </ul>
+    <h1>
+      <span class="line">A model that</span>
+      <span class="line">holds the</span>
+      <span class="line gold">role,</span>
+      <span class="line dim">not a prompt</span>
+      <span class="line dim">that describes it</span>
+    </h1>
+    <div class="h180-lede">
+      <p>A frontier model can describe a job. It cannot hold one, because nothing about your work is written into it. Helix builds the training data for a single role, assimilates it into an open model, and returns weights you deploy inside your own environment.</p>
+      <p class="soft">The result is a worker that takes repetitive and skill-based decisions end to end, reaches for a person at boundaries you defined, and logs every call it makes. No records leave your network at inference. No vendor can change its behaviour underneath you.</p>
     </div>
-  </div>
-  <p class="hint" style="margin-top:14px;max-width:62ch">
-    Other tools optimize a prompt or a crawl. Helix optimizes the <strong>training set</strong>
-    those engines and your own model will learn from.
-  </p>
-</section>
-
-<section class="landing-decision" id="when">
-  <h2>When Helix is the right tool</h2>
-  <div class="landing-decision-grid">
-    <div class="card">
-      <h3>Choose Helix when…</h3>
-      <ul class="hint">
-        <li>You need a <strong>custom dataset</strong> for SFT / fine-tuning or offline eval</li>
-        <li>Ops/product owns quality and cannot wait on a labeling vendor</li>
-        <li>You have FAQs/policies (or public sources) to turn into gold Q&amp;A pairs</li>
-        <li>You want mining + gates + synthesis + export in one studio</li>
-        <li>You care about <strong>SEO and GEO</strong>: answers that stay on-brand</li>
-      </ul>
+    <div class="h180-actions">
+      <a class="btn-gold btn-gold-lg" href="/app">Talk to Riu</a>
+      <a class="btn-ghost-gold" href="#failure">Why general models fail</a>
+      <a class="btn-ghost-gold" href="#features">Capabilities</a>
     </div>
-    <div class="card">
-      <h3>Choose something else when…</h3>
-      <ul class="hint">
-        <li><strong>Prompting / evals / observability</strong> for an already-live agent</li>
-        <li><strong>Huge multimodal annotation</strong> programs (enterprise data engines)</li>
-        <li>You only need a chatbot UI and have no plan to train or eval offline</li>
-      </ul>
-      <p class="hint mb-0">
-        Many stacks use Helix for the dataset, then train and evaluate elsewhere.
-      </p>
+  </section>
+
+  <section class="h180-section" id="failure">
+    <div class="h180-watermark">FAIL</div>
+    <div class="h180-head">
+      <h2>Eight reasons a frontier model cannot replace a role</h2>
+      <span class="meta">01 — 08</span>
     </div>
-  </div>
-</section>
-
-<section class="landing-decision" id="cost">
-  <h2>Cost you can check against real bills</h2>
-  <div class="landing-decision-grid">
-    <div class="card">
-      <h3>Mining target</h3>
-      <p class="price-inline">~$0.75–$1 / gold row</p>
-      <p class="hint mb-0">
-        With your sources. No-source gold is ~$2–$3/row; synthetics ~$0.04–$0.20/row.
-        Jobs pause if trajectory would exceed the cap.
-      </p>
+    {% set fails = [
+      ("01", "No weight updates", "Every conversation starts from the same fixed parameters. Whatever it is told about your work is discarded when the session ends, so the model never gets better at your job — only at sounding like it might.", "Correct decisions for the role are written into the weights during assimilation. The competence is in the artefact, so it persists across every session and every restart."),
+      ("02", "A role is not a document", "Pasting the handbook into the context window makes the rules available for one exchange, not learned. Long contexts also degrade: material in the middle gets weighted less, and a role is exactly the kind of accumulated judgment that will not fit in the window at all.", "The role is trained in rather than retrieved. Context stays free for the case in front of it, and the behaviour holds whether the prompt reminds it or not."),
+      ("03", "Prompt drift and silent updates", "The same input returns a different answer next month, because the endpoint moved beneath you. Instructions that were tuned against one version quietly mean something else against the next, and you find out from an incident rather than a release note.", "You hold pinned weights at a named version. Nothing changes until you retrain deliberately, which is the condition any sign-off process actually requires."),
+      ("04", "Trained for generality, so it hedges", "General training rewards answers that are acceptable everywhere. The result is qualified, both-sided output, and refusals on ordinary professional work that merely resembles a sensitive topic. A role needs a decision, stated plainly, with a reason.", "Training data is built from decisions taken correctly and reasoned in your own terms, so committing to a call in your format is the behaviour being reinforced."),
+      ("05", "No model of its own boundary", "Knowing when not to decide is most of what makes a person trustworthy in a role. A general model has no representation of where your authority ends, so it answers thin cases with the same confidence as clear ones and escalates nothing.", "Riu requires the boundary before the data. Refusals, clarifying questions and hand-offs are trained as first-class behaviour, not filtered on afterwards."),
+      ("06", "Inference sends records off-premises", "Doing the work means handling the actual files. A hosted endpoint requires those files to cross your boundary on every call, which is where most replacement projects stop — not on capability, but in security review.", "The worker is deployed where the data already sits. Inference makes no external call, so there is no egress path to argue about."),
+      ("07", "No audit trail that survives review", "A regulator asks why this decision was made, on what basis, under which version. Chat transcripts against a moving hosted model answer none of those questions, and the reasoning was never recorded in a form anyone can inspect.", "Each decision is logged with its stated reason and the model version that produced it, and the gold library shows what the worker was trained to do."),
+      ("08", "Cost scales with every token, forever", "Metered inference means the work gets more expensive precisely as it succeeds, and the pricing is set by someone else. Volume becomes a reason not to automate, which defeats the purpose.", "Training is a bounded piece of work and the weights are then yours. Running cost is your own infrastructure, so volume stops being a commercial decision.")
+    ] %}
+    {% for n, title, problem, change in fails %}
+    <div class="h180-fail">
+      <div class="num">{{ n }}</div>
+      <div class="col">
+        <h3>{{ title }}</h3>
+        <p>{{ problem }}</p>
+      </div>
+      <div class="change">
+        <div class="h180-label">What Helix changes</div>
+        <p>{{ change }}</p>
+      </div>
     </div>
-    <div class="card">
-      <h3>Double Helix</h3>
-      <p class="price-inline">~$15–50 / train job</p>
-      <p class="hint mb-0">
-        QLoRA on an <strong>Apache-2.0 or MIT</strong> instruct model you pick (up to 30B).
-        Llama is not offered — Meta’s license is not Apache/MIT. Training is
-        <strong>pay per job</strong> (idle when unused; no always-on machine).
-        Download your gold and train anywhere, or confirm a train here — Helix
-        fetches gold from your account and then gives you a zip of the QLoRA
-        adapter and tokenizer. Helix does not invoice you; GPU usage is billed
-        at about $15–50 per train. Approved accounts only.
-      </p>
+    {% endfor %}
+    <p class="hint" style="margin-top:28px;max-width:70ch">Read together, all eight describe one absence: a general model has no durable, inspectable representation of the role it is being asked to hold. Producing one is the entire purpose of the system below.</p>
+  </section>
+
+  <section class="h180-section" id="strands">
+    <div class="h180-head">
+      <h2>Two strands, one artefact</h2>
+      <span class="meta">Diagram 01</span>
     </div>
-  </div>
-</section>
+    <div class="h180-grid3">
+      <article class="h180-card">
+        <div class="h180-label">Strand one — data</div>
+        <h3>Decisions, recorded correctly</h3>
+        <p>Mined from your sources and gated until what remains is a set of correct calls with the reasoning attached — the raw material for reinforcing real decision-making skill.</p>
+        <ul>
+          <li>Sources you nominate</li>
+          <li>Gated for correctness and scope</li>
+          <li>Deduplicated, then varied deliberately</li>
+        </ul>
+      </article>
+      <article class="h180-card">
+        <div class="h180-label">Strand two — assimilation</div>
+        <h3>Written into the weights</h3>
+        <p>Double Helix fine-tunes an open base model on that library until the behaviour is a property of the model rather than an instruction sitting in front of it.</p>
+        <ul>
+          <li>Settings chosen for the library</li>
+          <li>Held-back examples mark the result</li>
+          <li>Version pinned on completion</li>
+        </ul>
+      </article>
+      <article class="h180-card">
+        <div class="h180-label">Result — the artefact</div>
+        <h3>A worker for one role</h3>
+        <p>Either strand alone is inert: data with nothing to inhabit, or a capable model with no idea what your job is. Paired, they produce something deployable and accountable.</p>
+        <ul>
+          <li>Weights you hold and pin</li>
+          <li>Boundaries it will not cross</li>
+          <li>A log of every decision made</li>
+        </ul>
+      </article>
+    </div>
+  </section>
 
-<section class="landing-decision" id="trust">
-  <h2>Public pages (diligence-ready)</h2>
-  <p class="hint" style="max-width:62ch">
-    Evaluators should not hit dead links. Privacy, terms, security, account, trust, status, pricing, docs, about, and contact
-    are live HTML—not a hijacked OpenAPI explorer.
-  </p>
-  <div class="trust-row">
-    <a href="/trust">Trust</a>
-    <a href="/privacy">Privacy</a>
-    <a href="/terms">Terms</a>
-    <a href="/security">Security</a>
-    <a href="/account">Account</a>
-    <a href="/status">Status</a>
-    <a href="/pricing">Pricing</a>
-    <a href="/docs">Docs</a>
-    <a href="/about">About</a>
-    <a href="/contact">Contact</a>
-  </div>
-</section>
+  <section class="h180-section" id="compare">
+    <div class="h180-head">
+      <h2>Hosted model against Helix worker</h2>
+      <span class="meta">Matrix 01</span>
+    </div>
+    <table class="h180-table">
+      <thead>
+        <tr><th>Dimension</th><th>Hosted frontier model</th><th>Helix worker</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Where behaviour lives</td><td>In a prompt, reassembled on every call</td><td>In the weights, as a property of the model</td></tr>
+        <tr><td>On vendor update</td><td>Behaviour can change without notice</td><td>Nothing changes; the version is pinned</td></tr>
+        <tr><td>Where inference runs</td><td>Vendor infrastructure; records cross the boundary</td><td>Your hardware or private cloud; no external call</td></tr>
+        <tr><td>Uncertain cases</td><td>Answered with the same confidence as clear ones</td><td>Escalated at boundaries trained in during setup</td></tr>
+        <tr><td>Audit position</td><td>Transcripts against a model you cannot inspect</td><td>Reasoned decision log, fixed version, visible training set</td></tr>
+        <tr><td>Cost curve</td><td>Per token, indefinitely, at their price</td><td>Bounded training, then your own compute</td></tr>
+        <tr><td>What accumulates</td><td>Prompt files and transcripts</td><td>A gold library and successive model versions</td></tr>
+        <tr><td>If the supplier goes away</td><td>The capability leaves with them</td><td>The worker keeps running; you hold the weights</td></tr>
+      </tbody>
+    </table>
+  </section>
 
-<section class="landing-decision" id="faq">
-  <h2>FAQ</h2>
-  <div class="faq-list">
-    <details open>
-      <summary>Is Helix a chatbot?</summary>
-      <p>No. Riu is a setup guide. The product is a <strong>dataset studio</strong> that produces gold training files you own.</p>
-    </details>
-    <details>
-      <summary>How is Helix different from ChatGPT or a prompt platform?</summary>
-      <p>Those generate or debug answers. Helix <strong>mines and quality-gates the gold dataset</strong> you use to train or evaluate. Different job.</p>
-    </details>
-    <details>
-      <summary>What is GEO?</summary>
-      <p><strong>Generative engine optimization</strong>: making your domain the source AI systems cite. Helix gold trains models on your facts and voice—not generic web text.</p>
-    </details>
-    <details>
-      <summary>Who is Riu?</summary>
-      <p>Helix’s conversational setup guide. She collects your plan, labeled zips, unlabeled materials, shows a pricing estimate, and starts mining only after you confirm.</p>
-    </details>
-    <details>
-      <summary>Do I need a labeling team?</summary>
-      <p>No. Helix mines evidence, applies quality gates, and lets you bring your own docs. You review the library—not a vendor queue.</p>
-    </details>
-    <details>
-      <summary>How do I get access?</summary>
-      <p>Create an account at the studio. During beta, email verification and admin approval may apply. No payment system yet. See <a href="/account">Account</a>.</p>
-    </details>
-  </div>
-</section>
+  <section class="h180-section" id="perimeter">
+    <div class="h180-head">
+      <h2>Where the data sits</h2>
+      <span class="meta">Diagram 02</span>
+    </div>
+    <div class="h180-grid3">
+      <article class="h180-card">
+        <div class="h180-label">Inside your perimeter</div>
+        <h3>Everything that matters</h3>
+        <ul>
+          <li>Source records — never copied out to run the worker</li>
+          <li>The weights — downloaded once, pinned, yours</li>
+          <li>Inference — local serving; no outbound call</li>
+          <li>Decision log — written to your own storage</li>
+        </ul>
+      </article>
+      <article class="h180-card">
+        <div class="h180-label">Outside</div>
+        <h3>No standing path</h3>
+        <p>Mining, during the build only: public web material can be gathered while the library is being built, scoped to the plan you approved. Base model weights are obtained once from the open publisher, then held by you.</p>
+        <p style="margin-top:12px">There is no path in this direction at inference time. Nothing about a live case is sent anywhere.</p>
+      </article>
+    </div>
+  </section>
 
-<div class="poster-banner">
-  <p class="page-kicker">Enter through Riu</p>
-  <h2>Enter through Riu</h2>
-  <p>
-    Helix works with a focused group of teams each cycle. Riu is the structured
-    entry point — she learns your domain, takes your data, shows a cost estimate,
-    and starts mining only after you confirm.
-  </p>
-  <div class="flex" style="margin-top:28px;gap:12px;flex-wrap:wrap">
-    <a class="btn btn-primary btn-lg" href="/app">Talk to Riu</a>
-    <a class="btn btn-secondary" href="/docs">Read the docs</a>
-  </div>
+  <section class="h180-section" id="features">
+    <div class="h180-head">
+      <h2>Capabilities and what each one buys you</h2>
+      <span class="meta">01 — 12</span>
+    </div>
+    <div class="h180-caps">
+      <article class="h180-cap" id="riu">
+        <div class="n">01</div>
+        <div>
+          <h3>Riu, the setup interview</h3>
+          <p>Riu is the only way a plan gets created. She interviews you in plain English about the role, the domain, the categories of work, the tone, the edge cases and the review bar, and turns the answers into a specification the rest of the system runs against.</p>
+        </div>
+        <div>
+          <div class="h180-label">Why it matters</div>
+          <p>The person who knows the job specifies it, without needing anyone to translate it into configuration. Boundaries are captured before any data is collected.</p>
+        </div>
+      </article>
+      <article class="h180-cap">
+        <div class="n">02</div>
+        <div><h3>Plan scoping</h3><p>Each plan is bound to one domain and one role. Material that falls outside that scope is rejected during mining rather than absorbed.</p></div>
+        <div><div class="h180-label">Why it matters</div><p>A worker trained on one role behaves predictably in it; one trained on a mixture behaves like a generalist again.</p></div>
+      </article>
+      <article class="h180-cap">
+        <div class="n">03</div>
+        <div><h3>Web and corpus mining</h3><p>Candidate material is gathered from public sources, from a corpus you supply, or both, then normalised into the same decision-and-reasoning format.</p></div>
+        <div><div class="h180-label">Why it matters</div><p>You can begin without a curated dataset and add your own material later without restarting the plan.</p></div>
+      </article>
+      <article class="h180-cap">
+        <div class="n">04</div>
+        <div><h3>Hard quality gates</h3><p>Refusal boilerplate, restatements, off-domain material, and answers that do not take the decision are rejected rather than scored down.</p></div>
+        <div><div class="h180-label">Why it matters</div><p>A model trained on hedging learns to hedge. Gating for genuine decisions reinforces real decision-making skill.</p></div>
+      </article>
+      <article class="h180-cap">
+        <div class="n">05</div>
+        <div><h3>Deduplication</h3><p>Near-identical examples are dropped, including cases that differ only in wording.</p></div>
+        <div><div class="h180-label">Why it matters</div><p>Coverage is what improves the worker; volume alone does not.</p></div>
+      </article>
+      <article class="h180-cap">
+        <div class="n">06</div>
+        <div><h3>Data synthesis</h3><p>Controlled variants around a correct situation — different phrasing, difficulty, and awkward cases — then re-gated.</p></div>
+        <div><div class="h180-label">Why it matters</div><p>The same judgment has to hold across varied situations. Synthesis produces that variation deliberately.</p></div>
+      </article>
+      <article class="h180-cap">
+        <div class="n">07</div>
+        <div><h3>A gold library that persists</h3><p>Everything that passes is kept, versioned, and reviewable. The library outlives any single training run.</p></div>
+        <div><div class="h180-label">Why it matters</div><p>When a better base model appears, you retrain against the same library rather than starting again.</p></div>
+      </article>
+      <article class="h180-cap">
+        <div class="n">08</div>
+        <div><h3>Export you own</h3><p>The library exports as chat-format JSONL, ready for a trainer. It is a plain file, not an API you keep paying to read.</p></div>
+        <div><div class="h180-label">Why it matters</div><p>Train with Double Helix, or take the file and train it yourself. The asset still belongs to you either way.</p></div>
+      </article>
+      <article class="h180-cap">
+        <div class="n">09</div>
+        <div><h3>Double Helix fine-tuning</h3><p>Point a library at a training job. Open Apache-2.0 and MIT instruct models up to 30B are supported. Held-back examples mark the result.</p></div>
+        <div><div class="h180-label">Why it matters</div><p>This is the second strand: the step that turns a dataset into a worker.</p></div>
+      </article>
+      <article class="h180-cap">
+        <div class="n">10</div>
+        <div><h3>Self-hosted deployment</h3><p>The finished worker ships as weights with instructions for standard local serving. It runs on your GPU, in your private cloud, or fully air-gapped.</p></div>
+        <div><div class="h180-label">Why it matters</div><p>There is no egress to review and no residency question to answer.</p></div>
+      </article>
+      <article class="h180-cap">
+        <div class="n">11</div>
+        <div><h3>Decision logging</h3><p>Each decision is recorded with the reason the worker gave and the model version that produced it.</p></div>
+        <div><div class="h180-label">Why it matters</div><p>You can answer why a call was made, on what basis, and under which version.</p></div>
+      </article>
+      <article class="h180-cap">
+        <div class="n">12</div>
+        <div><h3>Retraining as the role changes</h3><p>Add to the library, re-gate, and retrain to a new pinned version. The previous version stays available.</p></div>
+        <div><div class="h180-label">Why it matters</div><p>Change becomes a deliberate, versioned event rather than silent drift.</p></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="h180-section" id="pipeline">
+    <div class="h180-head">
+      <h2>The strand, end to end</h2>
+      <span class="meta">Diagram 03</span>
+    </div>
+    <div class="h180-steps">
+      <div class="h180-step"><strong>01 Sources</strong><span>Web and your corpus, scoped to the approved plan</span></div>
+      <div class="h180-step"><strong>02 Normalise</strong><span>Decision and reasoning. One format.</span></div>
+      <div class="h180-step"><strong>03 Gate</strong><span>Pass or reject. No partial credit.</span></div>
+      <div class="h180-step"><strong>04 Dedup</strong><span>One per situation. Rephrasings dropped.</span></div>
+      <div class="h180-step"><strong>05 Synthesise</strong><span>Controlled variants, re-gated.</span></div>
+      <div class="h180-step"><strong>06 Library</strong><span>Kept, versioned, reviewable.</span></div>
+      <div class="h180-step"><strong>07 Export</strong><span>JSONL, or train. Yours either way.</span></div>
+    </div>
+  </section>
+
+  <section class="h180-section" id="deploy">
+    <div class="h180-watermark">DEPLOY</div>
+    <div class="h180-head">
+      <h2>Deployment topology</h2>
+      <span class="meta">Diagram 05</span>
+    </div>
+    <div class="h180-grid3">
+      <article class="h180-card"><div class="h180-label">Air-gapped</div><h3>No network route out</h3><p>Weights transferred in once. Local serving only. For environments where an outbound connection is not permitted at all.</p></article>
+      <article class="h180-card"><div class="h180-label">Private cloud</div><h3>Your account, your region</h3><p>Standard local serving stack. Logs to your own storage. Existing controls apply unchanged.</p></article>
+      <article class="h180-card"><div class="h180-label">On-premise</div><h3>Your own hardware</h3><p>Runs beside the source systems. Fixed running cost. Highest volume at the lowest marginal cost.</p></article>
+    </div>
+  </section>
+
+  <section class="h180-seo" id="seo-geo">
+    <p class="page-kicker">SEO + GEO</p>
+    <h2 style="text-transform:none;letter-spacing:-.02em;margin:.4rem 0 1rem">Not another chat box. Gold that search and generative engines can trust.</h2>
+    <p>Helix is a gold training-data studio, not a chatbot, prompt debugger, or labeling factory. Generative engine optimization (GEO) needs a model that answers from your domain. The library you export is the dataset; Double Helix writes it into weights.</p>
+  </section>
+
+  <section class="h180-cta" id="cta">
+    <div class="hx-kicker"><span class="dot"></span><span>Enter through Riu</span></div>
+    <h2>Describe the role. Everything else follows from it.</h2>
+    <p class="hint" style="max-width:46ch;margin:0 0 28px">One domain, one role, one worker at a time. Helix works with a focused group of teams each cycle so every strand is reviewed properly before it becomes a model.</p>
+    <div class="h180-actions">
+      <a class="btn-gold btn-gold-lg" href="/app">Talk to Riu</a>
+      <a class="btn-ghost-gold" href="/docs">Read the documentation</a>
+    </div>
+  </section>
 </div>
 {% endblock %}
