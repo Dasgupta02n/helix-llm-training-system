@@ -121,8 +121,14 @@ def _static_asset_version() -> str:
     import hashlib
 
     h = hashlib.sha1()
-    for name in ("app.js", "app.css", "modernist.css", "site.css"):
-        p = static_dir / name
+    paths = [
+        static_dir / "app.js",
+        static_dir / "app.css",
+        static_dir / "modernist.css",
+        static_dir / "site.css",
+        *sorted((static_dir / "js").glob("*.js")),
+    ]
+    for p in paths:
         if p.exists():
             h.update(p.read_bytes()[:200_000])
             h.update(str(p.stat().st_mtime_ns).encode())
