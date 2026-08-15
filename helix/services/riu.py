@@ -64,7 +64,7 @@ greet → role → discover → example → edge_cases → own_data → material
    Recommend one default from the catalog; let the user pick another. QLoRA only.
    Training compute is always pay-per-run GPU (idle when unused). Never offer an
    always-on GPU machine — those can sit on and keep billing.
-   DO NOT invent dollar amounts — the server attaches the official $35/1k estimate.
+   DO NOT invent dollar amounts — the server attaches official per-row rates.
 7) confirm → start_pipeline only after confirm (or start 10 if no corpus).
 8) offer_synth: ONLY after mining finishes (or after no-source scale).
    Ask if they want variations. Never emit start_synthesis during confirm.
@@ -72,7 +72,7 @@ greet → role → discover → example → edge_cases → own_data → material
    or train with Double Helix (start_double_helix_train only after confirm train).
    Synthetics join training only if they say confirm train with synthetics.
 10) No corpus + target > 10: start 10, then review_seed (each gold, each parameter),
-    then 10 proof, then confirm scale at $55/1k. Do not skip the review.
+    then 10 proof, then confirm scale at ~$2–$3 per gold row. Do not skip the review.
 
 Risk: hiring/credit/medical/legal = high (stricter fairness, more edge cases).
 Captions/copy = low. Support/sales/HR = medium.
@@ -130,7 +130,7 @@ Rules for actions:
 - Emit save_goals when gold_target / variations known. gold_target is a library
   goal, not a promise this job will produce that many. First job is batch_size
   × total_batches (default 5×2=10).
-- Never invent costs. Official rate is $35 / 1,000 gold.
+- Never invent costs. Official gold is ~$0.75–$1/row with sources, ~$2–$3/row without. Synthetics ~$0.04–$0.20/row.
 - Emit start_pipeline only after the user confirms AND they either have corpus
   or explicitly accepted the 10-example exploratory job ("start 10").
   Do not emit start_pipeline for a 5000-gold promise with zero attached data.
@@ -437,9 +437,9 @@ def riu_start_block_reason(state: dict[str, Any]) -> str | None:
             "Large jobs (more than 10 units) need source material under My data. "
             "Web-research-only starts with **10** gold, then we review them "
             "one-by-one, generate **10 more** as proof, and only then scale. "
-            "Type **start 10**. No-source scale uses **$55 / 1,000** "
-            f"(so {intended:,} ≈ **${intended / 1000.0 * 55:.0f}**). "
-            "With your own docs the usual rate is **$35 / 1,000**."
+            "Type **start 10**. No-source scale is **~$2–$3 per gold row** "
+            f"(so {intended:,} ≈ **${intended * 2:,.0f}–${intended * 3:,.0f}**). "
+            "With your own docs the rate is **~$0.75–$1 per gold row**."
         )
     return None
 
@@ -800,7 +800,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             patch["recommended_model_name"] = rec["name"]
             reply = (
                 "Here’s the official setup summary — numbers come from the same "
-                "$35/1k + corpus rules as mining jobs, not a guess.\n\n"
+                "the same per-row rates as mining jobs, not a guess.\n\n"
                 f"• Project: **{pname}**\n"
                 f"• Goal: {mission}\n"
                 f"• Topics: {', '.join(cats)}\n"
@@ -910,7 +910,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             if patch:
                 actions.append({"type": "save_goals"})
     elif phase == "offer_synth":
-        from helix.services.cost_tracking import GOLD_COST_CAP_USD_PER_1000
+        from helix.services.cost_tracking import estimate_units_usd, format_row_rate
 
         try:
             g = int(state.get("gold_target") or 10)
@@ -918,7 +918,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         except (TypeError, ValueError):
             g, v = 10, 4
         extra = max(1, g) * max(1, v)
-        extra_usd = round((extra / 1000.0) * GOLD_COST_CAP_USD_PER_1000, 2)
+        extra_lo, extra_hi = estimate_units_usd(extra, kind="synthetic")
         yes = bool(re.search(r"\b(yes|yeah|yep|variations|synth)\b", lower))
         no = bool(re.search(r"\b(no|skip|later|not now)\b", lower))
         wants_train = (
@@ -958,9 +958,9 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         elif yes and not no:
             actions.append({"type": "start_synthesis"})
             reply = (
-                f"Starting variations: about **{extra:,}** extra rows, "
-                f"budgeted at **${extra_usd:.2f}** on the $35/1k meter "
-                f"({v} per gold). This is a separate job."
+                f"Starting variations: about **{extra:,}** extra rows "
+                f"({v} per gold), about **${extra_lo:,.2f}–${extra_hi:,.2f}** "
+                f"({format_row_rate(kind='synthetic')}). This is a separate job."
             )
             next_phase = "done"
             progress = 100
@@ -968,8 +968,8 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             reply = (
                 "Gold mining finished. Want **variations** of that gold?\n\n"
                 f"That would add about **{extra:,}** rows "
-                f"(**{v}** per gold) and is billed on the same "
-                f"**${GOLD_COST_CAP_USD_PER_1000:.0f}/1k** meter ≈ **${extra_usd:.2f}**.\n\n"
+                f"(**{v}** per gold), about **${extra_lo:,.2f}–${extra_hi:,.2f}** "
+                f"({format_row_rate(kind='synthetic')}).\n\n"
                 "Synthetics are stored separately from gold and join training "
                 "only if you later say **confirm train with synthetics**.\n\n"
                 "Reply **yes** to start synthesis, or **no** / **skip** to stop here."
@@ -1638,7 +1638,7 @@ def handle_user_message(
             turn = {
                 "reply": (
                     "Confirmed. Starting the no-source scale job at "
-                    "**$55 / 1,000** gold. Watch **Home** for the live log."
+                    "**~$2–$3 per gold row**. Watch **Home** for the live log."
                 ),
                 "phase": "running",
                 "progress": 95,

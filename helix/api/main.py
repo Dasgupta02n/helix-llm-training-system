@@ -305,7 +305,7 @@ def llms_txt() -> str:
         "## Product\n"
         "- Home: https://c7xai.in/\n"
         "- Docs: https://c7xai.in/docs\n"
-        "- Pricing: https://c7xai.in/pricing (~$35 per 1,000 gold all-in mining target)\n"
+        "- Pricing: https://c7xai.in/pricing (~$0.75–$1 per gold row with sources)\n"
         "- Account: https://c7xai.in/account\n"
         "- Studio: https://c7xai.in/app\n"
         "\n"

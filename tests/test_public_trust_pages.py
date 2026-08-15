@@ -136,7 +136,7 @@ def test_site_nav_on_inner_pages():
     r = client.get("/pricing")
     assert r.status_code == 200
     assert "Open studio" in r.text
-    assert "$35" in r.text or "35" in r.text
+    assert "0.75" in r.text or "per gold" in r.text.lower() or "per row" in r.text.lower()
     assert "Double Helix" in r.text or "double helix" in r.text.lower()
 
 

@@ -1,4 +1,4 @@
-"""Phase 0: accurate OpenRouter/Apify cost + $35/1k gold spend cap."""
+"""Spend-cap math uses the high end of the per-row bands."""
 
 from __future__ import annotations
 
@@ -16,9 +16,11 @@ from helix.services.cost_tracking import (
 
 def test_gold_spend_cap_scales_to_1000():
     assert gold_spend_cap_usd(1000) == GOLD_COST_CAP_USD_PER_1000
-    assert abs(gold_spend_cap_usd(10) - 0.35) < 1e-9
-    assert abs(gold_spend_cap_usd(5) - 0.175) < 1e-9
+    assert abs(gold_spend_cap_usd(10) - 10.0) < 1e-9
+    assert abs(gold_spend_cap_usd(5) - 5.0) < 1e-9
     assert gold_spend_cap_usd(0) == 0.0
+    assert gold_spend_cap_usd(10, no_corpus=True) == 30.0
+    assert gold_spend_cap_usd(10, kind="synthetic") == 2.0
 
 
 def test_openrouter_prefers_provider_cost_over_estimate():
@@ -74,9 +76,9 @@ def test_apify_sums_usage_usd_when_total_missing():
 
 def test_spend_cap_hard_stop_when_over_cap():
     pause, msg = should_pause_for_spend_cap(
-        cost_usd=0.40,
+        cost_usd=11.0,
         gold_new=2,
-        target_gold=10,  # cap $0.35
+        target_gold=10,  # cap $10
         completed_batches=1,
         total_batches=1,
     )
@@ -85,9 +87,9 @@ def test_spend_cap_hard_stop_when_over_cap():
 
 
 def test_spend_cap_trajectory_per_gold():
-    # $0.20 for 2 gold → $0.10/gold → 10 gold would be $1.00 > $0.35 cap
+    # $3 for 2 gold → $1.50/gold → 10 gold would be $15 > $10 cap
     pause, msg = should_pause_for_spend_cap(
-        cost_usd=0.20,
+        cost_usd=3.0,
         gold_new=2,
         target_gold=10,
         completed_batches=1,
@@ -98,7 +100,7 @@ def test_spend_cap_trajectory_per_gold():
 
 
 def test_spend_cap_allows_efficient_run():
-    # $0.02 for 5 gold → $0.004/gold × 10 = $0.04 < $0.35
+    # $0.02 for 5 gold → $0.004/gold × 10 = $0.04 < $10 cap
     pause, msg = should_pause_for_spend_cap(
         cost_usd=0.02,
         gold_new=5,
@@ -111,10 +113,10 @@ def test_spend_cap_allows_efficient_run():
 
 
 def test_spend_cap_batch_trajectory_without_gold():
-    # 1 batch spent $0.30, 2 batches planned, target 10 → cap $0.35
-    # projected $0.60 > $0.35
+    # 1 batch spent $8, 2 batches planned, target 10 → cap $10
+    # projected $16 > $10
     pause, msg = should_pause_for_spend_cap(
-        cost_usd=0.30,
+        cost_usd=8.0,
         gold_new=0,
         target_gold=10,
         completed_batches=1,

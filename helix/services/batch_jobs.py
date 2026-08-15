@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from helix.db import models as m
-from helix.services.cost_tracking import gold_rate_per_1000, gold_spend_cap_usd
+from helix.services.cost_tracking import format_row_rate, gold_spend_cap_usd
 from helix.services.pipeline_modes import (
     MODE_META,
     clamp_batch_size,
@@ -72,8 +72,9 @@ def create_batch_job(
     target_gold = max(1, batch_size * total_batches)
     cfg = dict(config or {})
     no_corpus = bool(no_corpus or cfg.get("no_corpus_rate"))
-    spend_cap = gold_spend_cap_usd(target_gold, no_corpus=no_corpus)
-    rate = gold_rate_per_1000(no_corpus=no_corpus)
+    kind = "synthetic" if job_type == "synthesis" else "gold"
+    spend_cap = gold_spend_cap_usd(target_gold, no_corpus=no_corpus, kind=kind)
+    rate_note = format_row_rate(no_corpus=no_corpus, kind=kind)
 
     job = m.BatchJob(
         id=_uid(),
@@ -107,7 +108,7 @@ def create_batch_job(
                 f"Job queued ({job_type}, quality mode {quality_mode}, "
                 f"{total_batches} batches × size {batch_size}). "
                 f"Spend cap ${spend_cap:.4f} for {target_gold} target units "
-                f"(${rate:.0f}/1k gold scale)."
+                f"({rate_note})."
             ),
             level="info",
         )
@@ -297,7 +298,7 @@ def continue_past_spend_cap(
     db: Session, job_id: str, owner_user_id: str
 ) -> m.BatchJob | None:
     """
-    Explicit user consent to resume a job paused for exceeding the $35/1k
+    Explicit user consent to resume a job paused for exceeding the per-row
     gold spend trajectory. Without this, the job stays paused.
     """
     job = db.query(m.BatchJob).filter_by(id=job_id, owner_user_id=owner_user_id).first()

@@ -129,8 +129,8 @@ def test_estimate_pricing_includes_caps():
             "materials_count": 5,
         }
     )
-    assert p["mining_target_all_in_usd"] == 35.0
-    assert p["first_job_unit_cap_usd"] == 0.35  # 10 units * 35/1000
+    assert p["mining_target_all_in_usd"] == 1000.0
+    assert p["first_job_unit_cap_usd"] == 10.0  # 10 units × $1/row cap
     assert p["your_labeled_rows"] == 10
     assert p["your_material_rows"] == 5
     assert p["requested_exceeds_corpus"] is True

@@ -1,19 +1,28 @@
-"""Accurate multi-provider cost tracking and hard spend-cap for mining jobs.
+"""Accurate cost tracking and hard spend-cap for mining / synthesis jobs.
 
-Hard product target: ~$35 all-in (OpenRouter + Apify) per 1,000 gold examples.
-Double Helix training ($15–50/job) is a future phase — cost fields here are
-structured so training spend can be added without reworking the meter.
+Gold with attached sources: about $0.75–$1.00 per row.
+Gold with no sources (after 10+10 review): about $2–$3 per row.
+Synthetics: about $0.04–$0.20 per row.
+Spend caps use the high end of each band.
 """
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Literal
 
-# ── Product cost targets ─────────────────────────────────────────────
-GOLD_COST_CAP_USD_PER_1000 = 35.0
-# No attached sources: more judge work, no cheap extraction. After 10+10 review.
-GOLD_COST_NO_CORPUS_USD_PER_1000 = 55.0
-# Future Double Helix training band (documentation only for now)
+# ── Product cost targets (USD per row) ───────────────────────────────
+GOLD_WITH_RESOURCE_USD_MIN = 0.75
+GOLD_WITH_RESOURCE_USD_MAX = 1.00
+GOLD_NO_RESOURCE_USD_MIN = 2.00
+GOLD_NO_RESOURCE_USD_MAX = 3.00
+SYNTH_USD_MIN = 0.04
+SYNTH_USD_MAX = 0.20
+
+# High-end rates used as spend-cap scale (also exposed as /1k for older callers).
+GOLD_COST_CAP_USD_PER_1000 = GOLD_WITH_RESOURCE_USD_MAX * 1000.0  # 1000
+GOLD_COST_NO_CORPUS_USD_PER_1000 = GOLD_NO_RESOURCE_USD_MAX * 1000.0  # 3000
+SYNTH_COST_CAP_USD_PER_1000 = SYNTH_USD_MAX * 1000.0  # 200
+
 DOUBLE_HELIX_TRAINING_COST_MIN_USD = 15.0
 DOUBLE_HELIX_TRAINING_COST_MAX_USD = 50.0
 
@@ -30,25 +39,60 @@ MODEL_PRICING_PER_M: dict[str, tuple[float, float]] = {
 }
 
 
-def gold_rate_per_1000(*, no_corpus: bool = False) -> float:
-    return (
-        GOLD_COST_NO_CORPUS_USD_PER_1000
-        if no_corpus
-        else GOLD_COST_CAP_USD_PER_1000
-    )
+Kind = Literal["gold", "synthetic"]
+
+
+def gold_rate_per_row(*, no_corpus: bool = False, kind: Kind = "gold") -> float:
+    """High-end per-row rate used for spend caps."""
+    if kind == "synthetic":
+        return SYNTH_USD_MAX
+    return GOLD_NO_RESOURCE_USD_MAX if no_corpus else GOLD_WITH_RESOURCE_USD_MAX
+
+
+def gold_rate_band(*, no_corpus: bool = False, kind: Kind = "gold") -> tuple[float, float]:
+    if kind == "synthetic":
+        return SYNTH_USD_MIN, SYNTH_USD_MAX
+    if no_corpus:
+        return GOLD_NO_RESOURCE_USD_MIN, GOLD_NO_RESOURCE_USD_MAX
+    return GOLD_WITH_RESOURCE_USD_MIN, GOLD_WITH_RESOURCE_USD_MAX
+
+
+def format_row_rate(*, no_corpus: bool = False, kind: Kind = "gold") -> str:
+    lo, hi = gold_rate_band(no_corpus=no_corpus, kind=kind)
+    if kind == "synthetic":
+        return f"~${lo:.2f}–${hi:.2f} per synthetic row"
+    label = "gold row (no source material)" if no_corpus else "gold row (with your sources)"
+    return f"~${lo:.2f}–${hi:.2f} per {label}"
+
+
+def estimate_units_usd(
+    n: int, *, no_corpus: bool = False, kind: Kind = "gold"
+) -> tuple[float, float]:
+    lo, hi = gold_rate_band(no_corpus=no_corpus, kind=kind)
+    units = max(0, int(n or 0))
+    return round(units * lo, 2), round(units * hi, 2)
+
+
+def gold_rate_per_1000(*, no_corpus: bool = False, kind: Kind = "gold") -> float:
+    return gold_rate_per_row(no_corpus=no_corpus, kind=kind) * 1000.0
 
 
 def gold_spend_cap_usd(
-    target_gold: int, *, usd_per_1000: float | None = None, no_corpus: bool = False
+    target_gold: int,
+    *,
+    usd_per_1000: float | None = None,
+    no_corpus: bool = False,
+    kind: Kind = "gold",
 ) -> float:
-    """Hard cap for a job aiming at `target_gold` verified examples."""
+    """Hard cap for a job aiming at `target_gold` units (high end of the band)."""
     n = max(0, int(target_gold or 0))
     if n <= 0:
         return 0.0
-    rate = float(usd_per_1000) if usd_per_1000 is not None else gold_rate_per_1000(
-        no_corpus=no_corpus
-    )
-    return round((n / 1000.0) * rate, 6)
+    if usd_per_1000 is not None:
+        rate = float(usd_per_1000) / 1000.0
+    else:
+        rate = gold_rate_per_row(no_corpus=no_corpus, kind=kind)
+    return round(n * rate, 6)
 
 
 def _as_float(val: Any) -> float | None:
@@ -173,6 +217,9 @@ def should_pause_for_spend_cap(
     target_gold: int,
     completed_batches: int,
     total_batches: int,
+    spend_cap_usd: float | None = None,
+    no_corpus: bool = False,
+    kind: Kind = "gold",
 ) -> tuple[bool, str]:
     """
     Hard auto-pause when spend already hits cap, or trajectory would exceed it.
@@ -182,17 +229,21 @@ def should_pause_for_spend_cap(
     """
     cost = max(0.0, float(cost_usd or 0.0))
     target = max(0, int(target_gold or 0))
-    cap = gold_spend_cap_usd(target) if target > 0 else 0.0
+    cap = (
+        float(spend_cap_usd)
+        if spend_cap_usd is not None
+        else (gold_spend_cap_usd(target, no_corpus=no_corpus, kind=kind) if target > 0 else 0.0)
+    )
     if cap <= 0:
         return False, ""
+    rate_note = format_row_rate(no_corpus=no_corpus, kind=kind)
 
     if cost >= cap:
         return (
             True,
             (
                 f"Hard spend cap reached: ${cost:.4f} spent "
-                f"(cap ${cap:.4f} for {target} target gold @ "
-                f"${GOLD_COST_CAP_USD_PER_1000:.0f}/1k)."
+                f"(cap ${cap:.4f} for {target} target units, {rate_note})."
             ),
         )
 
@@ -204,9 +255,9 @@ def should_pause_for_spend_cap(
             return (
                 True,
                 (
-                    f"Spend trajectory pause: ${per_gold:.4f}/gold × {target} target "
+                    f"Spend trajectory pause: ${per_gold:.4f}/row × {target} target "
                     f"= ${projected:.4f} would exceed cap ${cap:.4f} "
-                    f"(${GOLD_COST_CAP_USD_PER_1000:.0f}/1k gold)."
+                    f"({rate_note})."
                 ),
             )
 

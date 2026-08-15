@@ -190,7 +190,7 @@ class SpendCapContinueBody(BaseModel):
 
     confirm: bool = Field(
         False,
-        description="Must be true to continue past the $35/1k gold spend cap.",
+        description="Must be true to continue past the per-row spend cap.",
     )
 
 

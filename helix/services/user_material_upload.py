@@ -317,6 +317,8 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
         DOUBLE_HELIX_TRAINING_COST_MAX_USD,
         DOUBLE_HELIX_TRAINING_COST_MIN_USD,
         GOLD_COST_CAP_USD_PER_1000,
+        estimate_units_usd,
+        format_row_rate,
         gold_spend_cap_usd,
     )
 
@@ -334,10 +336,10 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
     except (TypeError, ValueError):
         q = 2
 
-    # Product target: $35 / 1k gold all-in
-    target_mining_usd = round((gold_target / 1000.0) * GOLD_COST_CAP_USD_PER_1000, 2)
     first_job_units = max(1, batches * bsize)
-    first_job_cap = gold_spend_cap_usd(first_job_units)
+    with_lo, with_hi = estimate_units_usd(gold_target, no_corpus=False)
+    none_lo, none_hi = estimate_units_usd(gold_target, no_corpus=True)
+    target_mining_usd = with_hi
     # Quality mode soft multiplier for narrative (cap is still hard)
     mode_note = {
         1: "best quality (higher judge cost)",
@@ -353,6 +355,8 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
     attached = int(state.get("attached_support") or 0)
     if attached <= 0:
         attached = corpus_units + own + mats
+    no_sources = corpus_docs <= 0 and attached <= 0
+    first_job_cap = gold_spend_cap_usd(first_job_units, no_corpus=no_sources)
 
     honest_lines: list[str] = []
     if corpus_docs or corpus_units:
@@ -371,8 +375,8 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
             f"You asked for **{gold_target:,}** gold. Your attached data supports "
             f"about **{attached:,}** pairs (corpus {corpus_units} + labeled {own} + "
             f"materials {mats}). I will **not** pretend we can mint {gold_target:,} "
-            f"from that. At the product rate, {gold_target:,} gold would be about "
-            f"**${target_mining_usd:,.2f}** — not a lower guessed band."
+            f"from that. With your sources, {gold_target:,} gold is about "
+            f"**${with_lo:,.0f}–${with_hi:,.0f}** ({format_row_rate()})."
         )
     else:
         honest_lines.append(
@@ -385,12 +389,12 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
     )
     if not can_start_requested:
         honest_lines.append(
-            f"Web-research-only (no corpus) starts with **{first_job_units}** "
-            f"examples (cap **${first_job_cap:.2f}**). Then we review those 10 "
-            "one-by-one, generate **10 more** as proof, and only then scale. "
-            f"No-source scale is **$55 / 1,000** "
-            f"(**{gold_target:,}** ≈ **${gold_target / 1000.0 * 55:.0f}**), "
-            "not $35. Type **start 10**."
+            f"Web-research-only starts with **{first_job_units}** examples "
+            f"(cap **${first_job_cap:.2f}**, {format_row_rate(no_corpus=True)}). "
+            "Then we review those 10 one-by-one, generate **10 more** as proof, "
+            "and only then scale. "
+            f"No-source scale for **{gold_target:,}** is about "
+            f"**${none_lo:,.0f}–${none_hi:,.0f}**. Type **start 10**."
         )
     else:
         honest_lines.append(
@@ -418,10 +422,9 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
         "can_start_requested": can_start_requested,
         "first_job_units": first_job_units,
         "summary_lines": [
-            f"Helix rate: **${GOLD_COST_CAP_USD_PER_1000:.0f} per 1,000 gold** "
-            f"all-in (model + gather). "
-            f"**{gold_target:,}** gold ≈ **${target_mining_usd:,.2f}** if we can "
-            f"actually produce it — not a lower guessed range.",
+            f"Helix gold rate **with your sources**: {format_row_rate()}. "
+            f"**{gold_target:,}** gold ≈ **${with_lo:,.0f}–${with_hi:,.0f}** "
+            "if we can actually produce it.",
             f"First job: **{first_job_units}** units, spend cap **${first_job_cap:.2f}** "
             f"({batches}×{bsize}). Jobs pause if trajectory would exceed the cap.",
             f"Quality mode **{q}** — {mode_note}. Time for this first job is "
@@ -443,7 +446,7 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
 def format_official_estimate(pricing: dict[str, Any], *, project: str = "") -> str:
     """User-facing block. Riu must show this instead of invented $ / hour quotes."""
     lines = list(pricing.get("summary_lines") or [])
-    head = "Official Helix estimate (from the same $35/1k + corpus rules as jobs):"
+    head = "Official Helix estimate (same per-row rates the jobs use):"
     if project:
         head = f"{head}\n• Project: **{project}**"
     body = "\n".join(f"• {ln}" if not ln.startswith("•") else ln for ln in lines)

@@ -85,7 +85,7 @@ def _offer_riu_synthesis(db, job: m.BatchJob) -> None:
             "Mining finished. I did **not** start variations. "
             "Synthetics stay stored separately from gold. After you generate them, "
             "say **confirm train with synthetics** if you want both in the adapter, "
-            "or **yes** first to generate variations (I’ll quote the $35/1k cost)."
+            "or **yes** first to generate variations (I’ll quote ~$0.04–$0.20 per synthetic row)."
         )
     row.state_json = json.dumps(state)
     msgs.append(
@@ -337,6 +337,8 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             target_gold=int(job.target_gold or (job.batch_size * job.total_batches)),
             completed_batches=job.completed_batches,
             total_batches=job.total_batches,
+            spend_cap_usd=float(job.spend_cap_usd or 0.0) or None,
+            kind="synthetic" if job.job_type == "synthesis" else "gold",
         )
         # Only pause when more work remains and user has not consented past the cap.
         # If the last batch just finished, complete normally (cost already spent).

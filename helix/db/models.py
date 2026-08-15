@@ -488,7 +488,7 @@ class BatchJob(Base):
     openrouter_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     apify_cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
-    # Spend-cap: ~$35 per 1k gold, scaled to job target_gold
+    # Spend-cap: high end of the per-row band, scaled to job target_gold
     target_gold: Mapped[int] = mapped_column(Integer, default=0)
     spend_cap_usd: Mapped[float] = mapped_column(Float, default=0.0)
     # User explicitly consented to continue past the hard spend cap

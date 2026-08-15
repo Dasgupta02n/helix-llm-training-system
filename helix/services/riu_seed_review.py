@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from helix.db import models as m
-from helix.services.cost_tracking import GOLD_COST_NO_CORPUS_USD_PER_1000
+from helix.services.cost_tracking import estimate_units_usd, format_row_rate
 
 REVIEW_PARAMS: list[tuple[str, str]] = [
     ("input", "Is this a real question someone in this role would ask?"),
@@ -106,9 +106,8 @@ def begin_review(
         "Next: we walk **each of these 10** (or however many we got), "
         "**one parameter at a time**. I store what you say. Then I generate "
         "**10 more** as a proof I understood. After you confirm or edit those, "
-        f"I scale to **{target:,}** at the **no-source rate "
-        f"${GOLD_COST_NO_CORPUS_USD_PER_1000:.0f} / 1,000** "
-        f"(higher than the usual $35, because there is no corpus to extract from).\n\n"
+        f"I scale to **{target:,}** at **{format_row_rate(no_corpus=True)}** "
+        f"(higher than {format_row_rate()}, because there is no corpus).\n\n"
         + _prompt_current(db, state)
     )
 
@@ -214,13 +213,12 @@ def compile_understanding(db: Session, state: dict[str, Any]) -> str:
     rs["understanding"] = understanding[:4000]
     state["seed_understanding"] = rs["understanding"]
     target = int(state.get("gold_target") or 1000)
-    usd = round((target / 1000.0) * GOLD_COST_NO_CORPUS_USD_PER_1000, 2)
+    lo, hi = estimate_units_usd(target, no_corpus=True)
     return (
         "I have notes on all **10** (or however many we reviewed). "
         "I will now generate **10 more gold** as a proof I understood you.\n\n"
         f"After you confirm or edit those 10, I will scale to **{target:,}** "
-        f"at **${GOLD_COST_NO_CORPUS_USD_PER_1000:.0f}/1,000** ≈ **${usd:,.2f}** "
-        "(no-source rate).\n\n"
+        f"at **{format_row_rate(no_corpus=True)}** ≈ **${lo:,.0f}–${hi:,.0f}**.\n\n"
         "Starting the proof batch now."
     )
 

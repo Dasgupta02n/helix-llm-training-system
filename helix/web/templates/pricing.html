@@ -1,7 +1,7 @@
 {% extends "public_base.html" %}
 {% block title %}Pricing{% endblock %}
 {% block canonical %}https://c7xai.in/pricing{% endblock %}
-{% block meta_description %}Helix pricing — free during public beta; ~$35 per 1,000 gold examples as the mining cost target; Double Helix training later.{% endblock %}
+{% block meta_description %}Helix pricing — free during public beta; about $0.75–$1 per gold row with your sources, $2–$3 without, synthetics $0.04–$0.20.{% endblock %}
 {% block content %}
 <article class="legal-doc">
   <p class="page-kicker">Pricing · Early beta</p>
@@ -22,7 +22,7 @@
         <li>Mining jobs (web gather + quality gates)</li>
         <li>Gold library, synthesis, exports</li>
         <li>Jobs that keep running after sign-out</li>
-        <li>Spend-cap pause at ~$35 / 1,000 gold trajectory</li>
+        <li>Spend-cap pause at the high end of the per-row band</li>
       </ul>
       <p class="hint">
         Model and gather usage is metered in-app. Heavy use may be throttled so the beta stays stable.
@@ -46,7 +46,9 @@
 
   <h2>How we design cost (so you can audit us)</h2>
   <ul>
-    <li><strong>Mining target:</strong> about <strong>$35 all-in per 1,000 gold examples</strong> (model + gather combined).</li>
+    <li><strong>Gold with your sources:</strong> about <strong>$0.75–$1.00 per row</strong>.</li>
+    <li><strong>Gold with no sources</strong> (after the 10 + 10 review): about <strong>$2–$3 per row</strong>.</li>
+    <li><strong>Synthetics:</strong> about <strong>$0.04–$0.20 per row</strong>, stored separately.</li>
     <li><strong>Jobs:</strong> auto-pause if spend trajectory would exceed that ratio; you must confirm to continue past the cap.</li>
     <li><strong>In-app meter:</strong> model and gather shown separately, using billed amounts when available.</li>
     <li><strong>Double Helix v1 (not charged by Helix):</strong> QLoRA on an Apache-2.0 or MIT instruct model you choose (up to 30B). GPU is <strong>pay per train</strong> (idle when unused; Helix never leaves a machine running). You can download your gold and train anywhere, or confirm a train here — Helix fetches gold from your account and then gives you a zip of the adapter + tokenizer. Designed around <strong>$15–50</strong> per train job.</li>

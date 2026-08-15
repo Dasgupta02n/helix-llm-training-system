@@ -777,7 +777,7 @@ function _jobResultBanner(j) {
   if (j.status === "paused_spend_cap") {
     return `<div class="banner warn" style="margin-top:8px">
       <strong>Paused — spend cap (consent required).</strong>
-      ${escapeHtml(msg || "Job trajectory would exceed $35 per 1,000 gold.")}
+      ${escapeHtml(msg || "Job trajectory would exceed the spend cap for this job.")}
       ${costLine}
       <p class="hint mb-0" style="margin-top:6px">
         Confirm to run remaining batches past the cap, or Cancel to stop. No further spend until you choose.
@@ -1072,7 +1072,7 @@ async function loadJobs() {
     $("jobsList").querySelectorAll("[data-continue-cap]").forEach((btn) => {
       btn.onclick = async () => {
         const ok = window.confirm(
-          "This job is over the $35-per-1,000-gold spend trajectory.\n\n" +
+          "This job is over the spend-cap trajectory for its gold/synthetic target.\n\n" +
             "Continue remaining batches anyway?\n" +
             "You will be charged for further model + gather usage."
         );

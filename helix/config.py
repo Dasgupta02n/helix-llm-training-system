@@ -69,7 +69,7 @@ class Settings(BaseSettings):
     auto_create_workspace_on_signup: bool = True
 
     max_tool_rounds: int = 12
-    default_tenant_monthly_budget_usd: float = 50.0
+    default_tenant_monthly_budget_usd: float = 2000.0
     # Local default 7d; production should set ACCESS_TOKEN_EXPIRE_MINUTES lower (e.g. 1440)
     access_token_expire_minutes: int = 60 * 24 * 7  # 7 days
 

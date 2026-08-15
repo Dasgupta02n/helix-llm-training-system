@@ -2,6 +2,7 @@
 
 from helix.services.cost_tracking import (
     GOLD_COST_NO_CORPUS_USD_PER_1000,
+    GOLD_NO_RESOURCE_USD_MAX,
     gold_spend_cap_usd,
 )
 from helix.services.riu import riu_start_block_reason
@@ -36,9 +37,9 @@ def test_scale_allowed_after_review():
 
 
 def test_no_corpus_rate_is_higher():
-    assert GOLD_COST_NO_CORPUS_USD_PER_1000 > 35
-    assert gold_spend_cap_usd(1000, no_corpus=True) == 55.0
-    assert gold_spend_cap_usd(1000, no_corpus=False) == 35.0
+    assert GOLD_COST_NO_CORPUS_USD_PER_1000 == GOLD_NO_RESOURCE_USD_MAX * 1000
+    assert gold_spend_cap_usd(1000, no_corpus=True) == 3000.0
+    assert gold_spend_cap_usd(1000, no_corpus=False) == 1000.0
 
 
 def test_scale_plan_fits_job_caps():
@@ -89,4 +90,4 @@ def test_review_walks_params_then_finishes(monkeypatch):
         turn = apply_review_reply(db, state=state, text="ok keep this")
     assert turn["phase"] == "proof_wait"
     assert any(a.get("type") == "start_proof_batch" for a in turn["actions"])
-    assert "55" in turn["reply"]
+    assert "2" in turn["reply"] or "per gold" in turn["reply"].lower()

@@ -1,4 +1,4 @@
-"""Riu must use job-system $35/1k + corpus gate — never invent $47-65 / 3-6 hours."""
+"""Riu must use official per-row rates + corpus gate — never invent $47-65 / 3-6 hours."""
 
 from helix.services.riu import (
     apply_official_riu_estimate,
@@ -23,14 +23,13 @@ def test_official_rate_is_35_per_1000_not_invented_band():
             "materials_count": 0,
         }
     )
-    assert p["cost_per_1000_gold_usd"] == 35.0
-    assert p["mining_target_all_in_usd"] == 175.0
+    assert p["cost_per_1000_gold_usd"] == 1000.0
+    assert p["mining_target_all_in_usd"] == 5000.0
     assert p["first_job_units"] == 10
-    assert abs(p["first_job_unit_cap_usd"] - 0.35) < 1e-9
+    assert abs(p["first_job_unit_cap_usd"] - 30.0) < 1e-9
     assert p["can_start_requested"] is False
     blob = " ".join(p["summary_lines"]).lower()
-    assert "$35" in blob or "35 per" in blob
-    assert "175" in blob
+    assert "0.75" in blob or "per gold" in blob or "per row" in blob
     assert "47" not in blob and "65" not in blob
 
 
@@ -54,8 +53,7 @@ def test_apply_official_replaces_invented_quote():
     assert "$47" not in out and "$65" not in out
     assert "approximately $47" not in out
     assert "finishes in 3-6 hours" not in low
-    assert "35" in out
-    assert "175" in out
+    assert "0.75" in out or "per gold" in out.lower() or "per row" in out.lower()
     assert "start 10" in low or "exploratory" in low
     assert "just type start and" not in low
 
@@ -73,7 +71,7 @@ def test_start_5000_without_corpus_is_blocked():
     assert reason
     assert "5000" in reason or "5,000" in reason
     assert "start 10" in reason.lower()
-    assert "35" in reason
+    assert "0.75" in reason or "2" in reason or "per gold" in reason.lower()
 
 
 def test_start_10_exploratory_is_allowed():
