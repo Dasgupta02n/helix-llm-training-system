@@ -434,11 +434,11 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
             *honest_lines,
             (
                 f"Your uploads already in library: **{own}** labeled gold + **{mats}** "
-                "material-converted rows (downloadable; Double Helix ready)."
+                "material-converted rows (downloadable; C7X-IO ready)."
                 if (own or mats)
                 else "No labeled/material uploads yet."
             ),
-            f"Optional later: **Double Helix** training ~**"
+            f"Optional later: **C7X-IO** training ~**"
             f"${DOUBLE_HELIX_TRAINING_COST_MIN_USD:.0f}–"
             f"${DOUBLE_HELIX_TRAINING_COST_MAX_USD:.0f}** per job (not charged now).",
         ],
@@ -448,7 +448,7 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
 def format_official_estimate(pricing: dict[str, Any], *, project: str = "") -> str:
     """User-facing block. Riu must show this instead of invented $ / hour quotes."""
     lines = list(pricing.get("summary_lines") or [])
-    head = "Official Helix estimate (same per-row rates the jobs use):"
+    head = "Official C7X estimate (same per-row rates the jobs use):"
     if project:
         head = f"{head}\n• Project: **{project}**"
     body = "\n".join(f"• {ln}" if not ln.startswith("•") else ln for ln in lines)

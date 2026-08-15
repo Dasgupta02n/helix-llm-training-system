@@ -1,4 +1,4 @@
-"""Helix — gold-data studio (c7xai.in).
+"""C7X — gold-data studio (c7xai.in).
 
 Layout
 ------
@@ -15,8 +15,8 @@ helix/packaging/    PEFT load script shipped in trained zips
 User path
 ---------
 public site → /app signup (admin gate) → Riu setup → mine/synth jobs
-→ My data (gold + synthetics, stored apart) → download and/or Double Helix train
+→ My data (gold + synthetics, stored apart) → download and/or C7X-IO train
 Usage counter = 2 × billed service spend (model + gather + compute + other).
 """
 
-__version__ = "2.0.5"
+__version__ = "2.0.6"

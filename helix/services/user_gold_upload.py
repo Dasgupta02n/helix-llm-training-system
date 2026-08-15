@@ -1,4 +1,4 @@
-"""Bring-your-own data: zip → gold-format rows for Helix + Double Helix."""
+"""Bring-your-own data: zip → gold-format rows for C7X + C7X-IO."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 from helix.db import models as m
 from helix.services.library import add_gold_example, gold_to_dict
 
-# source_kind for user-supplied labeled data (Double Helix ready)
+# source_kind for user-supplied labeled data (C7X-IO ready)
 USER_UPLOAD_SOURCE_KIND = "user_upload"
 
 MAX_ZIP_BYTES = 25 * 1024 * 1024  # 25 MiB
@@ -259,7 +259,7 @@ def import_zip_as_gold(
 ) -> dict[str, Any]:
     """
     Parse zip → GoldExample rows with source_kind=user_upload.
-    Stored in gold format for download + future Double Helix training.
+    Stored in gold format for download + future C7X-IO training.
     """
     batch_id = _uid("uby_")
     rows, meta = extract_pairs_from_zip(fileobj, default_topic=default_topic)
@@ -321,7 +321,7 @@ def import_zip_as_gold(
         "message": (
             f"Saved {created} gold-format example(s) from your zip "
             f"(batch {batch_id}). Download anytime from My data · Export my uploads. "
-            "These rows are ready for Double Helix training later."
+            "These rows are ready for C7X-IO training later."
         ),
     }
 

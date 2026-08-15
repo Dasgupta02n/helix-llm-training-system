@@ -168,7 +168,7 @@ function renderLiveProcessPanel(jobs, train) {
   });
   if (trainActive) {
     sources.push({
-      kind: "Double Helix train",
+      kind: "C7X-IO train",
       progress_message: train.progress,
       ...train,
     });

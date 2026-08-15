@@ -1614,14 +1614,29 @@ select {
 .sidebar-brand .brand-text strong,
 .sidebar-brand .brand-text span,
 .sidebar .ws-label,
-.sidebar .nav-pill,
 .user-meta strong,
 .user-meta span {
   color: #f0e5c8 !important;
 }
-.nav-pill.active {
-  color: #c9a227 !important;
-  border-color: rgba(201, 162, 39, 0.45);
+.sidebar .nav-pill {
+  color: rgba(240, 229, 200, 0.78) !important;
+  background: transparent;
+}
+.sidebar .nav-pill:hover {
+  color: #f5e7b8 !important;
+  background: rgba(245, 231, 184, 0.08);
+}
+.sidebar .nav-pill.active,
+.nav-pill.active,
+.nav-pill-riu.active {
+  background: #f5e7b8 !important;
+  color: #0c0b09 !important;
+  border-color: #f5e7b8;
+  font-weight: 800;
+}
+.sidebar .nav-pill.active .nav-num,
+.nav-pill.active .nav-num {
+  color: #0c0b09 !important;
 }
 .app-shell,
 .auth-shell,
@@ -1637,9 +1652,41 @@ input,
 textarea,
 select {
   background: #141210;
-  color: #f0e5c8;
+  color: #f5e7b8;
   border-color: rgba(201, 162, 39, 0.28);
+}
+.page-head h2,
+.pane h3,
+.pane h4,
+.tab-panel h2,
+.tab-panel h3 {
+  color: #f5e7b8 !important;
+}
+label,
+.field-help,
+.hint,
+.page-kicker {
+  color: #e4d39a !important;
+}
+.btn-secondary,
+.btn-ghost {
+  color: #f5e7b8 !important;
+  border-color: #c9a227 !important;
+  background: #1c1812 !important;
+}
+.btn-secondary:hover:not(:disabled),
+.btn-ghost:hover:not(:disabled) {
+  color: #0c0b09 !important;
+  background: #f5e7b8 !important;
+  border-color: #f5e7b8 !important;
+}
+.btn-primary {
+  color: #0c0b09 !important;
+}
+#tab-account .pane h3 {
+  color: #f5e7b8 !important;
 }
 .declaration-text {
   background: rgba(201, 162, 39, 0.06);
+  color: #f0e5c8;
 }

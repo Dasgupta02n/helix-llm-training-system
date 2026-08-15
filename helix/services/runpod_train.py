@@ -1,6 +1,6 @@
-"""Double Helix GPU backend: RunPod Serverless only.
+"""C7X-IO GPU backend: RunPod Serverless only.
 
-Helix never creates or bills a GPU Cloud pod. Training is pay-per-run on a
+C7X never creates or bills a GPU Cloud pod. Training is pay-per-run on a
 Serverless endpoint with min workers = 0 (idle = $0).
 """
 
@@ -20,7 +20,7 @@ def assert_serverless_only(backend: str | None = None) -> None:
     b = (backend or COMPUTE_BACKEND).strip().lower()
     if b in FORBIDDEN_BACKENDS or b != COMPUTE_BACKEND:
         raise ValueError(
-            "Double Helix trains only on pay-per-run GPU. "
+            "C7X-IO trains only on pay-per-run GPU. "
             "Always-on machines are not used (they can sit on and bill)."
         )
 
@@ -63,7 +63,7 @@ def compute_policy() -> dict[str, Any]:
         "estimated_usd_min": 15,
         "estimated_usd_max": 50,
         "note": (
-            "Helix always uses pay-per-run GPU. Do not leave an always-on "
+            "C7X always uses pay-per-run GPU. Do not leave an always-on "
             "machine running — idle machines bill until you stop them. "
             "A job that idles at zero workers costs nothing until "
             "Riu submits a QLoRA train."
@@ -182,8 +182,8 @@ def submit_qlora_job(
     import uuid
     import urllib.request
 
-    rid = (run_id or f"helix-{uuid.uuid4().hex[:12]}").strip()
-    hub = (hub_model_id or "").strip() or f"helix-qlora-{rid}"
+    rid = (run_id or f"C7X-{uuid.uuid4().hex[:12]}").strip()
+    hub = (hub_model_id or "").strip() or f"C7X-qlora-{rid}"
     payload = official_qlora_input(
         run_id=rid,
         base_model=model_id,

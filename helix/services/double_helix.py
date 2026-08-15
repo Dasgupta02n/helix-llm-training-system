@@ -1,4 +1,4 @@
-"""Double Helix v1: package gold as QLoRA-ready files for a chosen Apache/MIT model.
+"""C7X-IO v1: package gold as QLoRA-ready files for a chosen Apache/MIT model.
 
 Does not start a GPU job unless RUNPOD_API_KEY is configured.
 """
@@ -16,25 +16,25 @@ from helix.services.role_risk import RECOMMENDED_TRAINING
 
 LICENSE_NOTE = """This package is built for a base model licensed Apache-2.0 or MIT.
 
-Helix does not redistribute base weights. Download the model from its official
+C7X does not redistribute base weights. Download the model from its official
 card under that model's license. You are responsible for complying with it.
 
-Llama / Gemma / other non-Apache-non-MIT bases are not offered in Double Helix.
+Llama / Gemma / other non-Apache-non-MIT bases are not offered in C7X-IO.
 """
 
 USAGE_OWNERSHIP = """USAGE, OWNERSHIP, AND LIABILITY
 
-1. You own the gold JSONL in this zip. Helix does not claim copyright in your examples.
+1. You own the gold JSONL in this zip. C7X does not claim copyright in your examples.
 2. The fine-tuned adapter (if you train it) is yours to run locally.
-3. Helix is not liable for decisions made by a model you train — especially hiring,
+3. C7X is not liable for decisions made by a model you train — especially hiring,
    credit, medical, or other high-risk roles. Human review remains required.
 4. Training method for v1 is QLoRA only on the Apache-2.0 / MIT model you selected (≤30B).
-5. No payment is collected. Access is limited to admin-approved Helix accounts.
+5. No payment is collected. Access is limited to admin-approved C7X accounts.
 """
 
 
 def _readme(model: dict[str, Any]) -> str:
-    return f"""# Double Helix v1 package
+    return f"""# C7X-IO v1 package
 
 Base model: {model['id']}
 Name: {model['name']}
@@ -51,13 +51,13 @@ QLoRA VRAM hint: ~{model['vram_gb_qlora']} GB
 ## Ollama (local)
 1. Pull the base from its official Apache/MIT model card.
 2. After you train a QLoRA adapter, convert/export per your trainer.
-3. `ollama create helix-custom -f Modelfile` then `ollama run helix-custom`
+3. `ollama create C7X-custom -f Modelfile` then `ollama run C7X-custom`
 
 ## vLLM
 Serve the merged or adapter-backed model you trained.
 
 ## Pay-per-run GPU
-Helix/Riu always trains on **pay-per-run GPU** (idle when unused).
+C7X/Riu always trains on **pay-per-run GPU** (idle when unused).
 Always-on machines are never used — they stay billed if left running.
 """
 

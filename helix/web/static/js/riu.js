@@ -137,7 +137,7 @@ async function sendRiuMessage(text) {
       const trained = jobsStarted.some((r) => r.action === "start_double_helix_train");
       toast(
         trained
-          ? "Riu queued Double Helix training — watch My data for the download"
+          ? "Riu queued C7X-IO training — watch My data for the download"
           : "Riu started a job — it keeps running if you leave"
       );
       if (typeof hooks.refreshers.jobs === "function") hooks.refreshers.jobs().catch(() => {});

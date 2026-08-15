@@ -1,4 +1,4 @@
-/* My data — gold, synthetics, corpus, Double Helix, declarations, snapshots. */
+/* My data — gold, synthetics, corpus, C7X-IO, declarations, snapshots. */
 import {
   $,
   api,
@@ -128,7 +128,7 @@ async function loadLibrary(opts = {}) {
       if (uploadN) bits.push(`${uploadN} labeled gold upload(s)`);
       if (matN) bits.push(`${matN} material-converted row(s)`);
       $("userUploadCountHint").textContent = bits.length
-        ? `${bits.join(" · ")}. Export my uploads / Export materials / Export all trainable for Double Helix.`
+        ? `${bits.join(" · ")}. Export my uploads / Export materials / Export all trainable for C7X-IO.`
         : "No personal uploads yet. Use the zip uploaders above or finish Riu setup.";
     }
 
@@ -328,7 +328,7 @@ async function downloadLibraryZip({ scope = "library", version = "" } = {}) {
   const blob = await res.blob();
   const name = _filenameFromDisposition(
     res.headers.get("content-disposition"),
-    `helix_${state.tenantSlug}_${version || scope}.zip`
+    `c7x_${state.tenantSlug}_${version || scope}.zip`
   );
   _saveBlob(blob, name);
   const empty = res.headers.get("X-Helix-Pack-Empty");
@@ -351,7 +351,7 @@ async function exportLibrary(kind, fmt) {
     );
     if (!res.ok) throw new Error("Download failed");
     const blob = await res.blob();
-    _saveBlob(blob, `helix_${state.tenantSlug}_${kind}.${format === "json" ? "json" : "jsonl"}`);
+    _saveBlob(blob, `c7x_${state.tenantSlug}_${kind}.${format === "json" ? "json" : "jsonl"}`);
     toast("Download started");
   } catch (e) {
     toast(e.message, "err");
@@ -569,7 +569,7 @@ function renderDoubleHelixTrain(job) {
         ? job.declaration_accepted
           ? "Declaration on file. You can download the trained zip (adapter, tokenizer, gold, load_adapter.py)."
           : "Training finished. Accept the ownership/liability declaration to download."
-        : "Helix is using gold already in this account. You can still download the data zip anytime.";
+        : "C7X is using gold already in this account. You can still download the data zip anytime.";
   }
   if (wrap) wrap.classList.toggle("hidden", !job.download_ready);
   const cancelBtn = $("doubleHelixTrainCancelBtn");
@@ -605,7 +605,7 @@ if ($("doubleHelixZipBtn")) {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "helix_double_helix_v1.zip";
+      a.download = "c7x_io_gold_v1.zip";
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -704,7 +704,7 @@ async function downloadTrainedZip(jobId) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = `helix_trained_${jobId}.zip`;
+  a.download = `c7x_io_trained_${jobId}.zip`;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -854,7 +854,7 @@ export function bindLibraryEvents() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "helix_double_helix_v1.zip";
+        a.download = "c7x_io_gold_v1.zip";
         document.body.appendChild(a);
         a.click();
         a.remove();

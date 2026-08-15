@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Helix — Training Data Studio</title>
+  <title>C7X — Training Data Studio</title>
   <meta name="theme-color" content="#0c0b09" />
   <meta name="robots" content="noindex,nofollow" />
   <link rel="canonical" href="https://c7xai.in/app" />
@@ -20,7 +20,7 @@
           <path d="M10 0c0 6.7-7 3.3-7 10s7 3.3 7 10" stroke="#F0E5C8" stroke-width="1.1" opacity=".5"/>
         </svg>
         <div class="brand-text">
-          <strong>Helix</strong>
+          <strong>C7X</strong>
           <span>Training data studio</span>
         </div>
       </a>
@@ -88,7 +88,7 @@
         <p id="loginSuccess" class="status-line ok"></p>
         <p id="devLinkBox" class="hint hidden" style="word-break:break-all;margin-top:.75rem"></p>
         <p class="auth-legal">
-          By using Helix you agree to the
+          By using C7X you agree to the
           <a href="/terms">Terms</a> and <a href="/privacy">Privacy</a> policies.
           <a href="/security">Security</a> · <a href="/account">Account</a> · <a href="/contact">Contact</a>
         </p>
@@ -105,7 +105,7 @@
           <path d="M10 0c0 6.7-7 3.3-7 10s7 3.3 7 10" stroke="#F0E5C8" stroke-width="1.1" opacity=".5"/>
         </svg>
         <div class="brand-text">
-          <strong>Helix</strong>
+          <strong>C7X</strong>
           <span>Training data studio</span>
         </div>
       </a>
@@ -146,7 +146,7 @@
           <div>
             <span class="page-kicker">Your guide</span>
             <h2>Chat with Riu</h2>
-            <p class="hint">Riu asks plain-English questions, sets up Helix for you, then starts collecting training data.</p>
+            <p class="hint">Riu asks plain-English questions, sets up C7X for you, then starts collecting training data.</p>
           </div>
           <div class="page-actions">
             <span class="badge accent" id="riuProgressBadge">Setup 0%</span>
@@ -169,7 +169,7 @@
               <p class="hint">
                 Zip of <code>.jsonl</code> / <code>.json</code> / <code>.csv</code> with
                 <strong>input + output</strong> pairs (or question/answer). Saved as gold format —
-                downloadable in My data and ready for Double Helix later.
+                downloadable in My data and ready for C7X-IO later.
               </p>
               <input id="riuGoldZip" type="file" accept=".zip,application/zip" />
               <div class="flex" style="margin-top:8px;gap:8px;flex-wrap:wrap">
@@ -225,7 +225,7 @@
         <div class="page-head">
           <div>
             <span class="page-kicker">Home</span>
-            <h2>How Helix works</h2>
+            <h2>How C7X works</h2>
             <p class="hint">Setup is <strong>Riu only</strong> — she interviews you, sets the quality bar, estimates cost, and starts mining. Home, My data, and Download stay for jobs and files.</p>
           </div>
           <div class="page-actions">
@@ -311,7 +311,7 @@
           <h3 class="mt-0">Your labeled data (gold format)</h3>
           <p class="hint">
             Upload a <strong>zip</strong> of labeled Q&amp;A (jsonl/json/csv). We store it in the same gold format
-            as curated examples — downloadable anytime and ready for <strong>Double Helix</strong> training later.
+            as curated examples — downloadable anytime and ready for <strong>C7X-IO</strong> training later.
           </p>
           <div class="flex" style="gap:8px;flex-wrap:wrap;align-items:center">
             <input id="libraryGoldZip" type="file" accept=".zip,application/zip" />
@@ -342,14 +342,14 @@
             <label for="doubleHelixModel">Base model (Apache-2.0 / MIT, ≤30B)</label>
             <select id="doubleHelixModel"></select>
           </div>
-          <p class="hint">GPU is <strong>pay per job</strong> (idle when unused). Helix never leaves a machine running.</p>
+          <p class="hint">GPU is <strong>pay per job</strong> (idle when unused). C7X never leaves a machine running.</p>
           <div class="flex" style="gap:8px;flex-wrap:wrap;align-items:center;margin-top:8px">
             <button class="btn btn-secondary btn-sm" id="doubleHelixZipBtn" type="button">1. Download my gold (zip)</button>
-            <button class="btn btn-primary btn-sm" id="doubleHelixTrainBtn" type="button">2. Train with Double Helix</button>
+            <button class="btn btn-primary btn-sm" id="doubleHelixTrainBtn" type="button">2. Train with C7X-IO</button>
           </div>
           <label class="flex" style="align-items:center;gap:.5rem;font-weight:500;margin-top:10px">
             <input id="doubleHelixTrainConfirm" type="checkbox" style="width:auto;min-height:auto;margin:0" />
-            Start a paid GPU job (~$15–50). Helix will fetch gold from this account — I will not re-upload.
+            Start a paid GPU job (~$15–50). C7X will fetch gold from this account — I will not re-upload.
           </label>
           <label class="flex" style="align-items:center;gap:.5rem;font-weight:500;margin-top:8px">
             <input id="doubleHelixIncludeSynth" type="checkbox" style="width:auto;min-height:auto;margin:0" />
@@ -491,7 +491,7 @@
           <div>
             <span class="page-kicker">Step 5</span>
             <h2>Download your training data</h2>
-            <p class="hint">Every download is one zip with separate files: gold, synthetics, labeled corpus, and converted materials. Full library is everything in this account. Quick download is this Riu chat only. To train, use <strong>My data → Train with Double Helix</strong>.</p>
+            <p class="hint">Every download is one zip with separate files: gold, synthetics, labeled corpus, and converted materials. Full library is everything in this account. Quick download is this Riu chat only. To train, use <strong>My data → Train with C7X-IO</strong>.</p>
           </div>
           <div class="page-actions">
             <button class="btn btn-primary" id="exportAllLibraryBtn" type="button">Download my full library</button>
@@ -577,7 +577,7 @@
       <pre class="declaration-text" id="declarationBody"></pre>
       <label class="flex" style="align-items:center;gap:.5rem;font-weight:500;margin:12px 0">
         <input id="declarationConfirmBox" type="checkbox" style="width:auto;min-height:auto;margin:0" />
-        I have read this declaration and I accept it. I own this model and I am solely responsible for its use. Helix, Double Helix, and Riu are not liable.
+        I have read this declaration and I accept it. I own this model and I am solely responsible for its use. C7X, C7X-IO, and Riu are not liable.
       </label>
       <div class="flex" style="gap:8px;flex-wrap:wrap">
         <button class="btn btn-primary" id="declarationAcceptBtn" type="button">Accept and download</button>

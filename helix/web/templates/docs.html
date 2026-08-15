@@ -1,27 +1,27 @@
 {% extends "public_base.html" %}
 {% block title %}Docs{% endblock %}
 {% block canonical %}https://c7xai.in/docs{% endblock %}
-{% block meta_description %}Helix documentation — Plan, Riu, formats, mining, corpus, gold library, BYO zips, spend cap, and export.{% endblock %}
+{% block meta_description %}C7X documentation — Plan, Riu, formats, mining, corpus, gold library, BYO zips, spend cap, and export.{% endblock %}
 {% block content %}
 <article class="legal-doc">
   <p class="page-kicker">Documentation · Product guide</p>
-  <h1>Helix docs</h1>
+  <h1>C7X docs</h1>
   <p class="lead">
-    Helix is a <strong>no-code gold training-data studio</strong>. You define a domain plan, mine or paste
+    C7X is a <strong>no-code gold training-data studio</strong>. You define a domain plan, mine or paste
     evidence, quality-gate gold Q&amp;A pairs, optionally synthesize variants, and export for fine-tuning
     or evaluation. This page is the public product guide (not the OpenAPI explorer).
   </p>
 
-  <h2>When to use Helix</h2>
+  <h2>When to use C7X</h2>
   <p>
-    Use Helix when you need a <strong>task-specific dataset</strong> (support replies, HR handbook Q&amp;A,
+    Use C7X when you need a <strong>task-specific dataset</strong> (support replies, HR handbook Q&amp;A,
     sales objections, social brand voice pairs, etc.) and you want product/ops teams to drive quality—
     without standing up a labeling army.
   </p>
   <p>
     Prefer prompting + eval tools (e.g. prompt versioning / live review) when you are iterating on an
     already-deployed assistant and are <em>not</em> ready to fine-tune. Prefer enterprise labeling platforms
-    when you need huge multimodal annotation programs. Helix owns the wedge: <strong>fast domain dataset
+    when you need huge multimodal annotation programs. C7X owns the wedge: <strong>fast domain dataset
     mining + gold gates + export</strong>.
   </p>
 
@@ -64,8 +64,8 @@
   </p>
   <h3>Unlabeled materials</h3>
   <p>
-    Upload scripts, rulebooks, lesson notes as a zip. Helix converts them into trainable gold-format pairs
-    (Export materials). They sit alongside mined gold and labeled uploads for later Double Helix training.
+    Upload scripts, rulebooks, lesson notes as a zip. C7X converts them into trainable gold-format pairs
+    (Export materials). They sit alongside mined gold and labeled uploads for later C7X-IO training.
   </p>
   <h3>Gold library</h3>
   <p>
@@ -75,12 +75,12 @@
   <h3>Synthesis</h3>
   <p>
     Create controlled variations of gold (tone, persona, difficulty, etc.) for volume while preserving business logic.
-    Synthetics are stored separately, downloaded separately, and join Double Helix training only after you confirm.
+    Synthetics are stored separately, downloaded separately, and join C7X-IO training only after you confirm.
   </p>
   <h3>Export</h3>
   <p>
-    Download gold/synthetic sets and train anywhere. Or start <strong>Double Helix</strong>:
-    Helix fetches gold from your account, trains QLoRA on pay-per-run GPU, then
+    Download gold/synthetic sets and train anywhere. Or start <strong>C7X-IO</strong>:
+    C7X fetches gold from your account, trains QLoRA on pay-per-run GPU, then
     gives you a zip of the adapter, tokenizer, gold used, and <code>load_adapter.py</code>
     (not a full merged 30B dump). Downloading the trained zip requires accepting an
     ownership/liability declaration; a copy is emailed and kept even if you delete the account.

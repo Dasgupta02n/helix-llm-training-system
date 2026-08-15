@@ -110,7 +110,7 @@ def _base_html(title: str, body_html: str) -> str:
     <tr><td align="center">
       <table width="520" cellpadding="0" cellspacing="0" style="background:#161821;border-radius:16px;border:1px solid rgba(255,255,255,0.08);padding:32px;">
         <tr><td>
-          <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#e8a87c;">Helix</div>
+          <div style="font-size:22px;font-weight:700;margin-bottom:8px;color:#e8a87c;">C7X</div>
           <div style="font-size:13px;color:#8f8890;margin-bottom:24px;">Training data studio</div>
           {body_html}
           <p style="margin-top:28px;font-size:12px;color:#6d6770;">
@@ -128,7 +128,7 @@ def send_verification_email(db: Session, to: str, name: str, link: str) -> dict[
     body = f"""
       <h1 style="font-size:20px;margin:0 0 12px;">Confirm your email</h1>
       <p style="color:#c8c2b6;line-height:1.5;">Hi {name or "there"},</p>
-      <p style="color:#c8c2b6;line-height:1.5;">Thanks for joining Helix. Confirm your email to activate your account.</p>
+      <p style="color:#c8c2b6;line-height:1.5;">Thanks for joining C7X. Confirm your email to activate your account.</p>
       <p style="margin:28px 0;">
         <a href="{link}" style="display:inline-block;background:linear-gradient(135deg,#f0b58a,#e8a87c);color:#1a1210;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px;">
           Confirm email
@@ -139,9 +139,9 @@ def send_verification_email(db: Session, to: str, name: str, link: str) -> dict[
     return send_email(
         db,
         to=to,
-        subject="Confirm your Helix account",
+        subject="Confirm your C7X account",
         html=_base_html("Confirm email", body),
-        text=f"Confirm your Helix account: {link}",
+        text=f"Confirm your C7X account: {link}",
         template="verify_email",
     )
 
@@ -150,7 +150,7 @@ def send_password_reset_email(db: Session, to: str, name: str, link: str) -> dic
     body = f"""
       <h1 style="font-size:20px;margin:0 0 12px;">Reset your password</h1>
       <p style="color:#c8c2b6;line-height:1.5;">Hi {name or "there"},</p>
-      <p style="color:#c8c2b6;line-height:1.5;">We received a request to reset your Helix password. This link expires in 24 hours.</p>
+      <p style="color:#c8c2b6;line-height:1.5;">We received a request to reset your C7X password. This link expires in 24 hours.</p>
       <p style="margin:28px 0;">
         <a href="{link}" style="display:inline-block;background:linear-gradient(135deg,#f0b58a,#e8a87c);color:#1a1210;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px;">
           Choose a new password
@@ -161,9 +161,9 @@ def send_password_reset_email(db: Session, to: str, name: str, link: str) -> dic
     return send_email(
         db,
         to=to,
-        subject="Reset your Helix password",
+        subject="Reset your C7X password",
         html=_base_html("Reset password", body),
-        text=f"Reset your Helix password: {link}",
+        text=f"Reset your C7X password: {link}",
         template="reset_password",
     )
 
@@ -172,7 +172,7 @@ def send_set_password_email(db: Session, to: str, name: str, link: str) -> dict[
     body = f"""
       <h1 style="font-size:20px;margin:0 0 12px;">Create your password</h1>
       <p style="color:#c8c2b6;line-height:1.5;">Hi {name or "there"},</p>
-      <p style="color:#c8c2b6;line-height:1.5;">Your Helix account is ready. Set a password to start collecting training data.</p>
+      <p style="color:#c8c2b6;line-height:1.5;">Your C7X account is ready. Set a password to start collecting training data.</p>
       <p style="margin:28px 0;">
         <a href="{link}" style="display:inline-block;background:linear-gradient(135deg,#f0b58a,#e8a87c);color:#1a1210;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px;">
           Create password
@@ -183,9 +183,9 @@ def send_set_password_email(db: Session, to: str, name: str, link: str) -> dict[
     return send_email(
         db,
         to=to,
-        subject="Create your Helix password",
+        subject="Create your C7X password",
         html=_base_html("Create password", body),
-        text=f"Create your Helix password: {link}",
+        text=f"Create your C7X password: {link}",
         template="set_password",
     )
 
@@ -204,7 +204,7 @@ def send_admin_approval_request_email(
     body = f"""
       <h1 style="font-size:20px;margin:0 0 12px;">New user awaiting approval</h1>
       <p style="color:#c8c2b6;line-height:1.5;">
-        A user confirmed their email and is waiting for you to activate their Helix account.
+        A user confirmed their email and is waiting for you to activate their C7X account.
       </p>
       <table cellpadding="0" cellspacing="0" style="width:100%;margin:18px 0;border-collapse:collapse;">
         <tr>
@@ -236,10 +236,10 @@ def send_admin_approval_request_email(
     return send_email(
         db,
         to=admin_email,
-        subject=f"Approve Helix user: {user_email}",
+        subject=f"Approve C7X user: {user_email}",
         html=_base_html("Approve user", body),
         text=(
-            f"Approve Helix user {user_name} <{user_email}> (id={user_id}).\n"
+            f"Approve C7X user {user_name} <{user_email}> (id={user_id}).\n"
             f"Signed up: {created_at}\n"
             f"Approve: {approve_link}"
         ),
@@ -254,11 +254,11 @@ def send_account_activated_email(
       <h1 style="font-size:20px;margin:0 0 12px;">Your account is active</h1>
       <p style="color:#c8c2b6;line-height:1.5;">Hi {name or "there"},</p>
       <p style="color:#c8c2b6;line-height:1.5;">
-        An administrator approved your Helix account. You can sign in and start collecting training data.
+        An administrator approved your C7X account. You can sign in and start collecting training data.
       </p>
       <p style="margin:28px 0;">
         <a href="{login_url}" style="display:inline-block;background:linear-gradient(135deg,#f0b58a,#e8a87c);color:#1a1210;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px;">
-          Sign in to Helix
+          Sign in to C7X
         </a>
       </p>
       <p style="color:#8f8890;font-size:13px;word-break:break-all;">Or open:<br>{login_url}</p>
@@ -266,9 +266,9 @@ def send_account_activated_email(
     return send_email(
         db,
         to=to,
-        subject="Your Helix account is active",
+        subject="Your C7X account is active",
         html=_base_html("Account activated", body),
-        text=f"Your Helix account is active. Sign in: {login_url}",
+        text=f"Your C7X account is active. Sign in: {login_url}",
         template="account_activated",
     )
 
@@ -277,7 +277,7 @@ def send_invite_email(
     db: Session, to: str, name: str, inviter: str, workspace: str, link: str
 ) -> dict[str, Any]:
     body = f"""
-      <h1 style="font-size:20px;margin:0 0 12px;">You’re invited to Helix</h1>
+      <h1 style="font-size:20px;margin:0 0 12px;">You’re invited to C7X</h1>
       <p style="color:#c8c2b6;line-height:1.5;">Hi {name or "there"},</p>
       <p style="color:#c8c2b6;line-height:1.5;">
         <strong>{inviter}</strong> invited you to the workspace <strong>{workspace}</strong>.
@@ -292,9 +292,9 @@ def send_invite_email(
     return send_email(
         db,
         to=to,
-        subject=f"Invitation to {workspace} on Helix",
+        subject=f"Invitation to {workspace} on C7X",
         html=_base_html("Invitation", body),
-        text=f"You're invited to {workspace} on Helix: {link}",
+        text=f"You're invited to {workspace} on C7X: {link}",
         template="invite",
     )
 
@@ -317,8 +317,8 @@ def send_declaration_copy_email(
       <p style="color:#c8c2b6;line-height:1.5;">Hi {html_lib.escape(name or "there")},</p>
       <p style="color:#c8c2b6;line-height:1.5;">
         This is a copy of the ownership and liability declaration you accepted
-        before downloading a Double Helix trained model.
-        Helix, Double Helix, and Riu keep this copy. You cannot delete it.
+        before downloading a C7X-IO trained model.
+        C7X, C7X-IO, and Riu keep this copy. You cannot delete it.
         If you delete your account, this record stays keyed to <strong>{html_lib.escape(to)}</strong>.
       </p>
       <p style="color:#8f8890;font-size:13px;">
@@ -331,13 +331,13 @@ def send_declaration_copy_email(
       </div>
     """
     plain = (
-        f"Copy of your Double Helix declaration (version {version}).\n"
+        f"Copy of your C7X-IO declaration (version {version}).\n"
         f"Accepted: {accepted_at}\nJob: {job_id}\n\n{text}\n"
     )
     return send_email(
         db,
         to=to,
-        subject="Your Double Helix ownership and liability declaration",
+        subject="Your C7X-IO ownership and liability declaration",
         html=_base_html("Declaration copy", body),
         text=plain,
         template="declaration_copy",

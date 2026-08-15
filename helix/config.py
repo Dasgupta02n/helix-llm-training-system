@@ -1,4 +1,4 @@
-"""Helix configuration — local SQLite or VPS multi-tenant with OpenRouter."""
+"""C7X configuration — local SQLite or VPS multi-tenant with OpenRouter."""
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openrouter_model: str = "x-ai/grok-4.5"
     openrouter_site_url: str = "http://localhost:8000"
-    openrouter_site_name: str = "Helix"
+    openrouter_site_name: str = "C7X"
 
     # Optional local fallback (direct xAI)
     xai_api_key: str = ""
@@ -54,7 +54,7 @@ class Settings(BaseSettings):
 
     # Resend (transactional email)
     resend_api_key: str = ""
-    resend_from_email: str = "Helix <onboarding@resend.dev>"
+    resend_from_email: str = "C7X <onboarding@resend.dev>"
     resend_reply_to: str = ""
 
     # Auth policy
@@ -106,7 +106,7 @@ class Settings(BaseSettings):
     # Expose detailed health (Apify username/plan) only when true
     health_verbose: bool = False
 
-    # Double Helix trains only on RunPod Serverless (never GPU Cloud pods).
+    # C7X-IO trains only on RunPod Serverless (never GPU Cloud pods).
     runpod_api_key: str = ""
     runpod_serverless_endpoint_id: str = ""
     hf_token: str = ""

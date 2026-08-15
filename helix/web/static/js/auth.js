@@ -46,7 +46,7 @@ function setAuthMode(mode) {
     },
     signup: {
       eye: "New account",
-      title: "Create your Helix account",
+      title: "Create your C7X account",
       lead: "We’ll set up a private workspace for your training data.",
       panel: "authSignup",
     },

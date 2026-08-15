@@ -168,7 +168,7 @@ def _training_line(row: dict[str, Any], *, fmt: str) -> str:
 
 def _readme(scope: str, counts: dict[str, int], since_iso: str | None) -> str:
     lines = [
-        "Helix training pack",
+        "C7X training pack",
         f"Scope: {scope}",
     ]
     if since_iso:
@@ -357,4 +357,4 @@ def zip_saved_pack(
 
 def pack_filename(slug: str, label: str) -> str:
     safe = re.sub(r"[^a-zA-Z0-9_.-]+", "_", f"{slug}_{label}")[:80]
-    return f"helix_{safe}.zip"
+    return f"c7x_{safe}.zip"

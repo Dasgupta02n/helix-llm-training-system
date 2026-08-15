@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Load a Helix Double Helix QLoRA adapter with PEFT.
+"""Load a C7X C7X-IO QLoRA adapter with PEFT.
 
 Unzip the trained package and run this file from the unzipped folder:
 
@@ -82,7 +82,7 @@ def main(argv: list[str] | None = None) -> int:
     meta = _read_meta()
     default_base = str(meta.get("base_model") or "").strip()
     parser = argparse.ArgumentParser(
-        description="Load the Helix QLoRA adapter in this folder with PEFT."
+        description="Load the C7X QLoRA adapter in this folder with PEFT."
     )
     parser.add_argument(
         "--base",

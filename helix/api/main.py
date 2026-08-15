@@ -1,4 +1,4 @@
-"""Helix multi-tenant API + web console."""
+"""C7X multi-tenant API + web console."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ _settings = get_settings()
 
 # Product docs live at /docs (public HTML). OpenAPI UI is separate when enabled.
 app = FastAPI(
-    title="Helix",
+    title="C7X",
     description=(
         "Multi-tenant gold-data mining for LLM training — "
         "user-owned gold/synthetic libraries, synthesis, email auth, and mining jobs."
@@ -301,9 +301,9 @@ def robots_txt() -> str:
 @app.get("/llms.txt", response_class=PlainTextResponse)
 def llms_txt() -> str:
     return (
-        "# Helix (c7xai.in)\n"
+        "# C7X (c7xai.in)\n"
         "\n"
-        "> Helix is a gold training-data studio, not a chatbot. "
+        "> C7X is a gold training-data studio, not a chatbot. "
         "Teams plan in plain English with Riu, mine evidence, quality-gate gold examples, "
         "synthesize variants, and export files they own.\n"
         "\n"
@@ -340,13 +340,13 @@ def humans_txt() -> str:
     return (
         "/* TEAM */\n"
         "Operator: Sabyasachi Dasgupta\n"
-        "Site: Helix / c7x AI\n"
+        "Site: C7X / c7x AI\n"
         "Contact: dasgupta.02n@gmail.com\n"
         "Location: Building in public at c7xai.in\n"
         "\n"
         "/* SITE */\n"
         "Standards: HTML, CSS, JSON-LD, llms.txt, security.txt\n"
-        "Software: Helix training-data studio\n"
+        "Software: C7X training-data studio\n"
         "Last update: 2026-08-15\n"
     )
 

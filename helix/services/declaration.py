@@ -1,4 +1,4 @@
-"""Ownership / liability declaration for Double Helix trained-model download.
+"""Ownership / liability declaration for C7X-IO trained-model download.
 
 Acceptances are retained by email. There is no delete path. Account deletion
 does not remove these rows.
@@ -16,9 +16,9 @@ from helix.db import models as m
 
 DECLARATION_VERSION = "dh-liability-v1"
 
-DECLARATION_TITLE = "Double Helix trained-model ownership and liability declaration"
+DECLARATION_TITLE = "C7X-IO trained-model ownership and liability declaration"
 
-DECLARATION_TEXT = """DOUBLE HELIX TRAINED-MODEL OWNERSHIP AND LIABILITY DECLARATION
+DECLARATION_TEXT = """C7X-IO TRAINED-MODEL OWNERSHIP AND LIABILITY DECLARATION
 Version: dh-liability-v1
 
 By downloading this trained model package (QLoRA adapter, tokenizer files, and
@@ -26,7 +26,7 @@ related artifacts), you declare and agree:
 
 1. OWNERSHIP
    You own the fine-tuned adapter and any model you create from it using gold
-   that was in your Helix account. Helix does not claim copyright in your
+   that was in your C7X account. C7X does not claim copyright in your
    examples or in the adapter produced from them.
 
 2. YOUR RESPONSIBILITY
@@ -35,7 +35,7 @@ related artifacts), you declare and agree:
    safety-critical, or any other high-risk use. Human review remains required.
 
 3. NO LIABILITY
-   Helix, Double Helix, Riu, c7x AI, and their operators, officers, and
+   C7X, C7X-IO, Riu, c7x AI, and their operators, officers, and
    contractors are not liable for any claim, loss, damage, decision, or
    outcome arising from this model or its use — including direct, indirect,
    incidental, special, or consequential damages — to the maximum extent
@@ -47,12 +47,12 @@ related artifacts), you declare and agree:
 
 5. BASE MODEL LICENSE
    The public base checkpoint remains under its Apache-2.0 or MIT card. You
-   must comply with that license. Helix does not redistribute base weights.
+   must comply with that license. C7X does not redistribute base weights.
 
 6. RECORD KEEPING
    A copy of this accepted declaration is emailed to you and stored in your
-   Helix account. You cannot delete that copy. If you delete your account,
-   Helix still retains this declaration in a backend record keyed by your
+   C7X account. You cannot delete that copy. If you delete your account,
+   C7X still retains this declaration in a backend record keyed by your
    email address.
 
 I have read this declaration and I accept it."""

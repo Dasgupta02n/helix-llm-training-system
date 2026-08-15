@@ -279,8 +279,8 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             "Goals noted.\n\n"
             f"• Gold target: **{g:,}** · variations/gold: **{v}** · quality mode **{q}**\n\n"
             "Do you already have **your own labeled data** (Q&A, tickets, chats) "
-            "you want saved in the **same gold format** Helix uses — so you can "
-            "download it later and use it with **Double Helix** training?\n\n"
+            "you want saved in the **same gold format** C7X uses — so you can "
+            "download it later and use it with **C7X-IO** training?\n\n"
             "Reply **yes** (I'll show a zip upload) or **no** / **skip** to continue."
         )
         next_phase = "own_data"
@@ -323,7 +323,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
                 "Zip should include `.jsonl`, `.json`, or `.csv` files with pairs like "
                 "`input`+`output` (also accepts question/answer or prompt/completion).\n\n"
                 "I'll save them as **gold-format** rows (downloadable anytime, ready "
-                "for Double Helix later).\n\n"
+                "for C7X-IO later).\n\n"
                 "After uploading, reply **done** or **continue**. "
                 "Or say **skip** to move on without uploading."
             )
@@ -544,16 +544,16 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         no = bool(re.search(r"\b(no|skip|later|not now)\b", lower))
         wants_train = (
             "confirm train" in lower
-            or "train with double helix" in lower
-            or ("double helix" in lower and "confirm" in lower)
+            or "train with C7X-IO" in lower
+            or ("C7X-IO" in lower and "confirm" in lower)
         )
-        asks_train = ("train" in lower or "double helix" in lower) and not wants_train
+        asks_train = ("train" in lower or "C7X-IO" in lower) and not wants_train
         if wants_train:
             if "synth" in lower:
                 patch["include_synthetics_in_train"] = True
             actions.append({"type": "start_double_helix_train"})
             reply = (
-                "Starting Double Helix training on rows already in your account "
+                "Starting C7X-IO training on rows already in your account "
                 "(no re-upload). "
                 + (
                     "Gold **and** synthetics (stored separately) will both train."
@@ -569,7 +569,7 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
             reply = (
                 "Two options:\n\n"
                 "1. **Download** your gold from **My data** and train anywhere.\n"
-                "2. **Train with Double Helix** — Helix fetches gold from this account, "
+                "2. **Train with C7X-IO** — C7X fetches gold from this account, "
                 "runs QLoRA on pay-per-run GPU (~$15–50), then gives you a zip "
                 "(adapter + tokenizer + the gold used).\n\n"
                 "Say **confirm train** to start option 2, or open **My data**."
@@ -601,19 +601,19 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
                 next_phase = "done"
                 reply = (
                     "All set — no variations. From **My data** you can "
-                    "**download your gold** or **train with Double Helix** "
-                    "(Helix uses the gold already in your account)."
+                    "**download your gold** or **train with C7X-IO** "
+                    "(C7X uses the gold already in your account)."
                 )
                 progress = 100
     elif phase == "done":
         wants_train = "confirm train" in lower or (
-            "double helix" in lower and "confirm" in lower
+            "C7X-IO" in lower and "confirm" in lower
         )
-        asks_train = ("train" in lower or "double helix" in lower) and not wants_train
+        asks_train = ("train" in lower or "C7X-IO" in lower) and not wants_train
         if wants_train:
             actions.append({"type": "start_double_helix_train"})
             reply = (
-                "Starting Double Helix on gold already in your account. "
+                "Starting C7X-IO on gold already in your account. "
                 "Watch **My data** for the download link when training finishes."
             )
             next_phase = "done"
@@ -621,14 +621,14 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         elif asks_train:
             reply = (
                 "Download gold from **My data**, or say **confirm train** to "
-                "run Double Helix QLoRA (~$15–50) on that same account gold."
+                "run C7X-IO QLoRA (~$15–50) on that same account gold."
             )
             next_phase = "done"
             progress = 100
         else:
             reply = (
                 "I'm here. Download gold from **My data**, say **confirm train** "
-                "for Double Helix, or **restart** for a new collection."
+                "for C7X-IO, or **restart** for a new collection."
             )
             next_phase = "done"
             progress = 100
@@ -1146,7 +1146,7 @@ def execute_actions(
 
                 low = user_text.lower()
                 if "confirm train" not in low and not (
-                    "double helix" in low and "confirm" in low
+                    "C7X-IO" in low and "confirm" in low
                 ):
                     results.append(
                         {
@@ -1320,7 +1320,7 @@ def handle_user_message(
     actions = list(turn.get("actions") or [])
     lower_msg = text.lower()
     wants_confirm_train = "confirm train" in lower_msg or (
-        "double helix" in lower_msg and "confirm" in lower_msg
+        "C7X-IO" in lower_msg and "confirm" in lower_msg
     )
     if wants_confirm_train and not any(
         (a.get("type") if isinstance(a, dict) else "") == "start_double_helix_train"
@@ -1391,7 +1391,7 @@ def handle_user_message(
             reply += f"\n\nSynthesis job **{r['job']['id']}** is queued."
         if r.get("ok") and r.get("action") == "start_double_helix_train" and r.get("job"):
             reply += (
-                f"\n\nDouble Helix train **{r['job']['id']}** is queued. "
+                f"\n\nC7X-IO train **{r['job']['id']}** is queued. "
                 "Download the trained zip from **My data** when it is ready."
             )
         if not r.get("ok") and r.get("error"):

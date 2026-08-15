@@ -82,7 +82,7 @@ def test_crawler_files_exist():
     assert "llms.txt" in robots.text.lower() or "LLMs-Txt" in robots.text
     llms = client.get("/llms.txt")
     assert llms.status_code == 200
-    assert "helix" in llms.text.lower()
+    assert "c7x" in llms.text.lower()
     assert "training-data" in llms.text.lower() or "training data" in llms.text.lower()
     sec = client.get("/.well-known/security.txt")
     assert sec.status_code == 200
@@ -137,7 +137,7 @@ def test_site_nav_on_inner_pages():
     assert r.status_code == 200
     assert "Open studio" in r.text
     assert "0.75" in r.text or "per gold" in r.text.lower() or "per row" in r.text.lower()
-    assert "Double Helix" in r.text or "double helix" in r.text.lower()
+    assert "C7X-IO" in r.text or "C7X-IO" in r.text.lower()
 
 
 def test_docs_cover_riu_and_materials():

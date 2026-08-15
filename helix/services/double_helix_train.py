@@ -1,7 +1,7 @@
-"""Double Helix train: pull gold from the user's Helix account → RunPod QLoRA → zip.
+"""C7X-IO train: pull gold from the user's C7X account → RunPod QLoRA → zip.
 
 Option A (unchanged): user downloads gold and trains anywhere.
-Option B (this module): Helix fetches that same gold, trains on Serverless,
+Option B (this module): C7X fetches that same gold, trains on Serverless,
 then offers a zip of the QLoRA adapter + tokenizer + notes. Full merged
 7B–30B weights are not included (tens of GB).
 """
@@ -267,7 +267,7 @@ def create_train_job(
         )
     if not train_ready():
         raise ValueError(
-            "Double Helix train is not ready on this server."
+            "C7X-IO train is not ready on this server."
         )
     existing = (
         db.query(m.DoubleHelixTrainJob)
@@ -282,7 +282,7 @@ def create_train_job(
     )
     if existing:
         raise ValueError(
-            f"A Double Helix train is already {existing.status} ({existing.id}). "
+            f"A C7X-IO train is already {existing.status} ({existing.id}). "
             "Wait for it to finish or cancel it."
         )
     gold_rows = load_trainable_gold(db, owner_user_id=owner_user_id, tenant_id=tenant_id)
@@ -317,7 +317,7 @@ def create_train_job(
         gold_count=len(gold_rows),
         progress_message=(
             f"Queued QLoRA on {model['name']} using {mix} row(s) "
-            "already in your Helix account."
+            "already in your C7X account."
         ),
         meta_json=json.dumps(
             {
@@ -400,13 +400,13 @@ def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
         else f"{len(gold_rows)} gold"
     )
     append_train_activity(
-        job, f"Uploading {mix} row(s) from your Helix account…"
+        job, f"Uploading {mix} row(s) from your C7X account…"
     )
     db.commit()
 
     slug = job.id.replace("_", "-")
-    ds_name = f"helix-gold-{slug}"
-    md_name = f"helix-qlora-{slug}"
+    ds_name = f"C7X-gold-{slug}"
+    md_name = f"C7X-qlora-{slug}"
     ds_repo = create_private_repo(token, name=ds_name, repo_type="dataset")
     md_repo = create_private_repo(token, name=md_name, repo_type="model")
     chat_text, alpaca_text = build_dataset_texts(rows)
@@ -418,8 +418,8 @@ def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
             "train_chat.jsonl": chat_text,
             "train_alpaca.jsonl": alpaca_text,
             "README.md": (
-                f"# Helix gold for `{job.base_model_id}`\n\n"
-                f"{len(rows)} chat/alpaca rows exported from a Helix account. Private.\n"
+                f"# C7X gold for `{job.base_model_id}`\n\n"
+                f"{len(rows)} chat/alpaca rows exported from a C7X account. Private.\n"
             ),
         },
     )
@@ -536,7 +536,7 @@ def build_trained_zip(
 
     script_path = Path(__file__).resolve().parents[1] / "packaging" / "load_adapter.py"
     script_src = script_path.read_text(encoding="utf-8") if script_path.is_file() else ""
-    readme = f"""# Helix Double Helix trained package
+    readme = f"""# C7X C7X-IO trained package
 
 Base model: {model.get('id')}
 Name: {model.get('name')}
@@ -630,7 +630,7 @@ def _advance_packaging(db: Session, job: m.DoubleHelixTrainJob) -> None:
     if not repo:
         _fail(job, "Training finished but no adapter repo was recorded.")
         return
-    tmp = Path(tempfile.mkdtemp(prefix=f"helix-{job.id}-"))
+    tmp = Path(tempfile.mkdtemp(prefix=f"C7X-{job.id}-"))
     try:
         append_train_activity(job, "Downloading trained adapter files…")
         db.commit()
