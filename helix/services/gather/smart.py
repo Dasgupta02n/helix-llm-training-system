@@ -268,7 +268,7 @@ def gather_search(
             "needs_judgment": [_item_public(i) for i in existing],
             "discarded_low_relevance": 0,
             "gatherer": "apify",
-            "message": "Query recently run — reused stored items (no new Apify spend).",
+            "message": "Query recently run — reused stored items (no new gather spend).",
         }
 
     cached = None if force_refresh else _cache_get(db, tenant_id, cache_key)
@@ -422,9 +422,9 @@ def gather_search(
             "cost_usd": apify_cost,
         },
         "message": (
-            f"Gathered {len(results_out)} items via Apify; "
+            f"Gathered {len(results_out)} items; "
             f"{len(needs_j)} need judgment; {discarded} dropped by code filter"
-            + (f"; Apify ${apify_cost:.4f}" if apify_cost else " (cache, $0 Apify)")
+            + (f"; gather ${apify_cost:.4f}" if apify_cost else " (cache, $0 gather)")
             + "."
         ),
     }

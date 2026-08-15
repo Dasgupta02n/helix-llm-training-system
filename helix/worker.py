@@ -73,12 +73,14 @@ def _now() -> datetime:
 
 
 def _log(db, job: m.BatchJob, message: str, level: str = "info") -> None:
+    from helix.services.live_status import public_activity_text
+
     db.add(
         m.BatchJobEvent(
             id=_uid(),
             job_id=job.id,
             batch_index=job.completed_batches + 1,
-            message=message,
+            message=public_activity_text(message) or (message or ""),
             level=level,
         )
     )
@@ -188,7 +190,7 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 "job_user_message": (
                     f"Job so far: {total_gold} new gold across {batch_index} batch(es). "
                     f"Cost ${job.cost_usd:.4f} "
-                    f"(OR ${job.openrouter_cost_usd:.4f} + Apify ${job.apify_cost_usd:.4f}) "
+                    f"(model ${job.openrouter_cost_usd:.4f} + gather ${job.apify_cost_usd:.4f}) "
                     f"/ cap ${float(job.spend_cap_usd or 0):.4f}. "
                     f"This batch: {result.get('user_message') or f'{gold_new} gold'}."
                 ),
@@ -200,7 +202,7 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
                 job,
                 f"Batch {batch_index}/{job.total_batches} done (pipeline mode {job.quality_mode}): "
                 f"gold_new={gold_new} (job total={total_gold}), units~{items}, "
-                f"cost=${batch_cost:.4f} (OR ${or_cost:.4f} + Apify ${ap_cost:.4f}), "
+                f"cost=${batch_cost:.4f} (model ${or_cost:.4f} + gather ${ap_cost:.4f}), "
                 f"job total ${job.cost_usd:.4f}/{float(job.spend_cap_usd or 0):.4f} cap, "
                 f"{result.get('elapsed_seconds')}s. "
                 f"{result.get('user_message') or ''}",
@@ -343,8 +345,8 @@ def _process_one_batch(db, job: m.BatchJob) -> None:
             total_synth = int(summ.get("total_synth_new") or 0)
             cost_note = (
                 f" Cost ${float(job.cost_usd or 0):.4f} "
-                f"(OpenRouter ${float(job.openrouter_cost_usd or 0):.4f} + "
-                f"Apify ${float(job.apify_cost_usd or 0):.4f})"
+                f"(model ${float(job.openrouter_cost_usd or 0):.4f} + "
+                f"gather ${float(job.apify_cost_usd or 0):.4f})"
                 f" / cap ${float(job.spend_cap_usd or 0):.4f}."
             )
             if job.job_type == "pipeline":

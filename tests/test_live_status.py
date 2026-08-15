@@ -69,8 +69,25 @@ def test_job_to_dict_includes_heartbeat_and_events():
     listed = list_user_jobs(db, uid, tid)
     assert listed[0]["events"]
     assert "Gathering" in listed[0]["events"][0]["message"]
+    assert "Apify" not in listed[0]["events"][0]["message"]
     db.close()
     engine.dispose()
+
+
+def test_public_activity_strips_vendor_names():
+    from helix.services.live_status import public_activity_text
+
+    assert "Apify" not in public_activity_text("Gathering sources (Apify/code)…")
+    assert public_activity_text("Gathering sources (Apify/code)…") == "Gathering sources …"
+    assert public_activity_text("RunPod IN_PROGRESS") == "training IN_PROGRESS"
+    assert public_activity_text("Heartbeat — RunPod still In Progress.") == (
+        "Heartbeat — training still In Progress."
+    )
+    assert public_activity_text("Cost: OpenRouter $1.00 + Apify $0.20") == (
+        "Cost: the model $1.00 + gather $0.20"
+    )
+    assert "Hugging" not in public_activity_text("Uploading to Hugging Face…")
+    assert "Hostinger" not in public_activity_text("Deploying on Hostinger")
 
 
 def test_train_activity_appended():
@@ -91,4 +108,5 @@ def test_train_activity_appended():
     d = job_to_dict(job)
     assert d["live_state"] in {"live", "quiet", "stale"}
     assert len(d["events"]) == 2
-    assert d["events"][-1]["message"] == "RunPod IN_PROGRESS"
+    assert d["events"][-1]["message"] == "training IN_PROGRESS"
+    assert "RunPod" not in d["progress"]

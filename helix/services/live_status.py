@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from typing import Any
 
@@ -53,3 +54,28 @@ def heartbeat_fields(
         "live_state": state,
         "live_label": label,
     }
+
+
+# Step-log copy must not name vendors. Longer phrases first so they are not
+# half-replaced by a shorter name match.
+_VENDOR_SUBS = (
+    (re.compile(r"\(Apify/code\)", re.I), ""),
+    (re.compile(r"Apify/code", re.I), "the gather step"),
+    (re.compile(r"\bOpenRouter\b", re.I), "the model"),
+    (re.compile(r"\bApify\b", re.I), "gather"),
+    (re.compile(r"\bRunPod\b", re.I), "training"),
+    (re.compile(r"\bHugging\s*Face\b", re.I), "model storage"),
+    (re.compile(r"\bHuggingFace\b", re.I), "model storage"),
+    (re.compile(r"\bHostinger\b", re.I), "the server"),
+    (re.compile(r"\bHF Hub\b", re.I), "model storage"),
+    (re.compile(r"\bOR \$", re.I), "model $"),
+)
+
+
+def public_activity_text(msg: str | None) -> str:
+    out = (msg or "").strip()
+    if not out:
+        return ""
+    for pat, repl in _VENDOR_SUBS:
+        out = pat.sub(repl, out)
+    return re.sub(r" {2,}", " ", out).strip()

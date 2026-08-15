@@ -130,13 +130,24 @@ def job_to_dict(job: m.BatchJob, events: list[m.BatchJobEvent] | None = None) ->
         summary = json.loads(job.result_summary_json or "null")
     except json.JSONDecodeError:
         summary = None
-    from helix.services.live_status import heartbeat_fields
+    from helix.services.live_status import heartbeat_fields, public_activity_text
 
     hb = heartbeat_fields(
         job.updated_at,
         running=job.status in {"pending", "running"},
         started_at=job.started_at,
     )
+    if isinstance(summary, dict):
+        summary = dict(summary)
+        for key in ("job_user_message", "user_message", "spend_cap_message"):
+            if key in summary:
+                summary[key] = public_activity_text(summary.get(key))
+        last = summary.get("last_batch")
+        if isinstance(last, dict):
+            last = dict(last)
+            if "user_message" in last:
+                last["user_message"] = public_activity_text(last.get("user_message"))
+            summary["last_batch"] = last
     return {
         "id": job.id,
         "job_type": job.job_type,
@@ -148,7 +159,7 @@ def job_to_dict(job: m.BatchJob, events: list[m.BatchJobEvent] | None = None) ->
         "remaining_batches": remaining,
         "auto_continue": bool(job.auto_continue),
         "status": job.status,
-        "progress_message": job.progress_message,
+        "progress_message": public_activity_text(job.progress_message),
         "items_processed": job.items_processed,
         "last_batch_seconds": job.last_batch_seconds,
         "avg_batch_seconds": job.avg_batch_seconds,
@@ -175,7 +186,7 @@ def job_to_dict(job: m.BatchJob, events: list[m.BatchJobEvent] | None = None) ->
         },
         "config": config,
         "result_summary": summary,
-        "error": job.error,
+        "error": public_activity_text(job.error) or job.error,
         "created_at": job.created_at.isoformat() if job.created_at else None,
         "started_at": job.started_at.isoformat() if job.started_at else None,
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
@@ -185,7 +196,7 @@ def job_to_dict(job: m.BatchJob, events: list[m.BatchJobEvent] | None = None) ->
         "events": [
             {
                 "batch_index": e.batch_index,
-                "message": e.message,
+                "message": public_activity_text(e.message),
                 "level": e.level,
                 "created_at": e.created_at.isoformat() if e.created_at else None,
             }

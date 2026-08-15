@@ -32,7 +32,7 @@ from helix.services.hf_hub_io import (
     upload_text_files,
 )
 from helix.services.library import gold_to_chat_messages
-from helix.services.live_status import heartbeat_fields
+from helix.services.live_status import heartbeat_fields, public_activity_text
 from helix.services.runpod_train import (
     poll_qlora_job,
     submit_qlora_job,
@@ -118,17 +118,18 @@ def append_train_activity(job: m.DoubleHelixTrainJob, message: str, *, level: st
         meta = json.loads(job.meta_json or "{}")
     except json.JSONDecodeError:
         meta = {}
+    clean = public_activity_text(message) or (message or "").strip()
     evs = list(meta.get("activity") or [])
     evs.append(
         {
-            "message": message,
+            "message": clean,
             "level": level,
             "created_at": _now().isoformat(),
         }
     )
     meta["activity"] = evs[-40:]
     job.meta_json = json.dumps(meta)
-    job.progress_message = message[:500]
+    job.progress_message = clean[:500]
     job.updated_at = _now()
 
 
@@ -143,8 +144,8 @@ def job_to_dict(job: m.DoubleHelixTrainJob) -> dict[str, Any]:
         "status": job.status,
         "base_model_id": job.base_model_id,
         "gold_count": job.gold_count,
-        "progress": job.progress_message,
-        "error": job.error,
+        "progress": public_activity_text(job.progress_message),
+        "error": public_activity_text(job.error) or job.error,
         "download_ready": download_ready,
         "hf_dataset_repo": job.hf_dataset_repo,
         "hf_model_repo": job.hf_model_repo,
@@ -153,7 +154,14 @@ def job_to_dict(job: m.DoubleHelixTrainJob) -> dict[str, Any]:
         "created_at": job.created_at.isoformat() if job.created_at else None,
         "updated_at": job.updated_at.isoformat() if job.updated_at else None,
         "finished_at": job.finished_at.isoformat() if job.finished_at else None,
-        "events": _activity(job)[-16:],
+        "events": [
+            {
+                **e,
+                "message": public_activity_text(e.get("message") if isinstance(e, dict) else ""),
+            }
+            for e in _activity(job)[-16:]
+            if isinstance(e, dict)
+        ],
         **hb,
     }
 
@@ -279,7 +287,7 @@ def cancel_train_job(
     if job.status in {"completed", "failed", "cancelled"}:
         raise ValueError(f"Job is already {job.status}.")
     job.status = "cancelled"
-    append_train_activity(job, "Cancelled. No further RunPod submit or packaging.")
+    append_train_activity(job, "Cancelled. No further training submit or packaging.")
     job.finished_at = _now()
     db.commit()
     db.refresh(job)
@@ -289,7 +297,7 @@ def cancel_train_job(
 def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
     if job.runpod_job_id:
         job.status = "running"
-        append_train_activity(job, "Resuming watch on the existing RunPod job.")
+        append_train_activity(job, "Resuming watch on the existing training job.")
         return
     token = _hf_token()
     rows = load_trainable_gold(
@@ -301,7 +309,7 @@ def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
     job.gold_count = len(rows)
     job.status = "uploading"
     append_train_activity(
-        job, f"Uploading {len(rows)} gold row(s) from your Helix account to Hugging Face…"
+        job, f"Uploading {len(rows)} gold row(s) from your Helix account…"
     )
     db.commit()
 
@@ -326,7 +334,7 @@ def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
     )
     job.hf_dataset_repo = ds_repo
     job.hf_model_repo = md_repo
-    append_train_activity(job, f"Gold uploaded as private dataset `{ds_repo}`. Submitting RunPod job…")
+    append_train_activity(job, "Gold uploaded. Submitting the training job…")
     db.commit()
 
     submitted = submit_qlora_job(
@@ -338,19 +346,19 @@ def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
         hf_token=token,
     )
     if not submitted.get("ok"):
-        _fail(job, submitted.get("error") or "RunPod submit failed.")
+        _fail(job, submitted.get("error") or "Could not start the training job.")
         return
     rp_id = submitted.get("runpod_job_id") or ""
     if not rp_id and isinstance(submitted.get("runpod"), dict):
         rp_id = submitted["runpod"].get("id") or ""
     if not rp_id:
-        _fail(job, "RunPod accepted the request but returned no job id.")
+        _fail(job, "Training was accepted but no job id came back.")
         return
     job.runpod_job_id = str(rp_id)
     job.status = "running"
     append_train_activity(
         job,
-        f"RunPod job {rp_id} queued (Serverless, min workers 0). "
+        "Training job queued (pay per run, idle when unused). "
         "Usually 20–90 minutes depending on model size.",
     )
     db.commit()
@@ -360,24 +368,28 @@ def _advance_running(job: m.DoubleHelixTrainJob) -> None:
     polled = poll_qlora_job(job.runpod_job_id or "")
     if not polled.get("ok"):
         append_train_activity(
-            job, f"Polling RunPod… ({polled.get('error') or 'retry'})"
+            job, f"Checking training status… ({polled.get('error') or 'retry'})"
         )
         return
     st = str(polled.get("status") or "").upper()
     if st in {"COMPLETED", "COMPLETE", "SUCCESS"}:
         job.status = "packaging"
-        append_train_activity(job, "RunPod reported COMPLETED. Packaging adapter + tokenizer…")
+        append_train_activity(job, "Training finished. Packaging adapter + tokenizer…")
         return
     if st in {"FAILED", "CANCELLED", "CANCELED", "TIMED_OUT", "TIMEOUT"}:
-        _fail(job, f"RunPod job {st}. Check the Serverless logs for the worker error.")
+        _fail(job, f"Training job {st}. Check the training logs for the error.")
         return
     pretty = st.replace("_", " ").title() or "Queued"
     evs = _activity(job)
     last = (evs[-1]["message"] if evs else "") or ""
-    same = f"RunPod status: {pretty}" in last
+    same = (
+        f"Training status: {pretty}" in last
+        or f"RunPod status: {pretty}" in last
+        or f"training status: {pretty}" in last
+    )
     job.updated_at = _now()
     if not same:
-        append_train_activity(job, f"RunPod status: {pretty} (still training).")
+        append_train_activity(job, f"Training status: {pretty} (still training).")
     else:
         # Heartbeat only — UI can see updated_at move without a new log line every poll.
         try:
@@ -385,9 +397,7 @@ def _advance_running(job: m.DoubleHelixTrainJob) -> None:
             if last_ts:
                 prev = datetime.fromisoformat(str(last_ts).replace("Z", "+00:00"))
                 if (_now() - prev).total_seconds() >= 20:
-                    append_train_activity(
-                        job, f"Heartbeat — RunPod still {pretty}."
-                    )
+                    append_train_activity(job, f"Heartbeat — still {pretty}.")
         except Exception:  # noqa: BLE001
             pass
 
@@ -496,7 +506,7 @@ def _advance_packaging(db: Session, job: m.DoubleHelixTrainJob) -> None:
         return
     tmp = Path(tempfile.mkdtemp(prefix=f"helix-{job.id}-"))
     try:
-        append_train_activity(job, f"Downloading adapter files from `{repo}`…")
+        append_train_activity(job, "Downloading trained adapter files…")
         db.commit()
         adapter_dir = tmp / "adapter"
         download_repo_files(token, repo_id=repo, dest=adapter_dir, repo_type="model")
@@ -508,7 +518,7 @@ def _advance_packaging(db: Session, job: m.DoubleHelixTrainJob) -> None:
             _fail(
                 job,
                 "Training reported complete but no adapter weights were pushed. "
-                "The worker may have failed to upload. Check RunPod logs.",
+                "The worker may have failed to upload. Check the training logs.",
             )
             return
         tok_dir = tmp / "tokenizer"

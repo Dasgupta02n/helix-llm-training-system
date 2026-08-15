@@ -980,7 +980,7 @@ def run_pipeline_batch(
     or_before = float(getattr(tenant_row, "openrouter_spent_usd", 0.0) or 0.0) if tenant_row else 0.0
     ap_before = float(getattr(tenant_row, "apify_spent_usd", 0.0) or 0.0) if tenant_row else 0.0
 
-    _progress("Gathering sources (Apify/code) from your research plan…")
+    _progress("Gathering sources from your research plan…")
     code_res = run_code_pipeline_batch(
         db,
         tenant_id=tenant_id,
@@ -1001,7 +1001,7 @@ def run_pipeline_batch(
     brief = _brief_dict(db, tenant_id)
     domain = brief.get("domain") or "the active research domain"
     msg = (
-        f"JUDGE only — gathering already done by Apify/code. "
+        f"JUDGE only — gathering already done. "
         f"Active domain: {domain}. "
         f"Process at most {batch_size} pending items. Quality mode {quality_mode}. "
         f"Obey the Research Brief. Do NOT invent posts/URLs or domain facts. "
@@ -1088,7 +1088,7 @@ def run_pipeline_batch(
             f"gather_hits={code_res.get('gather_results', 0)})."
         )
     user_message += (
-        f" Cost: OpenRouter ${openrouter_cost_usd:.4f} + Apify ${apify_cost_usd:.4f} "
+        f" Cost: model ${openrouter_cost_usd:.4f} + gather ${apify_cost_usd:.4f} "
         f"= ${total_cost:.4f}."
     )
 

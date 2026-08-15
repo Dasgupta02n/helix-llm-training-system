@@ -711,8 +711,8 @@ function _jobCostLine(j) {
   if (total == null && orC == null && apC == null) return "";
   const cap = j.spend_cap_usd != null ? j.spend_cap_usd : s.spend_cap_usd;
   const bits = [];
-  if (orC != null) bits.push(`OpenRouter $${Number(orC).toFixed(4)}`);
-  if (apC != null) bits.push(`Apify $${Number(apC).toFixed(4)}`);
+  if (orC != null) bits.push(`model $${Number(orC).toFixed(4)}`);
+  if (apC != null) bits.push(`gather $${Number(apC).toFixed(4)}`);
   if (total != null) bits.push(`total $${Number(total).toFixed(4)}`);
   if (cap != null && Number(cap) > 0) bits.push(`cap $${Number(cap).toFixed(4)}`);
   return bits.length
@@ -890,9 +890,9 @@ async function loadJobs() {
         const updated = j.updated_at ? new Date(j.updated_at).toLocaleTimeString() : "—";
         const costBits = [];
         if (j.openrouter_cost_usd != null)
-          costBits.push(`OR $${Number(j.openrouter_cost_usd).toFixed(3)}`);
+          costBits.push(`model $${Number(j.openrouter_cost_usd).toFixed(3)}`);
         if (j.apify_cost_usd != null)
-          costBits.push(`Apify $${Number(j.apify_cost_usd).toFixed(3)}`);
+          costBits.push(`gather $${Number(j.apify_cost_usd).toFixed(3)}`);
         if (j.cost_usd != null) costBits.push(`Σ $${Number(j.cost_usd).toFixed(3)}`);
         if (j.spend_cap_usd != null && Number(j.spend_cap_usd) > 0)
           costBits.push(`cap $${Number(j.spend_cap_usd).toFixed(3)}`);
