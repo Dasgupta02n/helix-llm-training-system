@@ -2535,10 +2535,16 @@ if ($("doubleHelixTrainBtn")) {
       const mid = $("doubleHelixModel")?.value || "";
       const data = await api(`/api/t/${state.tenantSlug}/library/double-helix/train`, {
         method: "POST",
-        body: JSON.stringify({ model_id: mid, confirm: true }),
+        body: JSON.stringify({
+          model_id: mid,
+          confirm: true,
+          include_synthetics: !!(
+            $("doubleHelixIncludeSynth") && $("doubleHelixIncludeSynth").checked
+          ),
+        }),
       });
       renderDoubleHelixTrain(data.job);
-      toast("Training queued from gold in your account");
+      toast("Training queued from rows in your account");
     } catch (e) {
       toast(e.message || "Could not start training", "err");
     }

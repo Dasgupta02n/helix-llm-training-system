@@ -11,6 +11,8 @@ from typing import Any
 
 # ── Product cost targets ─────────────────────────────────────────────
 GOLD_COST_CAP_USD_PER_1000 = 35.0
+# No attached sources: more judge work, no cheap extraction. After 10+10 review.
+GOLD_COST_NO_CORPUS_USD_PER_1000 = 55.0
 # Future Double Helix training band (documentation only for now)
 DOUBLE_HELIX_TRAINING_COST_MIN_USD = 15.0
 DOUBLE_HELIX_TRAINING_COST_MAX_USD = 50.0
@@ -28,12 +30,25 @@ MODEL_PRICING_PER_M: dict[str, tuple[float, float]] = {
 }
 
 
-def gold_spend_cap_usd(target_gold: int) -> float:
+def gold_rate_per_1000(*, no_corpus: bool = False) -> float:
+    return (
+        GOLD_COST_NO_CORPUS_USD_PER_1000
+        if no_corpus
+        else GOLD_COST_CAP_USD_PER_1000
+    )
+
+
+def gold_spend_cap_usd(
+    target_gold: int, *, usd_per_1000: float | None = None, no_corpus: bool = False
+) -> float:
     """Hard cap for a job aiming at `target_gold` verified examples."""
     n = max(0, int(target_gold or 0))
     if n <= 0:
         return 0.0
-    return round((n / 1000.0) * GOLD_COST_CAP_USD_PER_1000, 6)
+    rate = float(usd_per_1000) if usd_per_1000 is not None else gold_rate_per_1000(
+        no_corpus=no_corpus
+    )
+    return round((n / 1000.0) * rate, 6)
 
 
 def _as_float(val: Any) -> float | None:

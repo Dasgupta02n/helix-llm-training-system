@@ -385,10 +385,12 @@ def estimate_setup_pricing(state: dict[str, Any]) -> dict[str, Any]:
     )
     if not can_start_requested:
         honest_lines.append(
-            f"Web-research-only (no corpus) can start an **exploratory** job of "
-            f"**{first_job_units}** examples, hard cap **${first_job_cap:.2f}**. "
-            f"Type **start 10** for that. Typing **start** alone will **not** "
-            f"launch {gold_target:,} — large jobs need attached corpus."
+            f"Web-research-only (no corpus) starts with **{first_job_units}** "
+            f"examples (cap **${first_job_cap:.2f}**). Then we review those 10 "
+            "one-by-one, generate **10 more** as proof, and only then scale. "
+            f"No-source scale is **$55 / 1,000** "
+            f"(**{gold_target:,}** ≈ **${gold_target / 1000.0 * 55:.0f}**), "
+            "not $35. Type **start 10**."
         )
     else:
         honest_lines.append(

@@ -146,6 +146,44 @@ def test_create_fetches_account_gold(db, monkeypatch):
     d = job_to_dict(job)
     assert d["download_ready"] is False
     assert d["estimated_usd_min"] == 15
+    assert d["include_synthetics"] is False
+
+
+def test_create_can_include_synthetics(db, monkeypatch):
+    tid, uid = _seed(db, 2)
+    gold = (
+        db.query(m.GoldExample)
+        .filter_by(owner_user_id=uid, tenant_id=tid)
+        .first()
+    )
+    db.add(
+        m.SyntheticExample(
+            id=_uid("syn_"),
+            owner_user_id=uid,
+            tenant_id=tid,
+            gold_id=gold.id,
+            topic="support",
+            input_text="Any update on my box?",
+            output_text="Here is the latest tracking.",
+            variation_index=1,
+        )
+    )
+    db.commit()
+    monkeypatch.setattr(
+        "helix.services.double_helix_train.train_ready", lambda: True
+    )
+    job = create_train_job(
+        db,
+        owner_user_id=uid,
+        tenant_id=tid,
+        model_id="Qwen/Qwen2.5-7B-Instruct",
+        confirm=True,
+        include_synthetics=True,
+    )
+    d = job_to_dict(job)
+    assert d["include_synthetics"] is True
+    assert d["synth_count"] == 1
+    assert job.gold_count == 2
 
 
 def test_official_payload_shape():

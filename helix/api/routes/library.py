@@ -601,7 +601,7 @@ def export_library(
             )
         for g in q.order_by(m.GoldExample.created_at.asc()).all():
             items.append(gold_to_dict(g, tenant_slug=tenant.slug))
-    if kind in {"all", "synthetic"}:
+    if kind in {"all", "synthetic", "trainable"}:
         for s in (
             db.query(m.SyntheticExample)
             .filter_by(owner_user_id=user.id, tenant_id=tenant.id, is_archived=False)
@@ -739,6 +739,7 @@ def double_helix_package(
 class DoubleHelixTrainRequest(BaseModel):
     model_id: str | None = None
     confirm: bool = False
+    include_synthetics: bool = False
 
 
 def _require_approved(user: m.User) -> None:
@@ -771,6 +772,7 @@ def double_helix_train_start(
             tenant_id=tenant.id,
             model_id=model_id,
             confirm=bool(body.confirm),
+            include_synthetics=bool(body.include_synthetics),
         )
     except ValueError as e:
         raise HTTPException(400, str(e)) from e

@@ -10,7 +10,7 @@ from typing import Any
 from sqlalchemy.orm import Session
 
 from helix.db import models as m
-from helix.services.cost_tracking import gold_spend_cap_usd
+from helix.services.cost_tracking import gold_rate_per_1000, gold_spend_cap_usd
 from helix.services.pipeline_modes import (
     MODE_META,
     clamp_batch_size,
@@ -38,6 +38,7 @@ def create_batch_job(
     total_batches: int = 1,
     auto_continue: bool = True,
     config: dict | None = None,
+    no_corpus: bool = False,
 ) -> m.BatchJob:
     if job_type not in {"pipeline", "synthesis"}:
         raise ValueError("job_type must be pipeline or synthesis")
@@ -69,11 +70,10 @@ def create_batch_job(
     # Synthesis uses synthetic rows as scale (not gold) — still cap on cost trajectory
     # using batch_size * total_batches as the job's "unit" target.
     target_gold = max(1, batch_size * total_batches)
-    if job_type == "pipeline":
-        spend_cap = gold_spend_cap_usd(target_gold)
-    else:
-        # Synthesis is LLM-only; use same $/1k unit budget as a safety rail
-        spend_cap = gold_spend_cap_usd(target_gold)
+    cfg = dict(config or {})
+    no_corpus = bool(no_corpus or cfg.get("no_corpus_rate"))
+    spend_cap = gold_spend_cap_usd(target_gold, no_corpus=no_corpus)
+    rate = gold_rate_per_1000(no_corpus=no_corpus)
 
     job = m.BatchJob(
         id=_uid(),
@@ -107,7 +107,7 @@ def create_batch_job(
                 f"Job queued ({job_type}, quality mode {quality_mode}, "
                 f"{total_batches} batches × size {batch_size}). "
                 f"Spend cap ${spend_cap:.4f} for {target_gold} target units "
-                f"($35/1k gold scale)."
+                f"(${rate:.0f}/1k gold scale)."
             ),
             level="info",
         )

@@ -61,6 +61,49 @@ def artifacts_dir() -> Path:
 def load_trainable_gold(
     db: Session, *, owner_user_id: str, tenant_id: str
 ) -> list[dict[str, Any]]:
+    return load_trainable_rows(
+        db, owner_user_id=owner_user_id, tenant_id=tenant_id, include_synthetics=False
+    )
+
+
+def load_trainable_synthetics(
+    db: Session, *, owner_user_id: str, tenant_id: str
+) -> list[dict[str, Any]]:
+    rows = (
+        db.query(m.SyntheticExample)
+        .filter_by(
+            owner_user_id=owner_user_id,
+            tenant_id=tenant_id,
+            is_archived=False,
+        )
+        .order_by(m.SyntheticExample.created_at.asc())
+        .all()
+    )
+    out: list[dict[str, Any]] = []
+    for s in rows:
+        inn = (s.input_text or "").strip()
+        outt = (s.output_text or "").strip()
+        if not inn or not outt:
+            continue
+        out.append(
+            {
+                "id": s.id,
+                "input": inn,
+                "output": outt,
+                "kind": "synthetic",
+                "gold_id": s.gold_id,
+            }
+        )
+    return out
+
+
+def load_trainable_rows(
+    db: Session,
+    *,
+    owner_user_id: str,
+    tenant_id: str,
+    include_synthetics: bool = False,
+) -> list[dict[str, Any]]:
     rows = (
         db.query(m.GoldExample)
         .filter_by(
@@ -72,15 +115,21 @@ def load_trainable_gold(
         .order_by(m.GoldExample.created_at.asc())
         .all()
     )
-    return [
+    gold = [
         {
             "id": g.id,
             "input": g.input_text or "",
             "output": g.output_text or "",
+            "kind": "gold",
         }
         for g in rows
         if (g.input_text or "").strip() and (g.output_text or "").strip()
     ]
+    if not include_synthetics:
+        return gold
+    return gold + load_trainable_synthetics(
+        db, owner_user_id=owner_user_id, tenant_id=tenant_id
+    )
 
 
 def gold_to_alpaca_line(row: dict[str, Any]) -> dict[str, str]:
@@ -101,6 +150,14 @@ def build_dataset_texts(rows: list[dict[str, Any]]) -> tuple[str, str]:
     return nl.join(chat_lines) + (nl if chat_lines else ""), nl.join(alpaca_lines) + (
         nl if alpaca_lines else ""
     )
+
+
+def _train_meta(job: m.DoubleHelixTrainJob) -> dict[str, Any]:
+    try:
+        meta = json.loads(job.meta_json or "{}")
+    except json.JSONDecodeError:
+        meta = {}
+    return meta if isinstance(meta, dict) else {}
 
 
 def _activity(job: m.DoubleHelixTrainJob) -> list[dict[str, Any]]:
@@ -144,6 +201,8 @@ def job_to_dict(job: m.DoubleHelixTrainJob) -> dict[str, Any]:
         "status": job.status,
         "base_model_id": job.base_model_id,
         "gold_count": job.gold_count,
+        "synth_count": int(_train_meta(job).get("synth_count") or 0),
+        "include_synthetics": bool(_train_meta(job).get("include_synthetics")),
         "progress": public_activity_text(job.progress_message),
         "error": public_activity_text(job.error) or job.error,
         "download_ready": download_ready,
@@ -199,6 +258,7 @@ def create_train_job(
     tenant_id: str,
     model_id: str | None,
     confirm: bool,
+    include_synthetics: bool = False,
 ) -> m.DoubleHelixTrainJob:
     if not confirm:
         raise ValueError(
@@ -225,22 +285,38 @@ def create_train_job(
             f"A Double Helix train is already {existing.status} ({existing.id}). "
             "Wait for it to finish or cancel it."
         )
-    rows = load_trainable_gold(db, owner_user_id=owner_user_id, tenant_id=tenant_id)
+    gold_rows = load_trainable_gold(db, owner_user_id=owner_user_id, tenant_id=tenant_id)
+    synth_rows = (
+        load_trainable_synthetics(db, owner_user_id=owner_user_id, tenant_id=tenant_id)
+        if include_synthetics
+        else []
+    )
+    rows = gold_rows + synth_rows
     if not rows:
         raise ValueError(
             "No trainable gold in this account. Mine, upload, or convert materials first. "
             "You can still download an empty package, but training needs examples."
         )
+    if include_synthetics and not synth_rows:
+        raise ValueError(
+            "You asked to include synthetics, but none are stored yet. "
+            "Generate variations first, or train on gold only."
+        )
     model = get_model(model_id or "") or recommend_model()
+    mix = (
+        f"{len(gold_rows)} gold + {len(synth_rows)} synthetic"
+        if include_synthetics
+        else f"{len(gold_rows)} gold"
+    )
     job = m.DoubleHelixTrainJob(
         id=_uid(),
         owner_user_id=owner_user_id,
         tenant_id=tenant_id,
         status="queued",
         base_model_id=model["id"],
-        gold_count=len(rows),
+        gold_count=len(gold_rows),
         progress_message=(
-            f"Queued QLoRA on {model['name']} using {len(rows)} gold row(s) "
+            f"Queued QLoRA on {model['name']} using {mix} row(s) "
             "already in your Helix account."
         ),
         meta_json=json.dumps(
@@ -248,11 +324,13 @@ def create_train_job(
                 "base_model_name": model["name"],
                 "license": model["license"],
                 "params_b": model["params_b"],
+                "include_synthetics": bool(include_synthetics),
+                "synth_count": len(synth_rows),
                 "activity": [
                     {
                         "message": (
-                            f"Queued QLoRA on {model['name']} using {len(rows)} "
-                            "gold row(s) from this account."
+                            f"Queued QLoRA on {model['name']} using {mix} "
+                            "row(s) from this account. Synthetics stay in a separate file."
                         ),
                         "level": "info",
                         "created_at": _now().isoformat(),
@@ -299,16 +377,30 @@ def _advance_queued(db: Session, job: m.DoubleHelixTrainJob) -> None:
         append_train_activity(job, "Resuming watch on the existing training job.")
         return
     token = _hf_token()
-    rows = load_trainable_gold(
+    want_synth = bool(_train_meta(job).get("include_synthetics"))
+    gold_rows = load_trainable_gold(
         db, owner_user_id=job.owner_user_id, tenant_id=job.tenant_id
     )
+    synth_rows = (
+        load_trainable_synthetics(
+            db, owner_user_id=job.owner_user_id, tenant_id=job.tenant_id
+        )
+        if want_synth
+        else []
+    )
+    rows = gold_rows + synth_rows
     if not rows:
         _fail(job, "Gold disappeared from the account before training started.")
         return
-    job.gold_count = len(rows)
+    job.gold_count = len(gold_rows)
     job.status = "uploading"
+    mix = (
+        f"{len(gold_rows)} gold + {len(synth_rows)} synthetic"
+        if want_synth
+        else f"{len(gold_rows)} gold"
+    )
     append_train_activity(
-        job, f"Uploading {len(rows)} gold row(s) from your Helix account…"
+        job, f"Uploading {mix} row(s) from your Helix account…"
     )
     db.commit()
 
@@ -407,11 +499,18 @@ def build_trained_zip(
     adapter_dir: Path,
     tokenizer_dir: Path | None,
     gold_rows: list[dict[str, Any]],
+    synth_rows: list[dict[str, Any]] | None = None,
 ) -> bytes:
     import io
 
     model = get_model(job.base_model_id) or {"id": job.base_model_id, "name": job.base_model_id, "license": "", "params_b": ""}
-    chat_text, _alpaca = build_dataset_texts(gold_rows)
+    synth_rows = synth_rows or [r for r in gold_rows if r.get("kind") == "synthetic"]
+    only_gold = [r for r in gold_rows if r.get("kind") != "synthetic"]
+    if not only_gold and gold_rows and not synth_rows:
+        only_gold = gold_rows
+    chat_text, _alpaca = build_dataset_texts(only_gold)
+    synth_text, _ = build_dataset_texts(synth_rows)
+    train_text, _ = build_dataset_texts(only_gold + synth_rows)
     from helix.services.declaration import DECLARATION_TEXT
 
     script_path = Path(__file__).resolve().parents[1] / "packaging" / "load_adapter.py"
@@ -423,12 +522,15 @@ Name: {model.get('name')}
 License (base): {model.get('license')}
 Method: QLoRA adapter only
 Gold rows used: {job.gold_count}
+Synthetic rows used: {len(synth_rows)}
 
 ## What is in this zip
 - `qlora/` — trained adapter weights (`adapter_model.safetensors` + `adapter_config.json`)
 - `tokenizer/` — tokenizer files for serving/merging
 - `load_adapter.py` — PEFT loader (run this)
-- `data/train_chat.jsonl` — the gold Helix used (from your account)
+- `data/gold_chat.jsonl` — gold only (stored separately)
+- `data/synth_chat.jsonl` — synthetics only (empty if you did not confirm them)
+- `data/train_chat.jsonl` — combined rows the trainer actually used
 - `DECLARATION.txt` — ownership and liability text you accepted
 - This is **not** a merged full-size model. A 7B–30B fp16 dump is 15–60 GB
   and is not hosted here. Load the adapter on top of the public base.
@@ -464,7 +566,9 @@ Private storage copies:
         zf.writestr("DECLARATION.txt", DECLARATION_TEXT)
         if script_src:
             zf.writestr("load_adapter.py", script_src)
-        zf.writestr("data/train_chat.jsonl", chat_text)
+        zf.writestr("data/gold_chat.jsonl", chat_text)
+        zf.writestr("data/synth_chat.jsonl", synth_text)
+        zf.writestr("data/train_chat.jsonl", train_text)
         zf.writestr(
             "meta.json",
             json.dumps(
@@ -476,6 +580,8 @@ Private storage copies:
                     "params_b": model.get("params_b"),
                     "training": "qlora",
                     "gold_count": job.gold_count,
+                    "synth_count": len(synth_rows),
+                    "include_synthetics": bool(len(synth_rows)),
                     "hf_dataset_repo": job.hf_dataset_repo,
                     "hf_model_repo": job.hf_model_repo,
                     "includes_full_merged_weights": False,
@@ -535,11 +641,19 @@ def _advance_packaging(db: Session, job: m.DoubleHelixTrainJob) -> None:
         gold_rows = load_trainable_gold(
             db, owner_user_id=job.owner_user_id, tenant_id=job.tenant_id
         )
+        synth_rows = (
+            load_trainable_synthetics(
+                db, owner_user_id=job.owner_user_id, tenant_id=job.tenant_id
+            )
+            if _train_meta(job).get("include_synthetics")
+            else []
+        )
         blob = build_trained_zip(
             job=job,
             adapter_dir=adapter_dir,
             tokenizer_dir=tok_dir,
             gold_rows=gold_rows,
+            synth_rows=synth_rows,
         )
         rel = f"{job.id}.zip"
         dest = artifacts_dir() / rel

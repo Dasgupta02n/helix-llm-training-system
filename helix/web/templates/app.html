@@ -324,8 +324,8 @@
         <div class="pane pad" style="margin-bottom:1rem">
           <h3 class="mt-0">Use your gold two ways</h3>
           <p class="hint">
-            Gold already in this account is the source of truth. Download it and train anywhere,
-            or let Double Helix train on pay-per-run GPU and then download the adapter zip.
+            Gold is stored separately from synthetics. Download both, or train on gold —
+            and on synthetics only after you confirm.
           </p>
           <div class="flex" style="gap:8px;flex-wrap:wrap;align-items:center">
             <label for="doubleHelixModel">Base model (Apache-2.0 / MIT, ≤30B)</label>
@@ -339,6 +339,10 @@
           <label class="flex" style="align-items:center;gap:.5rem;font-weight:500;margin-top:10px">
             <input id="doubleHelixTrainConfirm" type="checkbox" style="width:auto;min-height:auto;margin:0" />
             Start a paid GPU job (~$15–50). Helix will fetch gold from this account — I will not re-upload.
+          </label>
+          <label class="flex" style="align-items:center;gap:.5rem;font-weight:500;margin-top:8px">
+            <input id="doubleHelixIncludeSynth" type="checkbox" style="width:auto;min-height:auto;margin:0" />
+            Also use stored synthetics in training (kept in a separate file in the zip).
           </label>
           <p id="doubleHelixTrainStatus" class="status-line"></p>
           <p class="hint" id="doubleHelixTrainHint"></p>

@@ -439,6 +439,7 @@ def require_corpus_for_large_job(
     owner_user_id: str | None,
     batch_size: int,
     total_batches: int,
+    allow_no_corpus_scale: bool = False,
 ) -> dict[str, Any]:
     """
     Block large mining jobs when this plan has no attached corpus.
@@ -452,11 +453,15 @@ def require_corpus_for_large_job(
     units = max(1, int(batch_size or 1) * int(total_batches or 1))
     stats["job_units"] = units
     stats["large"] = units > LARGE_PIPELINE_UNITS
+    if allow_no_corpus_scale:
+        stats["allowed_no_corpus_scale"] = True
+        return stats
     if stats["large"] and int(stats["corpus_docs"] or 0) <= 0:
         raise ValueError(
             "Large mining jobs (more than 10 units) require an attached corpus "
-            "for this plan. Paste FAQs, policies, or scripts under My data, "
-            "then retry. Exploratory runs of 10 units or fewer can still mine the web."
+            "for this plan — unless you finished the no-source review "
+            "(10 gold, then 10 proof). Paste FAQs under My data, or type "
+            "**start 10** to begin that review path."
         )
     return stats
 

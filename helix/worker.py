@@ -47,20 +47,54 @@ def _offer_riu_synthesis(db, job: m.BatchJob) -> None:
     state = _load_json(row.state_json, {})
     state["run_synthesis"] = False
     state["mining_job_id"] = job.id
-    row.state_json = json.dumps(state)
-    row.phase = "offer_synth"
+    cfg = {}
+    try:
+        cfg = json.loads(job.config_json or "{}")
+    except json.JSONDecodeError:
+        cfg = {}
+    from helix.services.riu_seed_review import (
+        begin_review,
+        proof_ready_message,
+        wants_no_resource_scale,
+    )
+
     msgs = _load_json(row.messages_json, [])
+    if cfg.get("proof_from_seed"):
+        row.phase = "proof_review"
+        content = proof_ready_message(
+            db,
+            state=state,
+            owner_user_id=job.owner_user_id,
+            tenant_id=job.tenant_id,
+        )
+    elif (
+        (cfg.get("exploratory") or wants_no_resource_scale(state))
+        and not cfg.get("scale_from_seed_review")
+        and job.job_type == "pipeline"
+    ):
+        row.phase = "review_seed"
+        content = begin_review(
+            db,
+            state=state,
+            owner_user_id=job.owner_user_id,
+            tenant_id=job.tenant_id,
+        )
+    else:
+        row.phase = "offer_synth"
+        content = (
+            "Mining finished. I did **not** start variations. "
+            "Synthetics stay stored separately from gold. After you generate them, "
+            "say **confirm train with synthetics** if you want both in the adapter, "
+            "or **yes** first to generate variations (I’ll quote the $35/1k cost)."
+        )
+    row.state_json = json.dumps(state)
     msgs.append(
         {
             "id": riu_uid("msg_"),
             "role": "assistant",
             "name": "Riu",
-            "content": (
-                "Mining finished. I did **not** start variations. "
-                "If you want extra rows, say **yes** in this chat and I’ll quote "
-                "the $35/1k cost first."
-            ),
-            "phase": "offer_synth",
+            "content": content,
+            "phase": row.phase,
             "ts": riu_now().isoformat(),
         }
     )

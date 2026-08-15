@@ -66,10 +66,13 @@ greet → role → discover → example → edge_cases → own_data → material
    always-on GPU machine — those can sit on and keep billing.
    DO NOT invent dollar amounts — the server attaches the official $35/1k estimate.
 7) confirm → start_pipeline only after confirm (or start 10 if no corpus).
-8) offer_synth: ONLY after mining finishes. Ask if they want variations.
-   Never emit start_synthesis during confirm. User must opt in later.
-9) After gold exists, two options: download data from My data, OR train with
-   Double Helix (emit start_double_helix_train only after they say confirm train).
+8) offer_synth: ONLY after mining finishes (or after no-source scale).
+   Ask if they want variations. Never emit start_synthesis during confirm.
+9) After gold exists: download from My data, generate synthetics (stored separately),
+   or train with Double Helix (start_double_helix_train only after confirm train).
+   Synthetics join training only if they say confirm train with synthetics.
+10) No corpus + target > 10: start 10, then review_seed (each gold, each parameter),
+    then 10 proof, then confirm scale at $55/1k. Do not skip the review.
 
 Risk: hiring/credit/medical/legal = high (stricter fairness, more edge cases).
 Captions/copy = low. Support/sales/HR = medium.
@@ -416,6 +419,8 @@ def riu_start_block_reason(state: dict[str, Any]) -> str | None:
 
     if state.get("accept_exploratory"):
         return None
+    if state.get("seed_scale_ready"):
+        return None
     try:
         gold_target = int(state.get("gold_target") or 0)
     except (TypeError, ValueError):
@@ -430,9 +435,11 @@ def riu_start_block_reason(state: dict[str, Any]) -> str | None:
         return (
             f"I will not launch **{intended:,}** gold with no attached corpus. "
             "Large jobs (more than 10 units) need source material under My data. "
-            "Web-research-only can run an exploratory **10**-example job — type "
-            "**start 10**. Official rate is **$35 / 1,000** gold "
-            f"(so {intended:,} ≈ **${intended / 1000.0 * 35:.0f}**, not a lower guess)."
+            "Web-research-only starts with **10** gold, then we review them "
+            "one-by-one, generate **10 more** as proof, and only then scale. "
+            "Type **start 10**. No-source scale uses **$55 / 1,000** "
+            f"(so {intended:,} ≈ **${intended / 1000.0 * 55:.0f}**). "
+            "With your own docs the usual rate is **$35 / 1,000**."
         )
     return None
 
@@ -921,10 +928,18 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         )
         asks_train = ("train" in lower or "double helix" in lower) and not wants_train
         if wants_train:
+            if "synth" in lower:
+                patch["include_synthetics_in_train"] = True
             actions.append({"type": "start_double_helix_train"})
             reply = (
-                "Starting Double Helix training on the gold already in your account "
-                "(no re-upload). GPU is pay per run, about **$15–50**. "
+                "Starting Double Helix training on rows already in your account "
+                "(no re-upload). "
+                + (
+                    "Gold **and** synthetics (stored separately) will both train."
+                    if "synth" in lower
+                    else "Gold only — say **confirm train with synthetics** if you also want variations."
+                )
+                + " GPU is pay per run, about **$15–50**. "
                 "When it finishes, download the trained zip from **My data**."
             )
             next_phase = "done"
@@ -955,6 +970,8 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
                 f"That would add about **{extra:,}** rows "
                 f"(**{v}** per gold) and is billed on the same "
                 f"**${GOLD_COST_CAP_USD_PER_1000:.0f}/1k** meter ≈ **${extra_usd:.2f}**.\n\n"
+                "Synthetics are stored separately from gold and join training "
+                "only if you later say **confirm train with synthetics**.\n\n"
                 "Reply **yes** to start synthesis, or **no** / **skip** to stop here."
             )
             next_phase = "offer_synth"
@@ -1336,14 +1353,27 @@ def _apply_start_pipeline(
     # Exploratory: force the 10-unit web job, never a 5000-row launch.
     batch_size = int(state.get("batch_size") or 5)
     total_batches = int(state.get("total_batches") or 2)
-    if state.get("accept_exploratory"):
+    if state.get("accept_exploratory") and not state.get("seed_scale_ready"):
         batch_size, total_batches = 5, 2
+    scale = bool(state.get("seed_scale_ready"))
+    proof = bool(state.get("start_proof_batch"))
+    understanding = str(state.get("seed_understanding") or "").strip()
+    if (scale or proof) and understanding:
+        from helix.services.brief import get_active_project
+
+        plan = get_active_project(db, tenant_id)
+        if plan:
+            note = "\n\nSEED REVIEW (no corpus):\n" + understanding[:3500]
+            existing = plan.agent_instructions or ""
+            if "SEED REVIEW" not in existing:
+                plan.agent_instructions = (existing + note)[:8000]
     require_corpus_for_large_job(
         db,
         tenant_id=tenant_id,
         owner_user_id=user_id,
         batch_size=batch_size,
         total_batches=total_batches,
+        allow_no_corpus_scale=scale or proof,
     )
     job = create_batch_job(
         db,
@@ -1354,7 +1384,14 @@ def _apply_start_pipeline(
         batch_size=batch_size,
         total_batches=total_batches,
         auto_continue=True,
-        config={"source": "riu", "exploratory": bool(state.get("accept_exploratory"))},
+        no_corpus=scale,
+        config={
+            "source": "riu",
+            "exploratory": bool(state.get("accept_exploratory")) and not scale and not proof,
+            "proof_from_seed": proof,
+            "scale_from_seed_review": scale,
+            "no_corpus_rate": scale,
+        },
     )
     return {"ok": True, "action": "start_pipeline", "job": job_to_dict(job)}
 
@@ -1441,6 +1478,33 @@ def execute_actions(
                 )
                 session.last_job_id = r["job"]["id"]
                 results.append(r)
+            elif atype == "start_proof_batch":
+                state["start_proof_batch"] = True
+                state["accept_exploratory"] = True
+                state["batch_size"] = 5
+                state["total_batches"] = 2
+                r = _apply_start_pipeline(
+                    db, user_id=user_id, tenant_id=tenant.id, state=state
+                )
+                state["start_proof_batch"] = False
+                session.last_job_id = r["job"]["id"]
+                rs = state.get("seed_review") if isinstance(state.get("seed_review"), dict) else {}
+                rs["proof_job_id"] = r["job"]["id"]
+                state["seed_review"] = rs
+                results.append({**r, "action": "start_proof_batch"})
+            elif atype == "start_scale_batch":
+                from helix.services.riu_seed_review import scale_batch_plan
+
+                bsize, batches = scale_batch_plan(state)
+                state["seed_scale_ready"] = True
+                state["accept_exploratory"] = False
+                state["batch_size"] = bsize
+                state["total_batches"] = batches
+                r = _apply_start_pipeline(
+                    db, user_id=user_id, tenant_id=tenant.id, state=state
+                )
+                session.last_job_id = r["job"]["id"]
+                results.append({**r, "action": "start_scale_batch"})
             elif atype == "start_synthesis":
                 if not re.search(r"\b(yes|yeah|yep|variations|synth)\b", user_text.lower()):
                     results.append(
@@ -1471,12 +1535,19 @@ def execute_actions(
                         }
                     )
                     continue
+                include_syn = bool(
+                    state.get("include_synthetics_in_train")
+                    or "with synth" in low
+                    or "with synthetic" in low
+                    or "and synthetic" in low
+                )
                 job = create_train_job(
                     db,
                     owner_user_id=user_id,
                     tenant_id=tenant.id,
                     model_id=str(state.get("recommended_base_model") or "") or None,
                     confirm=True,
+                    include_synthetics=include_syn,
                 )
                 results.append(
                     {"ok": True, "action": atype, "job": job_to_dict(job)}
@@ -1552,16 +1623,61 @@ def handle_user_message(
 
     turn: dict[str, Any]
     used_llm = False
-    try:
-        turn = _llm_turn(
-            tenant=tenant,
-            messages=messages,
-            state=state,
-            phase=phase,
+    if phase in {"review_seed", "proof_review", "confirm_scale"}:
+        from helix.services.riu_seed_review import (
+            apply_review_reply,
+            proof_ready_message,
         )
-        used_llm = True
-    except Exception:
-        turn = _heuristic_turn(text, state, phase)
+
+        if phase == "review_seed":
+            turn = apply_review_reply(db, state=state, text=text)
+        elif phase == "proof_review" and (
+            "confirm scale" in text.lower()
+            or ("confirm" in text.lower() and "scale" in text.lower())
+        ):
+            turn = {
+                "reply": (
+                    "Confirmed. Starting the no-source scale job at "
+                    "**$55 / 1,000** gold. Watch **Home** for the live log."
+                ),
+                "phase": "running",
+                "progress": 95,
+                "actions": [{"type": "start_scale_batch"}],
+                "state_patch": {"seed_scale_ready": True},
+            }
+        elif phase == "proof_review":
+            turn = {
+                "reply": proof_ready_message(
+                    db,
+                    state=state,
+                    owner_user_id=user.id,
+                    tenant_id=tenant.id,
+                )
+                + "\n\nI stored that edit. Say **confirm scale** when the proof looks right.",
+                "phase": "proof_review",
+                "progress": 90,
+                "actions": [],
+                "state_patch": {},
+            }
+        else:
+            turn = {
+                "reply": "Say **confirm scale** to produce the remaining gold at the no-source rate.",
+                "phase": "confirm_scale",
+                "progress": 92,
+                "actions": [],
+                "state_patch": {},
+            }
+    else:
+        try:
+            turn = _llm_turn(
+                tenant=tenant,
+                messages=messages,
+                state=state,
+                phase=phase,
+            )
+            used_llm = True
+        except Exception:
+            turn = _heuristic_turn(text, state, phase)
 
     if turn.get("reset"):
         new = create_session(db, user_id=user.id, tenant_id=tenant.id)
@@ -1644,7 +1760,11 @@ def handle_user_message(
     # enrich reply with job ids if started
     reply = str(turn.get("reply") or "")
     for r in action_results:
-        if r.get("ok") and r.get("action") == "start_pipeline" and r.get("job"):
+        if r.get("ok") and r.get("action") in {
+            "start_pipeline",
+            "start_proof_batch",
+            "start_scale_batch",
+        } and r.get("job"):
             reply += f"\n\nMining job **{r['job']['id']}** is queued."
         if r.get("ok") and r.get("action") == "start_synthesis" and r.get("job"):
             reply += f"\n\nSynthesis job **{r['job']['id']}** is queued."
