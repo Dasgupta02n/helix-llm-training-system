@@ -357,7 +357,7 @@ def security_txt() -> str:
 
 @app.get("/sitemap.xml")
 def sitemap_xml() -> Response:
-    today = "2026-08-15"
+    today = "2026-08-15"  # public-page lastmod for crawlers
     paths = [
         ("/", "daily", "1.0"),
         ("/docs", "weekly", "0.9"),

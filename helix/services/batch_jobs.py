@@ -154,6 +154,11 @@ def job_to_dict(job: m.BatchJob, events: list[m.BatchJobEvent] | None = None) ->
             if "user_message" in last:
                 last["user_message"] = public_activity_text(last.get("user_message"))
             summary["last_batch"] = last
+    usage = usage_from_provider_parts(
+        model_usd=float(job.openrouter_cost_usd or 0.0),
+        gather_usd=float(job.apify_cost_usd or 0.0),
+        compute_usd=float(getattr(job, "compute_cost_usd", 0.0) or 0.0),
+    )
     return {
         "id": job.id,
         "job_type": job.job_type,
@@ -174,39 +179,27 @@ def job_to_dict(job: m.BatchJob, events: list[m.BatchJobEvent] | None = None) ->
         "progress_pct": round(
             100.0 * job.completed_batches / max(job.total_batches, 1), 1
         ),
-        **(
-            lambda usage: {
-                "openrouter_cost_usd": usage["model_usd"],
-                "apify_cost_usd": usage["gather_usd"],
-                "compute_cost_usd": usage["compute_usd"],
-                "provider_cost_usd": usage["provider_usd"],
-                "user_charge_usd": usage["user_charge_usd"],
-                "cost_usd": usage["user_charge_usd"],
-                "markup": usage["markup"],
-                "cost_breakdown": {
-                    "provider_usd": usage["provider_usd"],
-                    "user_charge_usd": usage["user_charge_usd"],
-                    "markup": usage["markup"],
-                    "model_usd": usage["model_usd"],
-                    "gather_usd": usage["gather_usd"],
-                    "compute_usd": usage["compute_usd"],
-                    "total_usd": usage["user_charge_usd"],
-                    "spend_cap_usd": round(float(job.spend_cap_usd or 0.0), 6),
-                    "target_gold": int(job.target_gold or 0),
-                    "spend_cap_override": bool(
-                        getattr(job, "spend_cap_override", False)
-                    ),
-                },
-            }
-        )(
-            usage_from_provider_parts(
-                model_usd=float(job.openrouter_cost_usd or 0.0),
-                gather_usd=float(job.apify_cost_usd or 0.0),
-                compute_usd=float(getattr(job, "compute_cost_usd", 0.0) or 0.0),
-            )
-        ),
+        "openrouter_cost_usd": usage["model_usd"],
+        "apify_cost_usd": usage["gather_usd"],
+        "compute_cost_usd": usage["compute_usd"],
+        "provider_cost_usd": usage["provider_usd"],
+        "user_charge_usd": usage["user_charge_usd"],
+        "cost_usd": usage["user_charge_usd"],
+        "markup": usage["markup"],
         "target_gold": int(job.target_gold or 0),
         "spend_cap_usd": round(float(job.spend_cap_usd or 0.0), 6),
+        "cost_breakdown": {
+            "provider_usd": usage["provider_usd"],
+            "user_charge_usd": usage["user_charge_usd"],
+            "markup": usage["markup"],
+            "model_usd": usage["model_usd"],
+            "gather_usd": usage["gather_usd"],
+            "compute_usd": usage["compute_usd"],
+            "total_usd": usage["user_charge_usd"],
+            "spend_cap_usd": round(float(job.spend_cap_usd or 0.0), 6),
+            "target_gold": int(job.target_gold or 0),
+            "spend_cap_override": bool(getattr(job, "spend_cap_override", False)),
+        },
         "spend_cap_override": bool(getattr(job, "spend_cap_override", False)),
         "needs_spend_consent": (job.status == "paused_spend_cap")
         and not bool(getattr(job, "spend_cap_override", False)),

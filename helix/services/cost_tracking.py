@@ -1,9 +1,13 @@
-"""Accurate cost tracking and hard spend-cap for mining / synthesis jobs.
+"""Cost ledger and usage counter.
 
-Gold with attached sources: about $0.75–$1.00 per row.
-Gold with no sources (after 10+10 review): about $2–$3 per row.
-Synthetics: about $0.04–$0.20 per row.
-Spend caps use the high end of each band.
+Provider ledger
+    model / gather / compute / other  — billed dollars from each service call
+Usage shown to the user
+    2 × (sum of provider ledger)
+Planning bands (Riu estimates, job spend-cap high end)
+    gold + sources   $0.75–$1.00 / row
+    gold, no sources $2.00–$3.00 / row
+    synthetics       $0.04–$0.20 / row
 """
 
 from __future__ import annotations

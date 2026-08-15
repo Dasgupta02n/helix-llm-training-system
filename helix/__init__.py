@@ -1,3 +1,19 @@
-"""Helix — multi-tenant Grok/OpenRouter agent ecosystem for research & training."""
+"""Helix — gold-data studio (c7xai.in).
 
-__version__ = "2.0.0"
+Layout
+------
+helix/api/          HTTP app, auth, jobs, library, Riu, studio
+helix/services/     domain logic (cost, Riu, train, gather, library)
+helix/web/          public HTML + studio JS/CSS
+helix/db/           models, migrate, session
+helix/agents/       judge-loop catalog + runner
+helix/packaging/    PEFT load script shipped in trained zips
+
+User path
+---------
+public site → /app signup (admin gate) → Riu setup → mine/synth jobs
+→ My data (gold + synthetics, stored apart) → download and/or Double Helix train
+Usage counter = 2 × billed service spend (model + gather + compute + other).
+"""
+
+__version__ = "2.0.1"

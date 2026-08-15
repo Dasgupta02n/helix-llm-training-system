@@ -1,4 +1,16 @@
-/* Helix console — designed for non-technical operators */
+/* Helix studio console
+ *
+ * Sections
+ *   auth          login / signup / reset
+ *   account       profile, password, stored-data snapshot
+ *   riu           setup chat + zip uploads
+ *   jobs          live step log + 2× usage
+ *   library       gold / synthetics / corpus / Double Helix
+ *   download      snapshots + full-library export
+ *
+ * Tabs: home | riu | library | download | account
+ * Usage shown to the user is 2 × billed service spend.
+ */
 
 const state = {
   token: localStorage.getItem("helix_token") || "",
@@ -331,6 +343,9 @@ function goTab(name) {
   if (name === "account") {
     loadAccount().catch((e) => toast(e.message, "err"));
   }
+  if (location.hash !== `#${name}`) {
+    history.replaceState(null, "", `#${name}`);
+  }
 }
 
 // ── Auth screens ────────────────────────────────────────────────────
@@ -590,6 +605,8 @@ async function bootstrap() {
   state.agents = await api(`/api/t/${state.tenantSlug}/agents`);
   if ($("agentList")) renderAgents();
   await refreshAll();
+  const hash = (location.hash || "").replace(/^#/, "");
+  if (hash && $(`tab-${hash}`)) goTab(hash);
 }
 
 function fillAccountForm() {
@@ -700,13 +717,16 @@ async function refreshAll() {
   state.tenantSlug = $("tenantSelect").value;
   localStorage.setItem("helix_tenant", state.tenantSlug);
   if (!state.tenantSlug) return;
-  await Promise.all([
+  const tasks = [
     refreshDashboard(),
     loadBrief(),
     loadDatasets(),
     loadLibrary(),
     loadJobs(),
-  ]);
+  ];
+  const results = await Promise.allSettled(tasks);
+  const failed = results.find((r) => r.status === "rejected");
+  if (failed) toast(failed.reason?.message || "Some panels failed to refresh", "err");
   updatePipeEta();
   updateSynthEta();
   startJobPolling();
@@ -1446,7 +1466,7 @@ async function exportLibrary(kind, fmt) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `helix_${state.tenantSlug}_${kind}.jsonl`;
+    a.download = `helix_${state.tenantSlug}_${kind}.${format === "json" ? "json" : "jsonl"}`;
     document.body.appendChild(a);
     a.click();
     a.remove();
@@ -2232,6 +2252,8 @@ async function sendRiuMessage(text) {
       (r) =>
         r.ok &&
         (r.action === "start_pipeline" ||
+          r.action === "start_proof_batch" ||
+          r.action === "start_scale_batch" ||
           r.action === "start_synthesis" ||
           r.action === "start_double_helix_train")
     );
@@ -2777,3 +2799,7 @@ updateSynthQualityUI();
 if (state.token && !authState.token) {
   bootstrap().catch(() => logout());
 }
+window.addEventListener("hashchange", () => {
+  const hash = (location.hash || "").replace(/^#/, "");
+  if (hash && $(`tab-${hash}`)) goTab(hash);
+});
