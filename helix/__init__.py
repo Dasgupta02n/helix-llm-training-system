@@ -19,4 +19,4 @@ public site → /app signup (admin gate) → Riu setup → mine/synth jobs
 Usage counter = 2 × billed service spend (model + gather + compute + other).
 """
 
-__version__ = "2.0.12"
+__version__ = "2.0.13"

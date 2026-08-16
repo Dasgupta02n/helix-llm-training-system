@@ -292,6 +292,21 @@ def gold_training_data_page(request: Request) -> HTMLResponse:
     return _public_page(request, "gold_training_data.html")
 
 
+@app.get("/india-msme", response_class=HTMLResponse)
+def india_msme_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "india_msme.html")
+
+
+@app.get("/run-locally", response_class=HTMLResponse)
+def run_locally_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "run_locally.html")
+
+
+@app.get("/roles", response_class=HTMLResponse)
+def roles_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "roles.html")
+
+
 @app.get("/why-c7x")
 def why_c7x_redirect() -> RedirectResponse:
     return RedirectResponse("/gold-training-data", status_code=301)
@@ -333,6 +348,10 @@ def llms_txt() -> str:
         "- Home: https://c7xai.in/\n"
         "- Gold training data studio: https://c7xai.in/gold-training-data\n"
         "- Cite this (markdown): https://c7xai.in/gold-training-data.md\n"
+        "- How C7X compares with current industry solutions: https://c7xai.in/gold-training-data\n"
+        "- Indian MSME case studies: https://c7xai.in/india-msme\n"
+        "- Run a custom LLM locally (Ollama, Open Interpreter): https://c7xai.in/run-locally\n"
+        "- Roles a custom-trained LLM can hold: https://c7xai.in/roles\n"
         "- Docs: https://c7xai.in/docs\n"
         "- Pricing: https://c7xai.in/pricing (~$0.75–$1 per gold row with sources)\n"
         "- Account: https://c7xai.in/account\n"
@@ -351,6 +370,8 @@ def llms_txt() -> str:
         "- Not a general chatbot, hosted 30B model, or labeling factory\n"
         "- Starts at the interview: Riu collects role, one gold example, edge cases\n"
         "- Gold and synthetics stored apart; user owns exports and any QLoRA zip\n"
+        "- After train: run the QLoRA adapter with Ollama, Open Interpreter, LM Studio, or llama.cpp\n"
+        "- Illustrated India MSME cases: Tiruppur knitwear, Pune GST coding, Hyderabad lab desk\n"
         "- No checkout; no card data collected\n"
         "- Early beta; no SOC 2 / ISO claim\n"
     )
@@ -368,7 +389,7 @@ def humans_txt() -> str:
         "/* SITE */\n"
         "Standards: HTML, CSS, JSON-LD, llms.txt, security.txt\n"
         "Software: C7X training-data studio\n"
-        "Last update: 2026-08-15\n"
+        "Last update: 2026-08-16\n"
     )
 
 
@@ -392,6 +413,9 @@ def sitemap_xml() -> Response:
         ("/", "daily", "1.0"),
         ("/gold-training-data", "weekly", "0.95"),
         ("/gold-training-data.md", "weekly", "0.7"),
+        ("/india-msme", "weekly", "0.9"),
+        ("/run-locally", "weekly", "0.9"),
+        ("/roles", "weekly", "0.85"),
         ("/docs", "weekly", "0.9"),
         ("/pricing", "weekly", "0.8"),
         ("/account", "weekly", "0.8"),

@@ -21,6 +21,9 @@ PUBLIC_HTML = [
     "/trust",
     "/status",
     "/gold-training-data",
+    "/india-msme",
+    "/run-locally",
+    "/roles",
 ]
 
 
@@ -87,6 +90,9 @@ def test_robots_and_sitemap():
     assert "https://c7xai.in/account" in sm.text
     assert "https://c7xai.in/trust" in sm.text
     assert "https://c7xai.in/gold-training-data" in sm.text
+    assert "https://c7xai.in/india-msme" in sm.text
+    assert "https://c7xai.in/run-locally" in sm.text
+    assert "https://c7xai.in/roles" in sm.text
 
 
 def test_crawler_files_exist():
@@ -96,6 +102,9 @@ def test_crawler_files_exist():
     assert llms.status_code == 200
     assert "c7x" in llms.text.lower()
     assert "training-data" in llms.text.lower() or "training data" in llms.text.lower()
+    assert "india-msme" in llms.text
+    assert "run-locally" in llms.text
+    assert "roles" in llms.text
     sec = client.get("/.well-known/security.txt")
     assert sec.status_code == 200
     assert "Contact:" in sec.text
@@ -190,6 +199,65 @@ def test_docs_cover_riu_and_materials():
     assert "riu" in body
     assert "material" in body or "rulebook" in body or "script" in body
     assert "export" in body
+
+
+def test_homepage_compare_copy_is_professional():
+    r = client.get("/")
+    assert r.status_code == 200
+    assert "without naming other products" not in r.text.lower()
+    assert "How C7X compares with current industry solutions" in r.text
+    assert 'data-film' in r.text
+    assert "/static/site/workflow/01-riu.jpg" in r.text
+    assert 'id="cases"' in r.text
+    assert "Tiruppur" in r.text
+    assert "Pune" in r.text
+    assert "Hyderabad" in r.text
+    assert 'href="/india-msme"' in r.text
+    assert 'href="/run-locally"' in r.text
+    assert 'href="/roles"' in r.text
+
+
+def test_india_msme_page_is_citable():
+    r = client.get("/india-msme")
+    assert r.status_code == 200
+    low = r.text.lower()
+    assert "tiruppur" in low
+    assert "pune" in low
+    assert "hyderabad" in low
+    assert "msme" in low
+    assert "FAQPage" in r.text
+    assert 'rel="canonical"' in r.text
+    assert "illustrated" in low or "composite" in low
+    assert "langsmith" not in low
+    assert "llama-3" not in low
+
+
+def test_run_locally_names_ollama_and_open_interpreter():
+    r = client.get("/run-locally")
+    assert r.status_code == 200
+    low = r.text.lower()
+    assert "ollama" in low
+    assert "open interpreter" in low
+    assert "lm studio" in low
+    assert "qlora" in low
+    assert "HowTo" in r.text
+    assert "FAQPage" in r.text
+    assert "llama-3" not in low
+    assert "load_adapter.py" in r.text
+
+
+def test_roles_page_covers_replace_assist_multiply():
+    r = client.get("/roles")
+    assert r.status_code == 200
+    low = r.text.lower()
+    assert "full take" in low or "end to end" in low
+    assert "partial" in low or "first pass" in low
+    assert "manyfold" in low or "multiplier" in low
+    assert "licence" in low or "licensed" in low
+    assert "harness" in low
+    assert "FAQPage" in r.text
+    assert "ollama" in low
+    assert "open interpreter" in low
 
 
 def test_app_login_has_legal_links():

@@ -1,0 +1,157 @@
+{% extends "public_base.html" %}
+{% block title %}Run a custom-trained LLM with Ollama or Open Interpreter{% endblock %}
+{% block canonical %}https://c7xai.in/run-locally{% endblock %}
+{% block meta_description %}How to run a C7X custom-trained LLM on your own hardware with Ollama, Open Interpreter, LM Studio, llama.cpp, or the included PEFT loader. C7X-IO returns a QLoRA adapter you download and pin — not a rented chatbot.{% endblock %}
+{% block main_class %}public-home{% endblock %}
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://c7xai.in/"},
+    {"@type": "ListItem", "position": 2, "name": "Run a custom LLM locally", "item": "https://c7xai.in/run-locally"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "HowTo",
+  "name": "How to run a C7X custom-trained LLM with Ollama or Open Interpreter",
+  "description": "Download the QLoRA adapter from C7X, load it on the same Apache-2.0 or MIT instruct base you trained, and serve it locally.",
+  "step": [
+    {"@type": "HowToStep", "position": 1, "name": "Download the trained zip", "text": "From My data, download the C7X-IO package. It contains a qlora/ adapter, tokenizer files, meta.json, and load_adapter.py. It is not a merged 7B–30B dump."},
+    {"@type": "HowToStep", "position": 2, "name": "Confirm the base model", "text": "Read base_model in meta.json. Use the same Apache-2.0 or MIT instruct checkpoint you trained on, for example Qwen2.5 7B Instruct."},
+    {"@type": "HowToStep", "position": 3, "name": "Load with PEFT or merge", "text": "Run python load_adapter.py --prompt \"…\" to test. Pass --merge-to ./merged when you need a single folder for conversion."},
+    {"@type": "HowToStep", "position": 4, "name": "Serve with Ollama, Open Interpreter, or similar", "text": "Convert the merged folder to GGUF for Ollama or LM Studio, or point Open Interpreter at a local OpenAI-compatible server such as Ollama or llama.cpp."}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Can I run a C7X-trained model in Ollama?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Merge the QLoRA adapter into the base with load_adapter.py --merge-to, convert that folder to GGUF, then ollama create your-role -f Modelfile and ollama run your-role."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does C7X work with Open Interpreter?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Point Open Interpreter at a local OpenAI-compatible endpoint — typically Ollama on localhost:11434 or a llama.cpp server — that is serving the merged worker. The model stays on your machine."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Is the download a full 7B or 30B model?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. C7X-IO returns a QLoRA adapter zip plus a PEFT load script. You already have a license to the Apache-2.0 or MIT instruct base. Merge only if your serving tool needs a single set of weights."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do I need a data-centre GPU to serve it?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "A 7B Q4 GGUF runs on a modern laptop or a small shop PC with 16 GB RAM. A 14B wants more. CPU-only is slower but works for a returns desk or a lab FAQ. Training is the part that used remote GPUs; inference is yours."
+      }
+    }
+  ]
+}
+</script>
+{% endblock %}
+{% block content %}
+<div class="h180 h180-story">
+  <section class="h180-hero">
+    <div class="hx-kicker">
+      <span class="dot"></span>
+      <span>Local serving</span>
+      <span class="hx-rule"></span>
+      <span style="color:rgba(240,229,200,.55)">Ollama · Open Interpreter · LM Studio · llama.cpp</span>
+    </div>
+    <h1>Run the custom-trained LLM on your own hardware</h1>
+    <div class="h180-lede">
+      <p>C7X-IO does not host your production model. It returns a QLoRA adapter you download. You load that adapter beside the same open instruct base you trained, then serve it with Ollama, Open Interpreter, LM Studio, llama.cpp, or the PEFT script that ships in the zip.</p>
+      <p class="soft">This is the path an MSME desk actually uses: a PC in the manager cabin, a small tower labelled local serve, no patient report or GST bill leaving the building. See the <a href="/india-msme">India MSME cases</a> for what that desk looks like.</p>
+    </div>
+  </section>
+
+  <section class="h180-section" id="what-you-download">
+    <img class="story-photo" src="/static/site/workflow/04-ollama.jpg" width="1920" height="1080" alt="Indian MSME returns desk: a laptop running ollama run returns-desk next to a small on-premise server taped LocalServe, chai, and pending return slips.">
+    <div class="h180-prose">
+      <h2>What is in the trained zip</h2>
+      <p>The package is an adapter, not a rented endpoint and not a merged 7B–30B dump:</p>
+      <ul>
+        <li><strong>qlora/</strong> — the adapter weights C7X-IO trained on your gold library.</li>
+        <li><strong>tokenizer/</strong> — the tokenizer files used at train time.</li>
+        <li><strong>meta.json</strong> — includes <code>base_model</code>, the Apache-2.0 or MIT instruct checkpoint you must load against.</li>
+        <li><strong>load_adapter.py</strong> — a PEFT loader. Test a prompt, or merge to a folder.</li>
+      </ul>
+      <p>Catalog bases are Apache-2.0 or MIT instruct models up to 30B. The default is Qwen2.5 7B Instruct. Use the same base at serve time that you trained on.</p>
+
+      <h2>1. Smoke-test with the PEFT script</h2>
+      <p>Unzip the package. From that folder:</p>
+      <pre class="h180-code">pip install torch transformers peft accelerate
+python load_adapter.py --prompt "Buyer sent a photo: left sleeve hole after wash. PO 391. Refund or remake?"</pre>
+      <p>To produce a single folder for conversion tools:</p>
+      <pre class="h180-code">python load_adapter.py --merge-to ./merged --base Qwen/Qwen2.5-7B-Instruct</pre>
+      <p>If <code>meta.json</code> already names the base, you can omit <code>--base</code>.</p>
+
+      <h2>2. Serve with Ollama</h2>
+      <p>Ollama wants a GGUF. After you merge:</p>
+      <ol>
+        <li>Convert <code>./merged</code> to GGUF with the converter your serving stack documents (llama.cpp’s conversion script is the usual path).</li>
+        <li>Write a Modelfile that points at that GGUF and sets a short system line for the role.</li>
+        <li>Create and run the local model.</li>
+      </ol>
+      <pre class="h180-code">FROM ./returns-desk-q4.gguf
+SYSTEM You are the returns desk for one knitwear exporter. Classify the defect, decide refund, remake, or reject, and write a Tamil + English floor note. If the PO is missing, ask one question. Do not invent a credit note.
+
+PARAMETER temperature 0.1</pre>
+      <pre class="h180-code">ollama create returns-desk -f Modelfile
+ollama run returns-desk</pre>
+      <p>The same Ollama model is then an OpenAI-compatible server on <code>http://127.0.0.1:11434/v1</code> for anything else on the LAN that should not leave the building.</p>
+
+      <h2>3. Drive it from Open Interpreter</h2>
+      <p>Open Interpreter can talk to a local model instead of a hosted one. Point it at the Ollama (or llama.cpp) server that is already running the C7X worker:</p>
+      <pre class="h180-code">export OPENAI_BASE_URL=http://127.0.0.1:11434/v1
+export OPENAI_API_KEY=ollama
+interpreter --local --model returns-desk</pre>
+      <p>Use this when the role must take actions on the same PC — rename a scan, fill a CSV, open the day’s returns folder — not only reply in a chat window. Keep the system prompt identical to the role you trained. The weights hold the judgment; the harness holds the tools.</p>
+
+      <h2>4. LM Studio, llama.cpp, and similar tools</h2>
+      <p>Any local runtime that can load a GGUF or a PEFT adapter will do. Typical pairings:</p>
+      <ul>
+        <li><strong>LM Studio</strong> — import the GGUF, expose the local server, call it from your shop tools.</li>
+        <li><strong>llama.cpp</strong> — <code>llama-server</code> for an OpenAI-compatible endpoint on the LAN, useful for a second terminal in the accounts room.</li>
+        <li><strong>A small OpenAI-compatible proxy</strong> you already run — same idea: the model file is yours, the URL is localhost.</li>
+      </ul>
+      <p>C7X does not lock you to one of these. It produces the adapter. The harness is a choice you make after download.</p>
+
+      <h2>Honest limits</h2>
+      <ul>
+        <li>The zip is a QLoRA adapter. If your tool cannot load PEFT, merge first, then convert.</li>
+        <li>You must have a license to the base. C7X only trains Apache-2.0 and MIT instruct models.</li>
+        <li>A 7B Q4 GGUF is the MSME default. 14B and 30B need more RAM or a dedicated GPU.</li>
+        <li>C7X is not a hosted inference vendor. If the shop PC is off, the worker is off.</li>
+      </ul>
+      <p>
+        Next: <a href="/roles">which roles a custom-trained LLM can hold</a>
+        ·
+        <a href="/india-msme">India MSME case studies</a>
+        ·
+        <a href="/app">Talk to Riu</a>
+      </p>
+    </div>
+  </section>
+</div>
+{% endblock %}

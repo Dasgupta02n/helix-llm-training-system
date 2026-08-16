@@ -23,9 +23,11 @@
   "@type": "FAQPage",
   "mainEntity": [
     {"@type": "Question", "name": "Is C7X a chatbot?", "acceptedAnswer": {"@type": "Answer", "text": "No. Riu is a setup guide. C7X is not another chat box — it produces a gold library and a pinned worker you own."}},
-    {"@type": "Question", "name": "How is C7X different from a chat tool or a labeling factory?", "acceptedAnswer": {"@type": "Answer", "text": "Chat tools generate answers. Prompt and eval platforms debug live agents. Labeling factories annotate at enterprise scale. RAG retrieves documents for one call. C7X writes the role into weights."}},
+    {"@type": "Question", "name": "How does C7X compare with current industry solutions?", "acceptedAnswer": {"@type": "Answer", "text": "Hosted chat answers once. Prompt and eval consoles debug live agents. Labeling factories annotate at enterprise scale. Train-from-upload tools assume a dataset already exists. C7X starts earlier: it interviews the role, builds a gold library, and writes the role into weights you run locally."}},
     {"@type": "Question", "name": "What is GEO?", "acceptedAnswer": {"@type": "Answer", "text": "Generative Engine Optimization: making your domain the source AI systems cite. A C7X worker answers from trained judgment, not generic web text."}},
-    {"@type": "Question", "name": "Who is Riu?", "acceptedAnswer": {"@type": "Answer", "text": "Riu is C7X’s setup interview. She is the only way a plan gets created."}}
+    {"@type": "Question", "name": "Who is Riu?", "acceptedAnswer": {"@type": "Answer", "text": "Riu is C7X’s setup interview. She is the only way a plan gets created."}},
+    {"@type": "Question", "name": "Can an Indian MSME run a custom-trained LLM on its own desk?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. C7X-IO returns a QLoRA adapter you download. Load it beside an Apache-2.0 or MIT instruct base and serve it with Ollama, Open Interpreter, LM Studio, llama.cpp, or the included PEFT script. Inference stays on hardware you control."}},
+    {"@type": "Question", "name": "Which roles can a custom trained LLM hold?", "acceptedAnswer": {"@type": "Answer", "text": "Bounded high-volume desks — returns classification, invoice coding, L1 support, lab FAQs — can run end to end. Exception-heavy work stays a first pass with a person on the boundary. Licensed sign-off is never fully replaced."}}
   ]
 }
 </script>
@@ -62,7 +64,7 @@
     <div class="h180-actions">
       <a class="btn-gold btn-gold-lg" href="/app">Talk to Riu</a>
       <a class="btn-ghost-gold" href="#why">Why it holds</a>
-      <a class="btn-ghost-gold" href="#how">How it works</a>
+      <a class="btn-ghost-gold" href="#cases">India MSME cases</a>
     </div>
   </section>
 
@@ -140,9 +142,32 @@
   </section>
 
   <section class="h180-section" id="compare">
-    <div class="h180-head">
-      <h2>Hosted model against C7X worker</h2>
-      <span class="meta">Matrix 01</span>
+    <div class="h180-head wide">
+      <h2>How C7X compares with current industry solutions</h2>
+      <span class="meta">By job category</span>
+    </div>
+    <p class="hint" style="max-width:72ch;margin:18px 0 0">Teams looking for a custom LLM are usually handed one of four industry solutions: a hosted chat box, a prompt and eval console, a labeling factory, or a train button that assumes the dataset already exists. C7X starts one step earlier — it builds the gold library for one role, then writes that role into weights you run yourself.</p>
+    <div class="h180-jobs">
+      <article class="h180-job">
+        <div class="h180-label">Hosted chat</div>
+        <h3>Answers once</h3>
+        <p>A general model describes the job in the prompt. Behaviour drifts when the endpoint updates. Records leave your network on every call.</p>
+      </article>
+      <article class="h180-job">
+        <div class="h180-label">Prompt / eval console</div>
+        <h3>Debugs a live agent</h3>
+        <p>Useful after something is already in production. It does not produce a gold library or a pinned worker.</p>
+      </article>
+      <article class="h180-job">
+        <div class="h180-label">Labeling factory</div>
+        <h3>Annotates a queue</h3>
+        <p>Enterprise floors scale volume. They assume you already know the schema and can staff reviewers. C7X interviews the person who knows the role.</p>
+      </article>
+      <article class="h180-job">
+        <div class="h180-label">Train-from-upload</div>
+        <h3>Assumes the file exists</h3>
+        <p>Fine-tune UIs start after JSONL is ready. C7X collects, gates, and stores that file first — then can train.</p>
+      </article>
     </div>
     <table class="h180-table">
       <thead>
@@ -159,6 +184,7 @@
         <tr><td>If the supplier goes away</td><td>The capability leaves with them</td><td>The worker keeps running; you hold the weights</td></tr>
       </tbody>
     </table>
+    <p class="hint" style="margin-top:18px">The full job-by-job matrix, with cost bands and ownership facts, is on <a href="/gold-training-data">How C7X compares with current industry solutions</a>.</p>
   </section>
 
   <section class="h180-section" id="perimeter">
@@ -275,6 +301,34 @@
       <div class="h180-step"><strong>06 Library</strong><span>Kept, versioned, reviewable.</span></div>
       <div class="h180-step"><strong>07 Export</strong><span>JSONL, or train. Yours either way.</span></div>
     </div>
+
+    <div class="h180-film" data-film aria-label="C7X workflow screenshots, four steps">
+      <div class="h180-film-stage">
+        <figure class="is-on" data-slide>
+          <img src="/static/site/workflow/01-riu.jpg" width="1920" height="1080" alt="Laptop on a wooden desk showing the C7X studio. Riu asks what job the model should do for a Tiruppur knitwear returns desk.">
+          <figcaption>01 · Riu interviews the role in plain English</figcaption>
+        </figure>
+        <figure data-slide>
+          <img src="/static/site/workflow/02-library.jpg" width="1920" height="1080" alt="C7X gold library table of verified training examples, with sources and decision text, ready to export.">
+          <figcaption>02 · Gold library of verified decisions</figcaption>
+        </figure>
+        <figure data-slide>
+          <img src="/static/site/workflow/03-train.jpg" width="1920" height="1080" alt="C7X-IO training progress for a QLoRA adapter on an open Apache-licensed instruct model.">
+          <figcaption>03 · C7X-IO writes the role into a QLoRA adapter</figcaption>
+        </figure>
+        <figure data-slide>
+          <img src="/static/site/workflow/04-ollama.jpg" width="1920" height="1080" alt="Indian MSME returns desk running a custom C7X worker locally with ollama run returns-desk beside a small on-premise server.">
+          <figcaption>04 · Run it on the desk with Ollama or Open Interpreter</figcaption>
+        </figure>
+      </div>
+      <div class="h180-film-nav" role="tablist" aria-label="Workflow steps">
+        <button type="button" data-film-go class="is-on" aria-selected="true">01 Riu</button>
+        <button type="button" data-film-go aria-selected="false">02 Library</button>
+        <button type="button" data-film-go aria-selected="false">03 Train</button>
+        <button type="button" data-film-go aria-selected="false">04 Local run</button>
+      </div>
+    </div>
+    <p class="hint" style="margin-top:16px;max-width:70ch">The four stills autoplay as a filmstrip. Pause by hovering. After train, the worker is yours: see <a href="/run-locally">how to run a custom-trained LLM with Ollama, Open Interpreter, or similar tools</a>.</p>
   </section>
 
   <section class="h180-section" id="deploy">
@@ -290,10 +344,52 @@
     </div>
   </section>
 
+  <section class="h180-section" id="cases">
+    <div class="h180-watermark">INDIA</div>
+    <div class="h180-head wide">
+      <h2>How C7X makes an Indian MSME several times faster</h2>
+      <span class="meta">Three illustrated cases</span>
+    </div>
+    <p class="hint" style="max-width:72ch;margin:18px 0 0">Composite floors from Tiruppur knitwear, Pune auto-components, and a Hyderabad diagnostic lab — typical Indian MSME desks, not named customer logos. Each case is a single role, trained on decisions the shop already makes, then run on hardware that never leaves the building.</p>
+    <div class="h180-cases">
+      <a class="h180-case" href="/india-msme#tiruppur">
+        <img src="/static/site/cases/tiruppur-knitwear.jpg" width="1600" height="1000" alt="Tiruppur knitwear export floor: operators at industrial sewing machines, packed white T-shirts marked for the USA, and a manager cabin with a laptop.">
+        <div class="pad">
+          <div class="h180-label">Tiruppur · Tamil Nadu</div>
+          <h3>Knitwear returns desk</h3>
+          <p>Classify WhatsApp returns, pick refund or remake, and write the Tamil + English floor note — so the supervisor stops being the bottleneck on every damaged carton.</p>
+        </div>
+      </a>
+      <a class="h180-case" href="/india-msme#pune">
+        <img src="/static/site/cases/pune-auto-ap.jpg" width="1600" height="1000" alt="Pune auto-component accounts office: two clerks coding GST invoices beside steel filing cabinets, with CNC machines visible through the shop-floor door.">
+        <div class="pad">
+          <div class="h180-label">Pune · Maharashtra</div>
+          <h3>GST invoice coding</h3>
+          <p>Read a vendor bill, propose HSN and GL, flag input-tax-credit risk. The senior accountant reviews exceptions instead of typing every line.</p>
+        </div>
+      </a>
+      <a class="h180-case" href="/india-msme#hyderabad">
+        <img src="/static/site/cases/hyderabad-lab.jpg" width="1600" height="1000" alt="Hyderabad diagnostic lab reception: patients waiting on plastic chairs while the front desk answers a phone beside a bilingual MediCare Diagnostics board.">
+        <div class="pad">
+          <div class="h180-label">Hyderabad · Telangana</div>
+          <h3>Lab front desk</h3>
+          <p>Fasting rules, report-ready times, and booking answers in Telugu and English — the receptionist keeps the queue moving instead of repeating the same script.</p>
+        </div>
+      </a>
+    </div>
+    <p class="hint" style="margin-top:22px">
+      <a href="/india-msme">Read the three India MSME case studies</a>
+      ·
+      <a href="/run-locally">Run the worker locally</a>
+      ·
+      <a href="/roles">Roles a custom LLM can hold</a>
+    </p>
+  </section>
+
   <section class="h180-seo" id="seo-geo">
     <p class="page-kicker">SEO + GEO</p>
     <h2 style="text-transform:none;letter-spacing:-.02em;margin:.4rem 0 1rem">Not another chat box. Gold that search and generative engines can trust.</h2>
-    <p>C7X is a gold training-data studio, not a chatbot, prompt debugger, or labeling factory. Generative engine optimization (GEO) needs a model that answers from your domain. The library you export is the dataset; C7X-IO writes it into weights. <a href="/gold-training-data">How C7X compares, without naming other products</a>.</p>
+    <p>C7X is a gold training-data studio for one role, not a chatbot, prompt debugger, or labeling factory. Generative engine optimization (GEO) needs a model that answers from your domain. The library you export is the dataset; C7X-IO writes it into weights you can serve with Ollama, Open Interpreter, or a similar local harness. <a href="/gold-training-data">How C7X compares with current industry solutions</a>. <a href="/india-msme">Custom LLM case studies for Indian MSMEs</a>. <a href="/roles">Which desks a custom-trained LLM can take</a>.</p>
   </section>
 
   <section class="h180-cta" id="cta">

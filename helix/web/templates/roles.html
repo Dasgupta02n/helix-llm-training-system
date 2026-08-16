@@ -1,0 +1,260 @@
+{% extends "public_base.html" %}
+{% block title %}Roles a custom-trained LLM can hold or multiply{% endblock %}
+{% block canonical %}https://c7xai.in/roles{% endblock %}
+{% block meta_description %}Which jobs a custom-trained LLM can fully take, which stay a first pass, and which only get faster. Returns desks, GST coding, L1 support, lab FAQs, HR policy — plus the licensed work a worker must never sign. Built for Indian MSME and ops teams using C7X.{% endblock %}
+{% block main_class %}public-home{% endblock %}
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://c7xai.in/"},
+    {"@type": "ListItem", "position": 2, "name": "Roles a custom LLM can hold", "item": "https://c7xai.in/roles"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Roles a custom-trained LLM can fully take, assist, or multiply",
+  "description": "Bounded high-volume desks can run end to end. Exception work stays a first pass. Licensed sign-off is never replaced. A custom LLM in a local harness multiplies the person who already knows the job.",
+  "author": {"@type": "Person", "name": "Sabyasachi Dasgupta"},
+  "publisher": {"@type": "Organization", "name": "c7x AI", "url": "https://c7xai.in/about"},
+  "mainEntityOfPage": "https://c7xai.in/roles",
+  "datePublished": "2026-08-16",
+  "dateModified": "2026-08-16"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Can a custom trained LLM replace a worker?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "It can replace a bounded decision queue, not a person with a licence or a pair of hands. A returns classifier, an L1 WhatsApp desk, or a lab FAQ can run end to end. The supervisor, accountant, or receptionist stays for exceptions, cash, and anything that needs a signature."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How much faster can a custom LLM make a desk?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "On a repetitive, well-bounded role the first-pass draft is immediate, so one reviewer covers the volume that used to need several people typing. The gain is manyfold on classification and FAQ work. It is smaller on jobs that are already mostly exceptions."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which jobs should never be fully replaced?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Anything that requires a licensed sign-off — a CA authenticating a return, a doctor interpreting a result, an advocate filing a pleading — plus cash handling, physical goods, and statutory notices. Train those as refusals, not as answers."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What is a harness in this context?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The local runtime around the weights: Ollama, Open Interpreter, LM Studio, llama.cpp, or a small internal app. The custom-trained LLM holds the judgment. The harness holds tools, files, and the audit log."
+      }
+    }
+  ]
+}
+</script>
+{% endblock %}
+{% block content %}
+<div class="h180 h180-story">
+  <section class="h180-hero">
+    <div class="hx-kicker">
+      <span class="dot"></span>
+      <span>Roles · harness</span>
+      <span class="hx-rule"></span>
+      <span style="color:rgba(240,229,200,.55)">Replace a queue, not a licence</span>
+    </div>
+    <h1>Roles a custom-trained LLM can hold — fully, partly, or manyfold faster</h1>
+    <div class="h180-lede">
+      <p>A custom-trained LLM in a local harness is not a general employee and not a hosted chatbot. It is one role, written into weights, sitting next to the person who already knows the job. Some queues it can take end to end. Some it only drafts. A few it must refuse.</p>
+      <p class="soft">The list below is written for Indian MSME and ops teams. Pair it with the <a href="/india-msme">Tiruppur, Pune, and Hyderabad cases</a> and the <a href="/run-locally">Ollama / Open Interpreter serving guide</a>.</p>
+    </div>
+  </section>
+
+  <section class="h180-section" id="three-modes">
+    <div class="h180-head">
+      <h2>Three ways the worker sits on a desk</h2>
+      <span class="meta">Replace · assist · multiply</span>
+    </div>
+    <div class="role-grid">
+      <article class="role-card">
+        <div class="tag">Full take</div>
+        <h3>The queue disappears</h3>
+        <p>The decision is bounded, frequent, and already written down. The worker classifies, replies, and logs. A person audits a sample, not every row.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Partial</div>
+        <h3>First pass, human posts</h3>
+        <p>The worker drafts the coding, the screen, or the letter. Someone with authority accepts, edits, or sends it back. Volume still drops sharply.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Multiplier</div>
+        <h3>The expert covers manyfold more</h3>
+        <p>The senior still decides the hard cases. They stop answering the same forty questions. One supervisor does the work that used to need a bench.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="h180-section" id="full">
+    <div class="h180-head">
+      <h2>Roles that can run end to end</h2>
+      <span class="meta">High volume · written rules</span>
+    </div>
+    <div class="role-grid">
+      <article class="role-card">
+        <div class="tag">Full take</div>
+        <h3>WhatsApp / email L1 desk</h3>
+        <p>Order status, size chart, courier tracking, store hours. The script already exists. The worker answers in the shop’s language and hands off when the order id is missing.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Full take</div>
+        <h3>Returns and defect classification</h3>
+        <p>Stitch, shade, hole, size, late ship. Refund, remake, or reject. The <a href="/india-msme#tiruppur">Tiruppur knitwear desk</a> is this job.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Full take</div>
+        <h3>IT helpdesk L1</h3>
+        <p>Password reset steps, VPN, printer, “have you tried the other browser”. Anything that needs an admin token is a hand-off.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Full take</div>
+        <h3>Lab and clinic FAQ</h3>
+        <p>Fasting, report-ready time, home collection, what a code on the slip means. No interpretation of a result. The <a href="/india-msme#hyderabad">Hyderabad front desk</a> is this job.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Full take</div>
+        <h3>HR leave and policy Q&amp;A</h3>
+        <p>Casual leave, PF, notice period, holiday roster — answers the handbook already contains. Approvals stay with the manager.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Full take</div>
+        <h3>Catalog copy from a spec sheet</h3>
+        <p>Turn a measurement table into a marketplace listing in a fixed brand voice. A merchandiser spot-checks new styles.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="h180-section" id="partial">
+    <div class="h180-head">
+      <h2>Roles that stay a first pass</h2>
+      <span class="meta">Person still posts</span>
+    </div>
+    <div class="role-grid">
+      <article class="role-card">
+        <div class="tag">Partial</div>
+        <h3>GST / AP invoice coding</h3>
+        <p>HSN, rate, ITC, GL. The worker proposes; the accountant posts. See the <a href="/india-msme#pune">Pune auto-component case</a>.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Partial</div>
+        <h3>Claims and warranty first review</h3>
+        <p>Read the form, pull the matching policy line, recommend pay / deny / ask. A person signs the letter.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Partial</div>
+        <h3>Inbound CV screen</h3>
+        <p>Match a JD the company wrote. Shortlist and a one-line reason. No hire / no-hire as a final act.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Partial</div>
+        <h3>Purchase-order matching</h3>
+        <p>Three-way match of PO, GRN, and bill. Exceptions (qty, rate, missing e-way) go to purchase.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Partial</div>
+        <h3>NCR and quality write-up</h3>
+        <p>Turn a floor note and a photo description into the plant’s NCR template. QA still closes the loop.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Partial</div>
+        <h3>Dealer or branch briefing</h3>
+        <p>Draft the day’s price list reply or scheme FAQ. The area manager sends it.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="h180-section" id="multiply">
+    <div class="h180-head">
+      <h2>Roles that become manyfold faster</h2>
+      <span class="meta">The expert stays</span>
+    </div>
+    <div class="role-grid">
+      <article class="role-card">
+        <div class="tag">Multiplier</div>
+        <h3>Floor supervisor</h3>
+        <p>Stops being the human FAQ for the line. Walks machines instead of typing the same return note.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Multiplier</div>
+        <h3>Senior accountant</h3>
+        <p>Reviews ITC risk and odd GSTIN changes. Does not retype eighty clean bills.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Multiplier</div>
+        <h3>Lab or clinic manager</h3>
+        <p>Keeps the queue and the phone from being the same person. Sits with the technician on real exceptions.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Multiplier</div>
+        <h3>Store or plant manager</h3>
+        <p>Dealer WhatsApp and staff policy questions go to the worker first. The manager handles cash, people, and vendors.</p>
+      </article>
+      <article class="role-card">
+        <div class="tag">Multiplier</div>
+        <h3>Associate to a CA, CS, or advocate</h3>
+        <p>First draft of a working paper or a letter from the firm’s own gold. The professional still signs. The licence is not the model’s.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="h180-section" id="never">
+    <div class="h180-head">
+      <h2>What a custom LLM must not fully replace</h2>
+      <span class="meta">Train as a refusal</span>
+    </div>
+    <div class="h180-prose">
+      <ul>
+        <li>Licensed sign-off: CA authentication, medical diagnosis or prescription, an advocate’s filing.</li>
+        <li>Cash, inventory movement, and anything that needs a pair of hands on the floor.</li>
+        <li>Statutory notices, show-cause replies, and union communication.</li>
+        <li>Any case where the gold library has no example and the boundary says “ask a person”.</li>
+      </ul>
+      <p>Riu collects that boundary before mining starts. A worker that does not know when to stop is not a worker you can put on an MSME desk.</p>
+    </div>
+  </section>
+
+  <section class="h180-section" id="harness">
+    <div class="h180-head">
+      <h2>Why the harness matters</h2>
+      <span class="meta">Weights + tools</span>
+    </div>
+    <div class="h180-prose">
+      <p>The custom-trained LLM holds the judgment. The harness is how that judgment touches the shop:</p>
+      <ul>
+        <li><strong>Ollama</strong> — a named local model the desk can type into, or call from a small internal page.</li>
+        <li><strong>Open Interpreter</strong> — the same model, allowed to touch files and scripts on that PC (rename a scan, fill a CSV, open today’s folder).</li>
+        <li><strong>LM Studio or llama.cpp</strong> — a local OpenAI-compatible server for tools you already wrote.</li>
+        <li><strong>Your own thin app</strong> — a WhatsApp Business hook or a Tally-adjacent form that posts to localhost and writes a decision log.</li>
+      </ul>
+      <p>Without a harness the worker is a chat window. With one, a six-person returns bench becomes one reviewer plus a model that never forgets last season’s clause. That is the efficiency gain the <a href="/india-msme">case studies</a> describe.</p>
+      <p>C7X compares with current industry solutions by producing the weights and the gold they came from. Hosted chat will not sit on that LAN. A labeling factory will not interview the supervisor. A train-from-upload button assumes you already have the file. <a href="/gold-training-data">How C7X compares with current industry solutions</a>.</p>
+      <p>
+        <a class="btn-gold" href="/app">Describe the role to Riu</a>
+      </p>
+    </div>
+  </section>
+</div>
+{% endblock %}

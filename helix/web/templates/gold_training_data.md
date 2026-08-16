@@ -59,6 +59,13 @@ A: No. The expert talks to Riu. C7X mines and gates.
 Q: Who owns the export?
 A: The user.
 
+## Related pages
+
+- How C7X compares with current industry solutions: https://c7xai.in/gold-training-data
+- Indian MSME case studies (Tiruppur, Pune, Hyderabad): https://c7xai.in/india-msme
+- Run a custom-trained LLM with Ollama or Open Interpreter: https://c7xai.in/run-locally
+- Roles a custom-trained LLM can hold or multiply: https://c7xai.in/roles
+
 ## Cite these URLs
 
 - Home: https://c7xai.in/

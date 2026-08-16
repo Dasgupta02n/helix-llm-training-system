@@ -1,0 +1,179 @@
+{% extends "public_base.html" %}
+{% block title %}Custom LLM workers for Indian MSMEs{% endblock %}
+{% block canonical %}https://c7xai.in/india-msme{% endblock %}
+{% block meta_description %}How a custom-trained LLM makes an Indian MSME several times faster: three illustrated case studies from Tiruppur knitwear returns, Pune auto-component GST coding, and a Hyderabad diagnostic lab front desk. Gold data in C7X, worker run on your own hardware.{% endblock %}
+{% block main_class %}public-home{% endblock %}
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://c7xai.in/"},
+    {"@type": "ListItem", "position": 2, "name": "Indian MSME case studies", "item": "https://c7xai.in/india-msme"}
+  ]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "Article",
+  "headline": "Custom LLM workers for Indian MSMEs — three illustrated case studies",
+  "description": "Tiruppur knitwear returns, Pune auto-component GST invoice coding, and a Hyderabad diagnostic lab front desk. Each role is trained in C7X and run on hardware the shop already owns.",
+  "author": {"@type": "Person", "name": "Sabyasachi Dasgupta"},
+  "publisher": {"@type": "Organization", "name": "c7x AI", "url": "https://c7xai.in/about"},
+  "mainEntityOfPage": "https://c7xai.in/india-msme",
+  "datePublished": "2026-08-16",
+  "dateModified": "2026-08-16",
+  "inLanguage": "en-IN",
+  "about": ["Indian MSME", "custom LLM", "Tiruppur knitwear", "Pune auto components", "Hyderabad diagnostic lab"]
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Can a custom trained LLM help an Indian MSME?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes, on one bounded desk at a time. C7X builds gold examples from the decisions that desk already makes — returns, GST coding, lab FAQs — then writes them into a worker you run on a PC or small server inside the building."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Are these named C7X customers?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. The three stories are illustrated composites of typical Indian MSME floors in Tiruppur, Pune, and Hyderabad. They show the job, the data, and the local-run path, not a paid testimonial."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does the worker need the internet at inference?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "No. After you download the QLoRA adapter, inference runs with Ollama, Open Interpreter, LM Studio, llama.cpp, or the PEFT script on hardware you control. Patient reports, GST bills, and buyer WhatsApp stay inside the perimeter."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "What does a first MSME worker cost?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Usage is 2× billed service spend. Gold with your sources is about $0.75–$1 per row. A small proof library plus a default 7B C7X-IO train is typically tens of dollars on the usage counter, then running cost is your own electricity and GPU or CPU."
+      }
+    }
+  ]
+}
+</script>
+{% endblock %}
+{% block content %}
+<div class="h180 h180-story">
+  <section class="h180-hero">
+    <div class="hx-kicker">
+      <span class="dot"></span>
+      <span>India · MSME case studies</span>
+      <span class="hx-rule"></span>
+      <span style="color:rgba(240,229,200,.55)">Illustrated composites, not named logos</span>
+    </div>
+    <h1>A custom LLM that makes an Indian MSME several times faster</h1>
+    <div class="h180-lede">
+      <p>Most Indian MSMEs do not need a general chatbot. They need one desk — returns, invoices, or reception — to stop repeating the same decision a hundred times a day. C7X interviews that desk, builds gold training data from the calls it already makes, and returns a worker that runs on a PC in the same room.</p>
+      <p class="soft">The three cases below are illustrated from typical floors in Tiruppur, Pune, and Hyderabad. They are composites of real MSME patterns, not named customer claims. Each one is a single role, with a boundary a person still holds.</p>
+    </div>
+    <nav class="h180-toc" aria-label="Case studies">
+      <a href="#tiruppur">01 Tiruppur knitwear</a>
+      <a href="#pune">02 Pune auto GST</a>
+      <a href="#hyderabad">03 Hyderabad lab</a>
+      <a href="/run-locally">Run locally</a>
+      <a href="/roles">Roles</a>
+    </nav>
+  </section>
+
+  <section class="h180-section" id="tiruppur">
+    <div class="h180-head">
+      <h2>Tiruppur knitwear returns</h2>
+      <span class="meta">Tamil Nadu · export apparel</span>
+    </div>
+    <img class="story-photo" src="/static/site/cases/tiruppur-knitwear.jpg" width="1600" height="1000" alt="Tiruppur knitwear export unit: women at Juki sewing machines, stacked white T-shirts tagged for a USA order, and a manager cabin with a laptop and shade cards.">
+    <div class="h180-prose">
+      <p class="lead">A 120-machine knitwear exporter in Tiruppur ships basic T-shirts and hoodies to US and EU buyers. The floor is fast. The bottleneck is the WhatsApp returns desk: every damaged carton, colour bleed, or dropped stitch lands on one supervisor who already walks the line.</p>
+      <h3>The job as it is done today</h3>
+      <p>Buyers and buying-house QC send photos and a one-line complaint. The desk must classify the defect (stitching, shade, hole, size, late ship), decide refund / remake / reject, calculate the INR amount against the contract, flag a repeat supplier, and write a Tamil + English note the floor can act on before the next cutting ticket.</p>
+      <h3>What C7X trains</h3>
+      <ul>
+        <li>Gold rows from last season’s settled returns — photo description, contract clause, the decision the supervisor actually took, and why.</li>
+        <li>Edge cases Riu will not skip: a buyer who always claims shade variation, a carton damaged by the liner, a style that was already closed.</li>
+        <li>A refusal: do not invent a credit note when the PO number is missing. Ask one clarifying question, then hand off.</li>
+      </ul>
+      <h3>What changes on the floor</h3>
+      <p>The worker drafts the classification and the bilingual floor note in seconds. The supervisor reviews exceptions and signs credits. A desk that ate half a shift now takes a short review pass. The sewing line keeps moving. Inference runs on a small PC in the manager cabin with <a href="/run-locally">Ollama</a> — buyer photos never go to a hosted chat box.</p>
+    </div>
+  </section>
+
+  <section class="h180-section" id="pune">
+    <div class="h180-head">
+      <h2>Pune auto-component GST coding</h2>
+      <span class="meta">Maharashtra · ancillary manufacturing</span>
+    </div>
+    <img class="story-photo" src="/static/site/cases/pune-auto-ap.jpg" width="1600" height="1000" alt="Pune auto-ancillary accounts room: two clerks coding GST invoices at desktop computers, steel cabinets labelled GSTR-1, CNC machines visible through the open shop-floor door.">
+    <div class="h180-prose">
+      <p class="lead">A Pune ancillary that machines housings for two-wheeler OEMs receives 80–150 vendor invoices a day. Two clerks type HSN, GST rate, and GL into the books. Month-end is a pile. Input-tax-credit mistakes show up as notices, not as a software error.</p>
+      <h3>The job as it is done today</h3>
+      <p>Each bill is a scan or a WhatsApp photo. The clerk matches the vendor, proposes an HSN from a worn cheat-sheet, checks whether ITC is allowed on that line, and posts. Anything odd — a freight line, a reverse-charge entry, a vendor who changed GSTIN — waits for the senior accountant.</p>
+      <h3>What C7X trains</h3>
+      <ul>
+        <li>Gold from posted invoices the senior already signed: vendor, line text, HSN, rate, ITC yes/no, GL, and the one-line reason.</li>
+        <li>Edge cases: capital goods vs consumable, mixed credit notes, e-way bill mismatch, a SEZ supply that looks domestic.</li>
+        <li>A hard boundary: never file GSTR-1 or GSTR-3B. Propose the coding. A person posts.</li>
+      </ul>
+      <h3>What changes on the floor</h3>
+      <p>The worker reads the bill text and returns a coding slip. Clear lines post after a glance. Exceptions queue for the senior. The same two people clear a day that used to spill into Saturday, and the GST working papers stay on the office PC. See <a href="/roles">which finance desks a custom LLM can hold</a>.</p>
+    </div>
+  </section>
+
+  <section class="h180-section" id="hyderabad">
+    <div class="h180-head">
+      <h2>Hyderabad diagnostic lab front desk</h2>
+      <span class="meta">Telangana · neighbourhood diagnostics</span>
+    </div>
+    <img class="story-photo" src="/static/site/cases/hyderabad-lab.jpg" width="1600" height="1000" alt="Neighbourhood diagnostic lab in Hyderabad: patients waiting on plastic chairs, a bilingual MediCare Diagnostics board, and the receptionist answering a phone at a wooden desk.">
+    <div class="h180-prose">
+      <p class="lead">A neighbourhood lab in Hyderabad runs blood tests, ECG, and ultrasound. The phone never stops: is fasting required, when is the report ready, can a home collection come to LB Nagar, what does this abbreviation on the slip mean. The receptionist is also taking cash and handing reports.</p>
+      <h3>The job as it is done today</h3>
+      <p>Every answer already exists in a printed rate list and a fasting chart taped to the wall. The cost is repetition, in Telugu and English, while a queue watches. Wrong fasting advice means a redraw. A late report call that could have been “after 6 pm” becomes an argument at the counter.</p>
+      <h3>What C7X trains</h3>
+      <ul>
+        <li>Gold from the actual rate list, fasting chart, and a week of the questions the desk already answered well.</li>
+        <li>Bilingual output: Telugu or English, matching the patient. No diagnosis. No “your result means…”.</li>
+        <li>A refusal: anything that interprets a value, recommends a medicine, or guesses a missing patient ID is handed to the technician or the reporting doctor.</li>
+      </ul>
+      <h3>What changes on the floor</h3>
+      <p>WhatsApp and the front-desk terminal draft the same answer the chart already holds. The receptionist confirms, takes payment, and keeps the chairs moving. Reports and patient names stay on the clinic machine. A custom LLM does not replace the pathologist. It stops the pathologist’s front desk from being a call centre.</p>
+    </div>
+  </section>
+
+  <section class="h180-section" id="how-to-copy">
+    <div class="h180-head">
+      <h2>How an MSME copies this</h2>
+      <span class="meta">One role at a time</span>
+    </div>
+    <div class="h180-prose">
+      <ol>
+        <li>Pick one desk that already makes the same decision all day.</li>
+        <li>Talk to <a href="/app">Riu</a> in plain English. Give one perfect example and the edge cases.</li>
+        <li>Upload last month’s settled tickets, bills, or FAQs — or start from a 10-row review.</li>
+        <li>Export the gold library. Confirm C7X-IO if you want a QLoRA adapter.</li>
+        <li>Load the adapter on a shop PC with <a href="/run-locally">Ollama, Open Interpreter, or the PEFT script</a>.</li>
+      </ol>
+      <p>C7X compares with current industry solutions by starting before the dataset exists. Hosted chat will answer the phone once. A labeling factory will annotate if you already have a schema and a budget. C7X interviews the person who knows the role, then leaves you with weights you pin.</p>
+      <p>
+        <a class="btn-gold" href="/app">Talk to Riu</a>
+      </p>
+    </div>
+  </section>
+</div>
+{% endblock %}

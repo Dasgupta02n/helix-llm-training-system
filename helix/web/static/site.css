@@ -605,6 +605,10 @@
   max-width: 760px;
   padding: 64px 28px 96px;
 }
+.site-body .public-home {
+  max-width: none;
+  padding: 0;
+}
 .site-body .legal-doc h1,
 .site-body .legal-doc h2,
 .site-body .legal-doc h3 {
