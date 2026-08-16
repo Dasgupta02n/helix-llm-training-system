@@ -854,7 +854,7 @@ def double_helix_train_list(
     # Worker starts queued jobs. Status polls only advance running/packaging
     # so two HTTP clients cannot double-submit to RunPod.
     if job and job.status in {"running", "packaging"}:
-        job = tick_train_job(db, job)
+        job = tick_train_job(db, job, package=False)
     payload = job_to_dict(job) if job else None
     if payload:
         from helix.services.declaration import get_acceptance
@@ -879,7 +879,7 @@ def double_helix_train_status(
     if not job or job.tenant_id != tenant.id or job.owner_user_id != user.id:
         raise HTTPException(404, "Train job not found")
     if job.status in {"running", "packaging"}:
-        job = tick_train_job(db, job)
+        job = tick_train_job(db, job, package=False)
     payload = job_to_dict(job)
     from helix.services.declaration import get_acceptance
 

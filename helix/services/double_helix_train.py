@@ -690,7 +690,18 @@ def _advance_packaging(db: Session, job: m.DoubleHelixTrainJob) -> None:
         shutil.rmtree(tmp, ignore_errors=True)
 
 
-def tick_train_job(db: Session, job: m.DoubleHelixTrainJob) -> m.DoubleHelixTrainJob:
+def tick_train_job(
+    db: Session,
+    job: m.DoubleHelixTrainJob,
+    *,
+    package: bool = True,
+) -> m.DoubleHelixTrainJob:
+    """Advance one train job.
+
+    ``package=False`` is for HTTP status polls: poll the trainer and flip
+    running → packaging, but never download the adapter in the request.
+    The worker is the only caller that may package (HF download + zip).
+    """
     try:
         if job.status == "cancelled":
             return job
@@ -704,11 +715,12 @@ def tick_train_job(db: Session, job: m.DoubleHelixTrainJob) -> m.DoubleHelixTrai
                 _advance_queued(db, job)
         elif job.status == "running":
             _advance_running(db, job)
-            if job.status == "packaging":
+            if job.status == "packaging" and package:
                 db.commit()
                 _advance_packaging(db, job)
         elif job.status == "packaging":
-            _advance_packaging(db, job)
+            if package:
+                _advance_packaging(db, job)
     except Exception as e:  # noqa: BLE001
         _fail(job, str(e)[:2000])
     job.updated_at = _now()

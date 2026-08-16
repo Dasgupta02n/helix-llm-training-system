@@ -4,7 +4,9 @@ from helix.services.riu import (
     apply_official_riu_estimate,
     official_estimate_for_state,
     riu_start_block_reason,
+    _heuristic_turn,
     _wants_exploratory,
+    _wants_run,
     _user_denied_attached_data,
 )
 from helix.services.user_material_upload import estimate_setup_pricing
@@ -72,6 +74,33 @@ def test_start_5000_without_corpus_is_blocked():
     assert "5000" in reason or "5,000" in reason
     assert "start 10" in reason.lower()
     assert "0.75" in reason or "2" in reason or "per gold" in reason.lower()
+
+
+def test_start_10_is_a_run_confirm():
+    assert _wants_exploratory("start 10")
+    assert _wants_run("start 10")
+    assert _wants_run("start small")
+    assert _wants_run("start")
+    assert not _wants_run("restart")
+    assert not _wants_run("start over")
+    assert not _wants_exploratory("start 5000")
+
+
+def test_heuristic_confirm_start_10_emits_pipeline():
+    turn = _heuristic_turn(
+        "start 10",
+        {
+            "project_name": "X",
+            "mission": "m",
+            "categories": ["a"],
+            "sample_input": "q",
+            "sample_output": "a",
+            "accept_exploratory": True,
+        },
+        "confirm",
+    )
+    assert any(a.get("type") == "start_pipeline" for a in turn["actions"])
+    assert turn["phase"] == "running"
 
 
 def test_start_10_exploratory_is_allowed():

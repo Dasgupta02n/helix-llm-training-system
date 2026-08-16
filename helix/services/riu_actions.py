@@ -39,8 +39,18 @@ from helix.services.riu_session import (
     session_to_dict,
 )
 
+def _wants_exploratory(text: str) -> bool:
+    t = (text or "").strip().lower()
+    if t in {"start 10", "start ten", "exploratory", "start small", "start exploratory"}:
+        return True
+    return bool(re.search(r"\bstart\s+(10|ten|small|exploratory)\b", t))
+
+
 def _wants_run(text: str) -> bool:
     """True only for explicit run commands — not 'restart' / 'start over'."""
+    # "start 10" / "start small" is a run confirm (exploratory 10-row job).
+    if _wants_exploratory(text):
+        return True
     t = (text or "").strip().lower()
     if t in {"start", "go", "yes", "y", "run", "launch", "begin"}:
         return True
@@ -97,13 +107,6 @@ def _user_denied_attached_data(text: str) -> bool:
         "no source material",
     )
     return any(c in t for c in cues)
-
-
-def _wants_exploratory(text: str) -> bool:
-    t = (text or "").strip().lower()
-    if t in {"start 10", "start ten", "exploratory", "start small", "start exploratory"}:
-        return True
-    return bool(re.search(r"\bstart\s+(10|ten|small|exploratory)\b", t))
 
 
 def _wants_mailbox_list(text: str) -> bool:
@@ -1498,6 +1501,23 @@ def handle_user_message(
     ):
         actions.append({"type": "list_mailbox"})
         turn["actions"] = actions
+    # "start" / "start 10" must queue mining even if the model only saved the plan.
+    # Bare "yes" during discover/materials is not a start — only confirm-ish phases.
+    next_phase_guess = str(turn.get("phase") or phase)
+    should_start = False
+    if _wants_exploratory(text):
+        should_start = True
+    elif _wants_run(text) and (
+        phase in {"confirm", "running", "model_estimate"}
+        or next_phase_guess in {"confirm", "running"}
+    ):
+        should_start = True
+    if should_start and not any(
+        (a.get("type") if isinstance(a, dict) else "") == "start_pipeline"
+        for a in actions
+    ):
+        actions.append({"type": "start_pipeline"})
+        turn["actions"] = actions
     draft = state.get("mailbox_draft") if isinstance(state.get("mailbox_draft"), dict) else None
     if _wants_send_mail(text) and draft and not any(
         (a.get("type") if isinstance(a, dict) else "") in {"send_mail", "reply_mail"}
@@ -1512,7 +1532,6 @@ def handle_user_message(
         turn["actions"] = actions
 
     # Official estimate overwrites invented $ / hour quotes
-    next_phase_guess = str(turn.get("phase") or phase)
     turn["reply"] = apply_official_riu_estimate(
         str(turn.get("reply") or ""),
         phase=next_phase_guess,

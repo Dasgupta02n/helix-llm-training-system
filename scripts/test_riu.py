@@ -12,6 +12,7 @@ def main() -> None:
     assert _wants_run("start")
     assert _wants_run("yes, start")
     assert _wants_run("run it")
+    assert _wants_run("start 10")
     assert not _wants_run("restart")
     assert not _wants_run("please restart later")
     assert not _wants_run("start over")

@@ -22,6 +22,7 @@ from helix.services.double_helix_train import (
     gold_to_alpaca_line,
     job_to_dict,
     load_trainable_gold,
+    tick_train_job,
 )
 from helix.services.runpod_train import official_qlora_input
 
@@ -252,3 +253,74 @@ def test_trained_zip_has_adapter_tokenizer_and_gold(tmp_path: Path):
     meta = json.loads(zf.read("meta.json"))
     assert meta["includes_full_merged_weights"] is False
     assert meta["training"] == "qlora"
+
+
+def _train_row(db, *, status: str) -> m.DoubleHelixTrainJob:
+    tid, uid = _seed(db, 2)
+    job = m.DoubleHelixTrainJob(
+        id=_uid("dht_"),
+        owner_user_id=uid,
+        tenant_id=tid,
+        status=status,
+        base_model_id="HuggingFaceTB/SmolLM2-1.7B-Instruct",
+        gold_count=2,
+        hf_model_repo="owner/C7X-qlora-test",
+        progress_message=status,
+        meta_json="{}",
+    )
+    db.add(job)
+    db.commit()
+    return job
+
+
+def test_http_tick_does_not_package(db, monkeypatch):
+    job = _train_row(db, status="packaging")
+    called = {"n": 0}
+
+    def boom(*_a, **_k):
+        called["n"] += 1
+        raise AssertionError("packaging must not run on HTTP poll")
+
+    monkeypatch.setattr(
+        "helix.services.double_helix_train._advance_packaging", boom
+    )
+    out = tick_train_job(db, job, package=False)
+    assert out.status == "packaging"
+    assert called["n"] == 0
+
+
+def test_http_tick_running_stops_at_packaging(db, monkeypatch):
+    job = _train_row(db, status="running")
+    called = {"n": 0}
+
+    def flip_to_packaging(_db, row):
+        row.status = "packaging"
+
+    def boom(*_a, **_k):
+        called["n"] += 1
+        raise AssertionError("inline packaging blocked")
+
+    monkeypatch.setattr(
+        "helix.services.double_helix_train._advance_running", flip_to_packaging
+    )
+    monkeypatch.setattr(
+        "helix.services.double_helix_train._advance_packaging", boom
+    )
+    out = tick_train_job(db, job, package=False)
+    assert out.status == "packaging"
+    assert called["n"] == 0
+
+
+def test_worker_tick_packages(db, monkeypatch):
+    job = _train_row(db, status="packaging")
+
+    def finish(_db, row):
+        row.status = "completed"
+        row.artifact_relpath = f"{row.id}.zip"
+
+    monkeypatch.setattr(
+        "helix.services.double_helix_train._advance_packaging", finish
+    )
+    out = tick_train_job(db, job, package=True)
+    assert out.status == "completed"
+    assert out.artifact_relpath
