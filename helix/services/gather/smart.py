@@ -185,13 +185,22 @@ def _recent_search_dup(db: Session, tenant_id: str, source: str, query: str) -> 
     return False
 
 
+def _as_query_list(query: str | list[str] | tuple[str, ...] | None) -> list[str]:
+    if query is None:
+        return []
+    if isinstance(query, (list, tuple)):
+        return [str(q).strip() for q in query if str(q).strip()]
+    parts = [p.strip() for p in str(query).splitlines() if p.strip()]
+    return parts or ([str(query).strip()] if str(query).strip() else [])
+
+
 def gather_search(
     db: Session,
     *,
     tenant_id: str,
     category: str,
     source: str,
-    query: str,
+    query: str | list[str] | tuple[str, ...],
     max_results: int | None = None,
     force_refresh: bool = False,
     deep: bool = False,
@@ -211,24 +220,28 @@ def gather_search(
         default_max = max(default_max, 15)
     max_results = max(1, min(int(max_results or default_max), cap))
     source = (source or "blog").lower()
-    query = (query or category or "training").strip()
-    # Enrich query for platform without LLM
-    search_q = f"{query}".strip()
-    if category and category.lower() not in search_q.lower():
-        search_q = f"{search_q} {category}".strip()
+    raw_queries = _as_query_list(query) or [str(category or "training").strip()]
     from helix.services.source_adapter import SOCIAL_CHANNELS, adapt_source
 
     spec = adapt_source(source)
     gather_channel = spec.get("channel") or "web"
-    if gather_channel in SOCIAL_CHANNELS:
-        hint = _site_hint(gather_channel)
-        if hint:
-            search_q = f"{search_q} site:{hint}"
-    elif spec.get("operators"):
-        # Public non-social type: keep the named phrase in the query.
-        op0 = spec["operators"][0]
-        if op0 and op0.lower() not in search_q.lower():
-            search_q = f"{search_q} {op0}".strip()
+    enriched: list[str] = []
+    for one in raw_queries:
+        search_q = one.strip()
+        if category and category.lower() not in search_q.lower():
+            search_q = f"{search_q} {category}".strip()
+        if gather_channel in SOCIAL_CHANNELS:
+            hint = _site_hint(gather_channel)
+            if hint and f"site:{hint}" not in search_q.lower():
+                search_q = f"{search_q} site:{hint}"
+        elif spec.get("operators"):
+            op0 = spec["operators"][0]
+            if op0 and op0.lower() not in search_q.lower():
+                search_q = f"{search_q} {op0}".strip()
+        if search_q:
+            enriched.append(search_q)
+    search_queries = enriched or raw_queries
+    search_q = " | ".join(search_queries)
     source = gather_channel if gather_channel != "unreachable" else "web"
 
     cache_key = _hash(tenant_id, source, search_q, str(max_results), domain_kind or "")
@@ -292,10 +305,11 @@ def gather_search(
             raise RuntimeError("Gathering is not configured on this server.")
         try:
             pages = 2 if deep else 1
+            take = max_results * max(1, len(search_queries))
             raw_items, meta = apify_client.search_web(
-                search_q, max_results=max_results, max_pages=pages
+                search_queries, max_results=max_results, max_pages=pages
             )
-            raw_items = _flatten_google_items(raw_items)[:max_results]
+            raw_items = _flatten_google_items(raw_items)[:take]
             # store cache
             db.add(
                 m.GatherCache(

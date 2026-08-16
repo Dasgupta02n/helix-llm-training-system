@@ -74,6 +74,18 @@ def create_batch_job(
     # Synthesis uses synthetic rows as scale (not gold) — still cap on cost trajectory
     # using batch_size * total_batches as the job's "unit" target.
     target_gold = max(1, batch_size * total_batches)
+    # A new small job must still be allowed to write rows even if an older
+    # project's verified gold already filled the account goal.
+    if job_type == "pipeline":
+        from helix.services.library import count_gold_toward_cap, get_or_create_scope
+
+        scope = get_or_create_scope(db, owner_user_id, tenant_id)
+        have = count_gold_toward_cap(
+            db, owner_user_id=owner_user_id, tenant_id=tenant_id
+        )
+        need = have + target_gold
+        if int(scope.gold_target_count or 0) < need:
+            scope.gold_target_count = need
     cfg = dict(config or {})
     no_corpus = bool(no_corpus or cfg.get("no_corpus_rate"))
     kind = "synthetic" if job_type == "synthesis" else "gold"

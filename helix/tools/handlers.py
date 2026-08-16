@@ -341,6 +341,7 @@ def trigger_discovery(
     category: str = "",
     source: str = "",
     query: str = "",
+    queries: list[str] | None = None,
     max_results: int | None = None,
     force_refresh: bool = False,
     deep: bool = False,
@@ -350,13 +351,18 @@ def trigger_discovery(
     """GATHER via Apify only — never invent results in the LLM."""
     from helix.services.gather.smart import gather_search
 
+    payload: str | list[str]
+    if queries:
+        payload = [str(q).strip() for q in queries if str(q).strip()]
+    else:
+        payload = query or category
     try:
         out = gather_search(
             ctx.db,
             tenant_id=ctx.tenant_id,
             category=category,
             source=source or "web",
-            query=query or category,
+            query=payload,
             max_results=max_results or ctx.settings.apify_max_results_per_search,
             force_refresh=bool(force_refresh),
             deep=bool(deep),

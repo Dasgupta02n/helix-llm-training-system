@@ -124,18 +124,26 @@ def fetch_dataset_items(dataset_id: str, limit: int = 50) -> list[dict[str, Any]
         return data.get("items") or data.get("data") or []
 
 
+def _query_list(query: str | list[str] | tuple[str, ...]) -> list[str]:
+    if isinstance(query, (list, tuple)):
+        return [str(q).strip() for q in query if str(q).strip()]
+    parts = [p.strip() for p in str(query or "").splitlines() if p.strip()]
+    return parts or ([str(query).strip()] if str(query).strip() else [])
+
+
 def search_web(
-    query: str,
+    query: str | list[str] | tuple[str, ...],
     max_results: int = 10,
     *,
     max_pages: int = 1,
 ) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Batch web search via Google Search scraper — primary discovery gatherer."""
+    """One Google Search scraper run — several questions share one cold start."""
     actor = ACTORS["search"]
+    queries = _query_list(query) or ["training examples"]
     pages = max(1, min(int(max_pages or 1), 3))
-    per_page = min(max(max_results, 5), 10)
+    per_page = min(max(int(max_results), 5), 10)
     run_input = {
-        "queries": query,
+        "queries": "\n".join(queries),
         "maxPagesPerQuery": pages,
         "resultsPerPage": per_page,
         "mobileResults": False,
@@ -145,7 +153,7 @@ def search_web(
     }
     run = run_actor(actor, run_input, memory_mbytes=2048)
     dataset_id = run.get("defaultDatasetId")
-    fetch_limit = max(max_results, per_page * pages)
+    fetch_limit = max(int(max_results) * len(queries), per_page * pages * len(queries))
     items = fetch_dataset_items(dataset_id, limit=fetch_limit) if dataset_id else []
     from helix.services.cost_tracking import apify_cost_from_run
 
@@ -155,6 +163,7 @@ def search_web(
         "dataset_id": dataset_id,
         "actor": actor,
         "max_pages": pages,
+        "query_count": len(queries),
         "cost_usd": cost_usd,
         "cost_source": cost_source,
         "usage_total_usd": run.get("usageTotalUsd"),

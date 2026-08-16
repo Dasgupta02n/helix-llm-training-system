@@ -160,12 +160,37 @@ def _already_promoted_refs(db: Session, owner_user_id: str, tenant_id: str) -> s
     return {r[0] for r in rows if r[0]}
 
 
+def gather_attempt_plan(batch_size: int) -> dict[str, Any]:
+    """How many Apify runs a mining batch is allowed.
+
+    Small jobs (≤10): at most two waits. Each attempt is ONE actor run that
+    carries every query for that attempt. No 2-page deep scrape.
+    """
+    small = clamp_batch_size(batch_size) <= 10
+    if small:
+        return {
+            "small": True,
+            "max_attempts": 2,
+            "queries_per_attempt": (2, 3),
+            "deep": False,
+            "force_refresh": False,
+        }
+    return {
+        "small": False,
+        "max_attempts": 3,
+        "queries_per_attempt": (2, 3, 3),
+        "deep": None,  # attempt >= 1
+        "force_refresh": None,  # attempt > 0
+    }
+
+
 def run_code_pipeline_batch(
     db: Session,
     *,
     tenant_id: str,
     owner_user_id: str | None,
     batch_size: int,
+    progress_cb: Any | None = None,
 ) -> dict[str, Any]:
     """Domain-agnostic code path: brief-driven discovery + gold promotion."""
     batch_size = clamp_batch_size(batch_size)
@@ -173,6 +198,13 @@ def run_code_pipeline_batch(
     steps: list[str] = []
     zero_evidence = False
     warnings: list[str] = []
+
+    def _note(msg: str) -> None:
+        if progress_cb:
+            try:
+                progress_cb(msg)
+            except Exception:  # noqa: BLE001
+                pass
 
     # Align category/source queues to the active research brief
     sync = sync_workspace_from_brief(db, tenant_id)
@@ -291,45 +323,57 @@ def run_code_pipeline_batch(
         )
 
         min_hits = min_evidence_threshold(batch_size)
-        # Adaptive gather: vary queries and deepen crawl until min evidence or max attempts
-        max_attempts = 3
+        plan = gather_attempt_plan(batch_size)
+        max_attempts = int(plan["max_attempts"])
         seen_urls: set[str] = set()
         all_results: list[dict[str, Any]] = []
         hits_by_label: dict[str, int] = {s["label"]: 0 for s in reachable_specs}
 
         for attempt in range(max_attempts):
-            deep = attempt >= 1
+            per = plan["queries_per_attempt"]
+            nq = per[attempt] if attempt < len(per) else per[-1]
+            deep = False if plan["deep"] is False else attempt >= 1
+            force_refresh = (
+                False if plan["force_refresh"] is False else attempt > 0
+            )
             spec = reachable_specs[attempt % len(reachable_specs)]
             source = spec["channel"]
-            qs = build_search_queries(
-                brief,
-                category=a["category"],
-                source=source,
-                attempt=attempt,
-                max_queries=2 if attempt == 0 else 3,
-                extra_operators=spec.get("operators") or [],
-                source_label=spec.get("label") or "",
-            )
-            attempt_hits = 0
-            for query in qs:
-                if query in queries_tried:
-                    continue
-                queries_tried.append(query)
-                job = h.trigger_discovery(
-                    ctx,
+            qs = [
+                q
+                for q in build_search_queries(
+                    brief,
                     category=a["category"],
                     source=source,
-                    query=query,
-                    max_results=15 if deep else None,
-                    force_refresh=attempt > 0,  # bust dedupe/cache on broaden
-                    deep=deep,
-                    domain_kind=kind,
+                    attempt=attempt,
+                    max_queries=nq,
+                    extra_operators=spec.get("operators") or [],
+                    source_label=spec.get("label") or "",
                 )
-                if not job.get("ok"):
-                    warnings.append(
-                        job.get("error") or job.get("message") or "Gather failed"
-                    )
-                    continue
+                if q not in queries_tried
+            ]
+            if not qs:
+                continue
+            queries_tried.extend(qs)
+            _note(
+                f"Gathering sources — Apify search {attempt + 1}/{max_attempts} "
+                f"({len(qs)} quer{'y' if len(qs) == 1 else 'ies'} in one job)…"
+            )
+            job = h.trigger_discovery(
+                ctx,
+                category=a["category"],
+                source=source,
+                queries=qs,
+                max_results=15 if deep else None,
+                force_refresh=force_refresh,
+                deep=deep,
+                domain_kind=kind,
+            )
+            attempt_hits = 0
+            if not job.get("ok"):
+                warnings.append(
+                    job.get("error") or job.get("message") or "Gather failed"
+                )
+            else:
                 apify_cost_usd += float(job.get("apify_cost_usd") or 0.0)
                 for r in job.get("results") or []:
                     url = (r.get("url") or "").strip()
@@ -338,34 +382,33 @@ def run_code_pipeline_batch(
                         continue
                     if key:
                         seen_urls.add(key)
-                    # Domain filter: drop ad-like for support before candidate write
                     kind_sc = score_item_for_kind(
                         kind=kind,
                         title=r.get("title") or "",
                         snippet=r.get("snippet") or "",
                         url=url,
                         category=a["category"],
-                        query=query,
+                        query=" ".join(qs)[:240],
                     )
                     if kind == "support" and kind_sc.get("ad_like") and not kind_sc.get(
                         "help_like"
                     ):
                         continue
-                    r = {**r, "_kind_score": kind_sc["relevance_score"], "_query": query}
+                    r = {**r, "_kind_score": kind_sc["relevance_score"], "_query": qs[0]}
                     all_results.append(r)
                     attempt_hits += 1
                     hits_by_label[spec["label"]] = hits_by_label.get(spec["label"], 0) + 1
-                h.record_search(
-                    ctx, source=source, query=query, category=a["category"]
-                )
+                for query in qs:
+                    h.record_search(
+                        ctx, source=source, query=query, category=a["category"]
+                    )
             gather_results = len(all_results)
             steps.append(
-                f"gather_attempt{attempt}:q={len(qs)},hits={attempt_hits},"
+                f"gather_attempt{attempt}:q={len(qs)},runs=1,hits={attempt_hits},"
                 f"total={gather_results},deep={deep}"
             )
             if gather_results >= min_hits:
                 break
-            # thin yield → broaden next attempt
             if attempt + 1 < max_attempts:
                 warnings.append(
                     f"Thin yield ({gather_results}<{min_hits}) — broadening research "
@@ -986,6 +1029,7 @@ def run_pipeline_batch(
         tenant_id=tenant_id,
         owner_user_id=owner_user_id,
         batch_size=batch_size,
+        progress_cb=progress_cb,
     )
     results.append({"step": "apify_gather_and_code", **code_res})
     items += int(code_res.get("items_processed") or 0)
