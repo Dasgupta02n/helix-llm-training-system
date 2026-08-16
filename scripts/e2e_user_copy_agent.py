@@ -386,12 +386,9 @@ def parse_env() -> dict[str, str]:
         or os.getenv("BOOTSTRAP_ADMIN_PASSWORD")
         or ""
     ).strip()
-    base = (
-        os.getenv("E2E_BASE_URL")
-        or os.getenv("C7X_BASE_URL")
-        or os.getenv("HELIX_BASE_URL")
-        or "https://c7xai.in"
-    ).rstrip("/")
+    # Local .env often sets C7X_BASE_URL=http://localhost:8000 for the app.
+    # E2E is a live-site copy unless E2E_BASE_URL or --base says otherwise.
+    base = (os.getenv("E2E_BASE_URL") or "https://c7xai.in").rstrip("/")
     return {"email": email, "password": password, "base": base}
 
 
