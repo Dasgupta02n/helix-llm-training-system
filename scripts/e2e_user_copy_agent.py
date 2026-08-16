@@ -447,7 +447,12 @@ def wait_counts(
     while time.time() < deadline:
         resp = cli.req("library", "GET", f"/api/t/{slug}/library/stats")
         last = resp.json()
-        gold = int(last.get("gold_count") or last.get("gold") or 0)
+        gold = int(
+            last.get("gold_verified_count")
+            or last.get("gold_count")
+            or last.get("gold")
+            or 0
+        )
         synth = int(last.get("synthetic_count") or last.get("synthetic") or 0)
         # stats shape may nest
         if not gold and isinstance(last.get("counts"), dict):
@@ -466,7 +471,7 @@ def extract_counts(stats: dict) -> tuple[int, int]:
             stats["counts"].get("synthetic") or 0
         )
     gold = 0
-    for k in ("gold_count", "gold", "verified_gold"):
+    for k in ("gold_verified_count", "gold_count", "gold", "verified_gold"):
         if stats.get(k) is not None:
             gold = int(stats[k])
             break
@@ -631,8 +636,17 @@ def run(args: argparse.Namespace) -> int:
             "library", "GET", f"/api/t/{slug}/library/gold?limit=50"
         ).json()
         if isinstance(gold_list, dict):
-            gold_n = max(gold_n, int(gold_list.get("total") or 0))
+            # List total includes rejected rows; verified count is the user goal.
             items = gold_list.get("items") or []
+            verified_items = [
+                it
+                for it in items
+                if str((it or {}).get("verification_status") or "").lower() != "rejected"
+            ]
+            if verified_items:
+                gold_n = max(gold_n, len(verified_items))
+            elif gold_n == 0:
+                gold_n = int(gold_list.get("total") or 0)
         else:
             items = gold_list
             gold_n = max(gold_n, len(items))
