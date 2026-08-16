@@ -12,18 +12,7 @@ def _looks_like_cost_quote(reply: str) -> bool:
     r = reply or ""
     if re.search(r"\$\s*\d", r):
         return True
-    low = r.lower()
-    return any(
-        w in low
-        for w in (
-            "credit",
-            "estimate",
-            "per 1,000",
-            "per 1000",
-            "hours",
-            "gold examples",
-        )
-    )
+    return bool(re.search(r"\b(\d+\s*[-–]\s*\d+|\d+)\s*hours?\b", r, re.I))
 
 
 def riu_start_block_reason(state: dict[str, Any]) -> str | None:
@@ -78,6 +67,10 @@ def apply_official_riu_estimate(
         pricing, project=str(state.get("project_name") or state.get("domain") or "")
     )
     ph = (phase or "").lower()
+    # Do not dump the full rate card on every running/skip turn — it bloated
+    # chat history and made later Riu replies 15–20s.
+    if ph in {"running", "offer_synth", "done", "edge_cases", "own_data", "materials"}:
+        return reply
     if ph in {"pricing", "confirm", "model_estimate"} or _looks_like_cost_quote(reply):
         lead = (reply or "").strip()
         # Drop leftover invented dollar/hour sentences from the model.

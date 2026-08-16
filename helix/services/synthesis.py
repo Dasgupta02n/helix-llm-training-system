@@ -230,18 +230,7 @@ def run_synthesis(
     batch_cap = max_golds if max_golds is not None else settings.max_synthesis_batch_golds
     batch_cap = max(1, min(int(batch_cap), settings.max_synthesis_batch_golds))
 
-    # How many synthetic slots remain toward target
     stats = library_stats(db, owner_user_id, tenant_id)
-    remaining_synth = stats["synthetic_remaining"]
-    if remaining_synth <= 0:
-        return {
-            "ok": False,
-            "message": "Synthesized data target already reached for this account.",
-            "stats": stats,
-        }
-
-    max_new = remaining_synth
-    max_golds_by_slots = max(1, max_new // n_var)
 
     q = db.query(m.GoldExample).filter_by(
         owner_user_id=owner_user_id,
@@ -251,16 +240,45 @@ def run_synthesis(
     )
     if gold_ids:
         q = q.filter(m.GoldExample.id.in_(gold_ids))
-    golds = q.order_by(m.GoldExample.created_at.desc()).limit(
-        min(batch_cap, max_golds_by_slots)
-    ).all()
-
-    if not golds:
+    gold_rows = q.order_by(m.GoldExample.created_at.desc()).all()
+    if not gold_rows:
         return {
             "ok": False,
             "message": "No verified gold examples in your account yet. Promote curated data first.",
             "stats": stats,
         }
+
+    # Per-gold remaining, not the account-wide 5×4 cap. New gold after a
+    # previous project must still get its own variations.
+    needy: list[tuple[m.GoldExample, int]] = []
+    for gold in gold_rows:
+        have = (
+            db.query(m.SyntheticExample)
+            .filter_by(gold_id=gold.id, is_archived=False)
+            .count()
+        )
+        deficit = max(0, n_var - have)
+        if deficit:
+            needy.append((gold, deficit))
+        if len(needy) >= batch_cap:
+            break
+    if not needy:
+        return {
+            "ok": False,
+            "message": "Every verified gold row already has its variations.",
+            "stats": stats,
+        }
+
+    needed_slots = sum(d for _, d in needy)
+    verified_n = int(stats.get("gold_verified_count") or len(gold_rows))
+    if int(scope.gold_target_count or 1) < verified_n:
+        scope.gold_target_count = verified_n
+        db.commit()
+        stats = library_stats(db, owner_user_id, tenant_id)
+
+    golds = [g for g, _ in needy]
+    max_new = needed_slots
+    deficits = {g.id: d for g, d in needy}
 
     run = m.SynthesisRun(
         id=_uid("srun_"),
@@ -293,7 +311,7 @@ def run_synthesis(
     for i, gold in enumerate(golds, start=1):
         if created >= max_new:
             break
-        need = min(n_var, max_new - created)
+        need = min(deficits.get(gold.id, n_var), max_new - created)
         try:
             if use_llm and tenant and get_settings().llm_provider != "none":
                 try:

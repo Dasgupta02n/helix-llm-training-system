@@ -8,7 +8,10 @@ from helix.services.riu import (
     _wants_exploratory,
     _wants_run,
     _user_denied_attached_data,
+    exploratory_job_shape,
+    pipeline_quality_mode,
 )
+from helix.services.riu_actions import _apply_count_cues, _should_skip_llm
 from helix.services.user_material_upload import estimate_setup_pricing
 
 
@@ -115,6 +118,49 @@ def test_start_10_exploratory_is_allowed():
         }
     )
     assert reason is None
+
+
+def test_exploratory_job_honors_five_gold():
+    assert exploratory_job_shape({"gold_target": 5}) == (5, 1)
+    assert exploratory_job_shape({"gold_target": 10}) == (10, 1)
+    assert exploratory_job_shape({"gold_target": 5000}) == (10, 1)
+    assert exploratory_job_shape({}) == (10, 1)
+
+
+def test_cheap_small_jobs_use_mode_3():
+    assert pipeline_quality_mode({"gold_target": 5, "accept_exploratory": True}) == 3
+    assert pipeline_quality_mode({"cheap_test": True, "quality_mode": 2}) == 3
+    assert pipeline_quality_mode({"quality_mode": 1, "gold_target": 5000}) == 1
+    assert pipeline_quality_mode({"quality_mode": 4}) == 4
+
+
+def test_count_cues_override_default_5000():
+    state: dict = {"gold_target": 5000, "quality_mode": 2}
+    _apply_count_cues(
+        "I only need 5 gold examples, then 20 synthetics. Cheap test.",
+        state,
+    )
+    assert state["gold_target"] == 5
+    assert state["variations_per_gold"] == 4
+    assert state["cheap_test"] is True
+    assert state["quality_mode"] == 3
+
+
+def test_start_and_skip_do_not_call_for_llm():
+    assert _should_skip_llm("start 10", "confirm")
+    assert _should_skip_llm("no corpus — web research only", "own_data")
+    assert _should_skip_llm("skip materials", "materials")
+    assert not _should_skip_llm("IT helpdesk for a SaaS company", "greet")
+
+
+def test_running_reply_does_not_append_rate_card():
+    out = apply_official_riu_estimate(
+        "Mining job queued. Watch Home.",
+        phase="running",
+        state={"gold_target": 5, "accept_exploratory": True},
+    )
+    assert "First job" not in out
+    assert out.startswith("Mining job queued")
 
 
 def test_user_denied_corpus_cues():

@@ -46,6 +46,83 @@ def _wants_exploratory(text: str) -> bool:
     return bool(re.search(r"\bstart\s+(10|ten|small|exploratory)\b", t))
 
 
+def exploratory_job_shape(state: dict) -> tuple[int, int]:
+    """No-corpus first job: one batch of min(gold_target, 10), not a forced 5×2."""
+    try:
+        target = int(state.get("gold_target") or 10)
+    except (TypeError, ValueError):
+        target = 10
+    units = max(1, min(target, 10))
+    return units, 1
+
+
+def _apply_count_cues(text: str, state: dict) -> None:
+    """User-stated counts win over the 5000-row default and the model patch."""
+    t = (text or "").lower()
+    gm = re.search(r"(\d+)\s*gold", t)
+    if gm:
+        state["gold_target"] = max(1, min(int(gm.group(1)), 1_000_000))
+    sm = re.search(r"(\d+)\s*synth", t)
+    if sm:
+        n = int(sm.group(1))
+        gold = max(1, int(state.get("gold_target") or 5))
+        state["synth_target"] = n
+        state["variations_per_gold"] = max(1, (n + gold - 1) // gold)
+    if any(
+        w in t
+        for w in (
+            "cheap",
+            "lowest cost",
+            "smollm",
+            "smoke test",
+            "cheap test",
+            "do not scale",
+            "don't scale",
+        )
+    ):
+        state["cheap_test"] = True
+        try:
+            mode = int(state.get("quality_mode") or 2)
+        except (TypeError, ValueError):
+            mode = 2
+        if mode <= 2:
+            state["quality_mode"] = 3
+
+
+def pipeline_quality_mode(state: dict) -> int:
+    """Small / cheap / exploratory jobs use mode 3 (two judges), not six."""
+    try:
+        requested = int(state.get("quality_mode") or 2)
+    except (TypeError, ValueError):
+        requested = 2
+    requested = max(1, min(4, requested))
+    try:
+        target = int(state.get("gold_target") or 5000)
+    except (TypeError, ValueError):
+        target = 5000
+    if requested >= 3:
+        return requested
+    if state.get("cheap_test") or state.get("accept_exploratory") or target <= 20:
+        return 3
+    return requested
+
+
+def _should_skip_llm(text: str, phase: str) -> bool:
+    """Deterministic turns must not wait 10–20s on the chat model."""
+    if _wants_run(text) or _wants_exploratory(text) or _user_denied_attached_data(text):
+        return True
+    t = (text or "").strip().lower()
+    if t in {"skip", "skip materials", "skip material", "no", "n", "skip it"}:
+        return phase in {
+            "own_data",
+            "materials",
+            "edge_cases",
+            "model_estimate",
+            "confirm",
+        }
+    return False
+
+
 def _wants_run(text: str) -> bool:
     """True only for explicit run commands — not 'restart' / 'start over'."""
     # "start 10" / "start small" is a run confirm (exploratory 10-row job).
@@ -265,11 +342,16 @@ def _heuristic_turn(user_text: str, state: dict, phase: str) -> dict[str, Any]:
         actions.append({"type": "save_plan"})
     elif phase == "edge_cases":
         edges = list(state.get("edge_cases") or [])
-        if t and lower not in {"skip", "done", "next"}:
+        skip_edge = (
+            lower in {"skip", "done", "next"}
+            or "skip material" in lower
+            or _user_denied_attached_data(t)
+        )
+        if t and not skip_edge:
             edges.append(t[:2000])
         patch["edge_cases"] = edges
         need = int(state.get("edge_cases_required") or 2)
-        if len(edges) < need and lower not in {"skip"}:
+        if len(edges) < need and not skip_edge:
             reply = (
                 f"Logged edge case **{len(edges)}/{need}**.\n\n"
                 "Give me another tricky one — bias, missing info, conflict, or abuse."
@@ -723,8 +805,9 @@ def _llm_turn(
             continue
         content = msg.get("content") or ""
         if role == "assistant":
-            # strip markdown bold for model noise reduction is optional
-            hist.append({"role": "assistant", "content": content})
+            # Prior turns used to carry the full official estimate (~1k tokens).
+            # Truncate so later setup messages stay fast.
+            hist.append({"role": "assistant", "content": content[:800]})
         else:
             hist.append({"role": "user", "content": content})
 
@@ -1023,11 +1106,11 @@ def _apply_start_pipeline(
     reason = riu_start_block_reason(state)
     if reason:
         raise ValueError(reason)
-    # Exploratory: force the 10-unit web job, never a 5000-row launch.
+    # Exploratory: one small batch honoring gold_target (capped at 10), never 5000.
     batch_size = int(state.get("batch_size") or 5)
     total_batches = int(state.get("total_batches") or 2)
     if state.get("accept_exploratory") and not state.get("seed_scale_ready"):
-        batch_size, total_batches = 5, 2
+        batch_size, total_batches = exploratory_job_shape(state)
     scale = bool(state.get("seed_scale_ready"))
     proof = bool(state.get("start_proof_batch"))
     understanding = str(state.get("seed_understanding") or "").strip()
@@ -1053,7 +1136,7 @@ def _apply_start_pipeline(
         owner_user_id=user_id,
         tenant_id=tenant_id,
         job_type="pipeline",
-        quality_mode=int(state.get("quality_mode") or 2),
+        quality_mode=pipeline_quality_mode(state),
         batch_size=batch_size,
         total_batches=total_batches,
         auto_continue=True,
@@ -1390,10 +1473,12 @@ def handle_user_message(
         if int(state.get("corpus_docs") or 0) == 0:
             state["attached_support"] = 0
 
+    _apply_count_cues(text, state)
     if _wants_exploratory(text):
         state["accept_exploratory"] = True
-        state["batch_size"] = 5
-        state["total_batches"] = 2
+        bsize, batches = exploratory_job_shape(state)
+        state["batch_size"] = bsize
+        state["total_batches"] = batches
 
     if text.lower().strip() in {"restart", "start over", "reset"}:
         # soft reset state but keep session
@@ -1455,23 +1540,34 @@ def handle_user_message(
                 mailbox_snap = mailbox_svc.snapshot_for_riu(db)
         except Exception:  # noqa: BLE001
             mailbox_snap = None
-        try:
-            turn = _llm_turn(
-                tenant=tenant,
-                messages=messages,
-                state=state,
-                phase=phase,
-                mailbox_snapshot=mailbox_snap,
-            )
-            used_llm = True
-        except Exception:
+        if _should_skip_llm(text, phase):
             turn = _heuristic_turn(text, state, phase)
+        else:
+            try:
+                turn = _llm_turn(
+                    tenant=tenant,
+                    messages=messages,
+                    state=state,
+                    phase=phase,
+                    mailbox_snapshot=mailbox_snap,
+                )
+                used_llm = True
+            except Exception:
+                turn = _heuristic_turn(text, state, phase)
 
     if turn.get("reset"):
         new = create_session(db, user_id=user.id, tenant_id=tenant.id)
         return session_to_dict(new)
 
     state = _merge_state(state, turn.get("state_patch"))
+    # User-stated counts beat a model patch that still says 5000.
+    _apply_count_cues(text, state)
+    if state.get("accept_exploratory") or (
+        int(state.get("gold_target") or 0) and int(state.get("gold_target") or 0) <= 10
+    ):
+        bsize, batches = exploratory_job_shape(state)
+        state["batch_size"] = bsize
+        state["total_batches"] = batches
     # ensure defaults
     if not state.get("topic_key") and state.get("format_name"):
         state["topic_key"] = _topic_key(state["format_name"])
@@ -1482,6 +1578,9 @@ def handle_user_message(
 
     if _wants_exploratory(text):
         state["accept_exploratory"] = True
+        bsize, batches = exploratory_job_shape(state)
+        state["batch_size"] = bsize
+        state["total_batches"] = batches
 
     # Never let the model launch a 5000-gold job the corpus gate would refuse
     actions = list(turn.get("actions") or [])

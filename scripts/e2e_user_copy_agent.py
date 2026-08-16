@@ -636,7 +636,13 @@ def run(args: argparse.Namespace) -> int:
         else:
             items = gold_list
             gold_n = max(gold_n, len(items))
-        log.agent("mine", "gold in library", count=gold_n)
+        log.agent(
+            "mine",
+            "gold in library",
+            count=gold_n,
+            verified=stats.get("gold_verified_count"),
+            rejected=stats.get("gold_rejected_count"),
+        )
         if gold_n < args.gold:
             log.ux_note(
                 f"Wanted {args.gold} gold, library has {gold_n}. "

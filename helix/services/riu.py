@@ -25,6 +25,8 @@ from helix.services.riu_actions import (
     _wants_mailbox_list,
     _wants_run,
     _wants_send_mail,
+    exploratory_job_shape,
+    pipeline_quality_mode,
     execute_actions,
     handle_user_message,
 )
@@ -75,6 +77,8 @@ __all__ = [
     "_wants_mailbox_list",
     "_wants_run",
     "_wants_send_mail",
+    "exploratory_job_shape",
+    "pipeline_quality_mode",
     "apply_official_riu_estimate",
     "create_session",
     "execute_actions",
