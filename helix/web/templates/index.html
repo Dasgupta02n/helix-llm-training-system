@@ -32,8 +32,19 @@
 }
 </script>
 
-<section class="uc-hero">
-  <img class="uc-hero-globe" src="/static/site/people/globe.jpg" width="1600" height="900" alt="">
+<div class="uc-loader" data-loader>
+  <div class="uc-loader-count" data-load-count>00</div>
+  <p class="uc-loader-sub" data-load-place>India</p>
+</div>
+
+<section class="uc-hero" data-hero>
+  <div class="uc-hero-stage">
+    <img class="uc-hero-globe" src="/static/site/people/globe.jpg" width="1600" height="900" alt="">
+    <svg class="uc-orbits" viewBox="0 0 400 400" aria-hidden="true">
+      <ellipse cx="200" cy="200" rx="168" ry="62"/>
+      <ellipse cx="200" cy="200" rx="148" ry="78"/>
+    </svg>
+  </div>
   <div class="uc-inner">
     <p class="uc-eyebrow">One operator</p>
     <h1 class="uc-h1">Every<br>desk of the<br>firm</h1>
@@ -41,6 +52,12 @@
     <div class="uc-actions">
       <a class="uc-btn" href="/app">Talk to Riu</a>
       <a class="uc-btn uc-btn-ghost" href="#how">Our services</a>
+    </div>
+  </div>
+  <div class="uc-rail" aria-hidden="true">
+    <div class="uc-rail-track">
+      <span>Riu interview</span><span>Gold library</span><span>C7X-IO</span><span>Local run</span><span>Decision log</span>
+      <span>Riu interview</span><span>Gold library</span><span>C7X-IO</span><span>Local run</span><span>Decision log</span>
     </div>
   </div>
 </section>
@@ -64,9 +81,9 @@
   </div>
   <div class="uc-wrap">
     <div class="uc-stats">
-      <div class="uc-stat"><b>1</b><span>Trusted person on the desk</span></div>
-      <div class="uc-stat"><b>5</b><span>Specialist workers — example, not a promise</span></div>
-      <div class="uc-stat"><b>0</b><span>Records leaving at inference</span></div>
+      <div class="uc-stat"><b data-count="1">0</b><span>Trusted person on the desk</span></div>
+      <div class="uc-stat"><b data-count="5">0</b><span>Specialist workers — example, not a promise</span></div>
+      <div class="uc-stat"><b data-count="0">0</b><span>Records leaving at inference</span></div>
     </div>
     <div class="uc-machine">
       <img src="/static/site/people/obj-laptop.jpg" width="800" height="800" alt="Isolated laptop on a white studio ground.">
