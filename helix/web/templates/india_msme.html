@@ -1,7 +1,7 @@
 {% extends "public_base.html" %}
-{% block title %}Custom LLM workers for Indian MSMEs{% endblock %}
+{% block title %}Staff one person like five — Indian MSME case studies{% endblock %}
 {% block canonical %}https://c7xai.in/india-msme{% endblock %}
-{% block meta_description %}How a custom-trained LLM makes an Indian MSME several times faster: three illustrated case studies from Tiruppur knitwear returns, Pune auto-component GST coding, and a Hyderabad diagnostic lab front desk. Gold data in C7X, worker run on your own hardware.{% endblock %}
+{% block meta_description %}Indian MSMEs are stuck: volume cannot pay for a bench, and without a bench volume cannot rise. C7X gives one trusted person specialist LLM workers. Illustrated cases from Tiruppur, Pune, and Hyderabad — five as an example, not a guarantee.{% endblock %}
 {% block main_class %}public-home{% endblock %}
 {% block extra_head %}
 <script type="application/ld+json">
@@ -18,8 +18,8 @@
 {
   "@context": "https://schema.org",
   "@type": "Article",
-  "headline": "Custom LLM workers for Indian MSMEs — three illustrated case studies",
-  "description": "Tiruppur knitwear returns, Pune auto-component GST invoice coding, and a Hyderabad diagnostic lab front desk. Each role is trained in C7X and run on hardware the shop already owns.",
+  "headline": "Staff one person like five — Indian MSME case studies",
+  "description": "Working-capital bind: you cannot hire until the books allow it, and you cannot grow the books without a bench. C7X staffs one trusted person with specialist workers. Tiruppur, Pune, Hyderabad — illustrated composites. Five is an example.",
   "author": {"@type": "Person", "name": "Sabyasachi Dasgupta"},
   "publisher": {"@type": "Organization", "name": "c7x AI", "url": "https://c7xai.in/about"},
   "mainEntityOfPage": "https://c7xai.in/india-msme",
@@ -36,10 +36,10 @@
   "mainEntity": [
     {
       "@type": "Question",
-      "name": "Can a custom trained LLM help an Indian MSME?",
+      "name": "Can a custom trained LLM help an Indian MSME grow without hiring a bench?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "Yes, on one bounded desk at a time. C7X builds gold examples from the decisions that desk already makes — returns, GST coding, lab FAQs — then writes them into a worker you run on a PC or small server inside the building."
+        "text": "That is the bind it is built for. Volume cannot pay for five salaries; without people, volume cannot rise. C7X trains a specialist brain on how one trusted person already decides, and sits it on a PC in the same room. On a typical high-volume desk, treat one person plus that worker as the example of a five-person bench — not a guarantee."
       }
     },
     {
@@ -77,12 +77,12 @@
       <span class="dot"></span>
       <span>India · MSME case studies</span>
       <span class="hx-rule"></span>
-      <span style="color:rgba(240,229,200,.55)">Illustrated composites, not named logos</span>
+      <span>Illustrated composites · five as an example</span>
     </div>
-    <h1>A custom LLM that makes an Indian MSME several times faster</h1>
+    <h1>Break the hire-or-stall bind without replacing the person</h1>
     <div class="h180-lede">
-      <p>Most Indian MSMEs do not need a general chatbot. They need one desk — returns, invoices, or reception — to stop repeating the same decision a hundred times a day. C7X interviews that desk, builds gold training data from the calls it already makes, and returns a worker that runs on a PC in the same room.</p>
-      <p class="soft">The three cases below are illustrated from typical floors in Tiruppur, Pune, and Hyderabad. They are composites of real MSME patterns, not named customer claims. Each one is a single role, with a boundary a person still holds.</p>
+      <p>Working capital is already in cloth, receivables, or an OEM’s sixty-day cycle. You cannot hire five people until the books allow it. You cannot grow the books until someone takes the extra returns, invoices, and calls. C7X does not replace that someone. It gives them specialist workers trained on how they already decide.</p>
+      <p class="soft">The three cases are composites from Tiruppur, Pune, and Hyderabad — not named logos. On a high-volume written desk, one trusted person plus a specialist brain is the example of a five-person bench. The first month is still that person training a junior. After that, they keep the judgment, the cash, and the relationship.</p>
     </div>
     <nav class="h180-toc" aria-label="Case studies">
       <a href="#tiruppur">01 Tiruppur knitwear</a>
@@ -98,9 +98,12 @@
       <h2>Tiruppur knitwear returns</h2>
       <span class="meta">Tamil Nadu · export apparel</span>
     </div>
-    <img class="story-photo" src="/static/site/cases/tiruppur-knitwear.jpg" width="1600" height="1000" alt="Tiruppur knitwear export unit: women at Juki sewing machines, stacked white T-shirts tagged for a USA order, and a manager cabin with a laptop and shade cards.">
+    <div class="h180-people">
+      <img src="/static/site/cases/tiruppur-together.jpg" width="1600" height="1067" alt="A Tiruppur supervisor and an operator looking together at a white T-shirt at the machine.">
+      <img src="/static/site/cases/tiruppur-knitwear.jpg" width="1600" height="1000" alt="The same kind of knitwear floor: operators at industrial machines and packed white T-shirts waiting for export.">
+    </div>
     <div class="h180-prose">
-      <p class="lead">A 120-machine knitwear exporter in Tiruppur ships basic T-shirts and hoodies to US and EU buyers. The floor is fast. The bottleneck is the WhatsApp returns desk: every damaged carton, colour bleed, or dropped stitch lands on one supervisor who already walks the line.</p>
+      <p class="lead">A 120-machine knitwear exporter in Tiruppur ships basic T-shirts and hoodies to US and EU buyers. The floor is fast. The bottleneck is the WhatsApp returns desk: every damaged carton lands on one supervisor who already walks the line. She is not the person you replace. She is the person you staff.</p>
       <h3>The job as it is done today</h3>
       <p>Buyers and buying-house QC send photos and a one-line complaint. The desk must classify the defect (stitching, shade, hole, size, late ship), decide refund / remake / reject, calculate the INR amount against the contract, flag a repeat supplier, and write a Tamil + English note the floor can act on before the next cutting ticket.</p>
       <h3>What C7X trains</h3>
@@ -110,7 +113,7 @@
         <li>A refusal: do not invent a credit note when the PO number is missing. Ask one clarifying question, then hand off.</li>
       </ul>
       <h3>What changes on the floor</h3>
-      <p>The worker drafts the classification and the bilingual floor note in seconds. The supervisor reviews exceptions and signs credits. A desk that ate half a shift now takes a short review pass. The sewing line keeps moving. Inference runs on a small PC in the manager cabin with <a href="/run-locally">Ollama</a> — buyer photos never go to a hosted chat box.</p>
+      <p>The specialist brain drafts the classification and the bilingual floor note. She reviews exceptions and signs credits — the example of a five-person WhatsApp bench, on the one person the floor already trusts. She walks the line again. Inference runs on a small PC in the cabin with <a href="/run-locally">Ollama</a>. Buyer photos never go to a hosted chat box, and growth is not another five CTC in working capital.</p>
     </div>
   </section>
 
@@ -119,7 +122,10 @@
       <h2>Pune auto-component GST coding</h2>
       <span class="meta">Maharashtra · ancillary manufacturing</span>
     </div>
-    <img class="story-photo" src="/static/site/cases/pune-auto-ap.jpg" width="1600" height="1000" alt="Pune auto-ancillary accounts room: two clerks coding GST invoices at desktop computers, steel cabinets labelled GSTR-1, CNC machines visible through the open shop-floor door.">
+    <div class="h180-people">
+      <img src="/static/site/cases/pune-together.jpg" width="1600" height="1067" alt="A senior accountant and a younger clerk reading an invoice together at a Pune accounts desk.">
+      <img src="/static/site/cases/pune-auto-ap.jpg" width="1600" height="1000" alt="The accounts room beside the shop floor, filing cabinets and a door open onto CNC machines.">
+    </div>
     <div class="h180-prose">
       <p class="lead">A Pune ancillary that machines housings for two-wheeler OEMs receives 80–150 vendor invoices a day. Two clerks type HSN, GST rate, and GL into the books. Month-end is a pile. Input-tax-credit mistakes show up as notices, not as a software error.</p>
       <h3>The job as it is done today</h3>
@@ -131,7 +137,7 @@
         <li>A hard boundary: never file GSTR-1 or GSTR-3B. Propose the coding. A person posts.</li>
       </ul>
       <h3>What changes on the floor</h3>
-      <p>The worker reads the bill text and returns a coding slip. Clear lines post after a glance. Exceptions queue for the senior. The same two people clear a day that used to spill into Saturday, and the GST working papers stay on the office PC. See <a href="/roles">which finance desks a custom LLM can hold</a>.</p>
+      <p>The specialist brain reads the bill and returns a coding slip. Clear lines post after a glance. Exceptions stay with the senior. The same two people clear a day that used to spill into Saturday — the hire the working capital could not stand. Papers stay on the office PC. See <a href="/roles">which finance desks a custom LLM can staff</a>.</p>
     </div>
   </section>
 
@@ -140,7 +146,10 @@
       <h2>Hyderabad diagnostic lab front desk</h2>
       <span class="meta">Telangana · neighbourhood diagnostics</span>
     </div>
-    <img class="story-photo" src="/static/site/cases/hyderabad-lab.jpg" width="1600" height="1000" alt="Neighbourhood diagnostic lab in Hyderabad: patients waiting on plastic chairs, a bilingual MediCare Diagnostics board, and the receptionist answering a phone at a wooden desk.">
+    <div class="h180-people">
+      <img src="/static/site/cases/hyderabad-together.jpg" width="1600" height="1067" alt="A receptionist leaning in kindly to explain something to an elderly patient at a Hyderabad lab desk.">
+      <img src="/static/site/cases/hyderabad-lab.jpg" width="1600" height="1000" alt="The same kind of neighbourhood diagnostic reception, with patients waiting on plastic chairs.">
+    </div>
     <div class="h180-prose">
       <p class="lead">A neighbourhood lab in Hyderabad runs blood tests, ECG, and ultrasound. The phone never stops: is fasting required, when is the report ready, can a home collection come to LB Nagar, what does this abbreviation on the slip mean. The receptionist is also taking cash and handing reports.</p>
       <h3>The job as it is done today</h3>
@@ -152,7 +161,7 @@
         <li>A refusal: anything that interprets a value, recommends a medicine, or guesses a missing patient ID is handed to the technician or the reporting doctor.</li>
       </ul>
       <h3>What changes on the floor</h3>
-      <p>WhatsApp and the front-desk terminal draft the same answer the chart already holds. The receptionist confirms, takes payment, and keeps the chairs moving. Reports and patient names stay on the clinic machine. A custom LLM does not replace the pathologist. It stops the pathologist’s front desk from being a call centre.</p>
+      <p>WhatsApp and the front-desk terminal draft the answer the chart already holds. She confirms, takes payment, and has time for the person in the chair. Reports stay on the clinic machine. A custom LLM does not replace the pathologist or the receptionist. It stops her desk from being a call centre she cannot staff.</p>
     </div>
   </section>
 

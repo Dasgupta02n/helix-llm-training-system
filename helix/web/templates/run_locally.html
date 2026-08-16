@@ -1,7 +1,7 @@
 {% extends "public_base.html" %}
 {% block title %}Run a custom-trained LLM with Ollama or Open Interpreter{% endblock %}
 {% block canonical %}https://c7xai.in/run-locally{% endblock %}
-{% block meta_description %}How to run a C7X custom-trained LLM on your own hardware with Ollama, Open Interpreter, LM Studio, llama.cpp, or the included PEFT loader. C7X-IO returns a QLoRA adapter you download and pin — not a rented chatbot.{% endblock %}
+{% block meta_description %}Sit the specialist worker next to the person who already knows the desk. Run a C7X QLoRA adapter on your own hardware with Ollama, Open Interpreter, LM Studio, or llama.cpp — GST bills and buyer photos never leave the building.{% endblock %}
 {% block main_class %}public-home{% endblock %}
 {% block extra_head %}
 <script type="application/ld+json">
@@ -76,17 +76,20 @@
       <span class="dot"></span>
       <span>Local serving</span>
       <span class="hx-rule"></span>
-      <span style="color:rgba(240,229,200,.55)">Ollama · Open Interpreter · LM Studio · llama.cpp</span>
+      <span>Ollama · Open Interpreter · LM Studio · llama.cpp</span>
     </div>
-    <h1>Run the custom-trained LLM on your own hardware</h1>
+    <h1>The workers sit next to the person, not in a rented cloud</h1>
     <div class="h180-lede">
-      <p>C7X-IO does not host your production model. It returns a QLoRA adapter you download. You load that adapter beside the same open instruct base you trained, then serve it with Ollama, Open Interpreter, LM Studio, llama.cpp, or the PEFT script that ships in the zip.</p>
-      <p class="soft">This is the path an MSME desk actually uses: a PC in the manager cabin, a small tower labelled local serve, no patient report or GST bill leaving the building. See the <a href="/india-msme">India MSME cases</a> for what that desk looks like.</p>
+      <p>C7X-IO does not host your production model and does not replace the person at the desk. It returns a QLoRA adapter you download. You load it beside the same open instruct base you trained, then serve it with Ollama, Open Interpreter, LM Studio, llama.cpp, or the PEFT script in the zip — on the PC that already sits in the cabin.</p>
+      <p class="soft">That is how an MSME breaks the hire-or-stall bind without sending GST bills or buyer photos to a hosted chat box. See the <a href="/india-msme">India MSME cases</a> for the person these workers sit beside.</p>
     </div>
   </section>
 
   <section class="h180-section" id="what-you-download">
-    <img class="story-photo" src="/static/site/workflow/04-ollama.jpg" width="1920" height="1080" alt="Indian MSME returns desk: a laptop running ollama run returns-desk next to a small on-premise server taped LocalServe, chai, and pending return slips.">
+    <div class="h180-people">
+      <img src="/static/site/people/desk-together.jpg" width="1600" height="900" alt="Two colleagues at a shop-office laptop, chai and return slips on a worn wooden desk.">
+      <img src="/static/site/workflow/04-ollama.jpg" width="1920" height="1080" alt="The same kind of desk running a local worker beside a small on-premise tower.">
+    </div>
     <div class="h180-prose">
       <h2>What is in the trained zip</h2>
       <p>The package is an adapter, not a rented endpoint and not a merged 7B–30B dump:</p>

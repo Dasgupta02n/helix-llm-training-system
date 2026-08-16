@@ -4,7 +4,7 @@
 .site-body {
   --bg: var(--hx-bg);
   --bg-2: var(--hx-bg-2);
-  --card: #18140f;
+  --card: #fffaf3;
   --ink: var(--hx-ink);
   --muted: var(--hx-muted);
   --line: var(--hx-line);
@@ -14,7 +14,7 @@
   --dot: var(--hx-gold);
   --shadow: none;
   --r: 8px;
-  color-scheme: dark;
+  color-scheme: light;
   background: var(--bg);
   color: var(--ink);
   font-family: var(--font-body);
@@ -48,7 +48,7 @@
   border: 0;
   border-bottom: 1px solid var(--line);
   border-radius: 0;
-  background: rgba(16, 14, 17, 0.82);
+  background: rgba(246, 240, 230, 0.9);
   box-shadow: none;
   backdrop-filter: blur(14px);
 }

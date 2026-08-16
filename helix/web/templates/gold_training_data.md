@@ -6,11 +6,11 @@
 > Contact: dasgupta.02n@gmail.com
 > Site: https://c7xai.in/
 
-C7X is a gold training-data studio for one role. It is not a chatbot, not a hosted foundation model, and not a labeling factory.
+C7X is a gold training-data studio that staffs one trusted person with a specialist LLM worker. It is not a chatbot, not a replacement for that person, not a hosted foundation model, and not a labeling factory.
 
 ## Direct answer
 
-C7X starts before the dataset exists. Riu interviews the person who knows the job in plain English. C7X then mines evidence, quality-gates gold examples, stores synthetics in a separate file, and exports a library the user owns. Optional C7X-IO trains a QLoRA adapter the user downloads and pins.
+Indian MSMEs (and any thin-margin desk) are stuck: volume cannot pay for a bench, and without a bench volume cannot rise. C7X starts before the dataset exists. Riu interviews the person who knows the job. C7X then mines evidence, quality-gates gold examples, stores synthetics apart, and exports a library the user owns. Optional C7X-IO trains a QLoRA adapter that sits next to that person — on hardware they already own. On a typical high-volume desk, one person plus that worker is the example of a five-person bench, not a guarantee.
 
 ## The seven steps
 

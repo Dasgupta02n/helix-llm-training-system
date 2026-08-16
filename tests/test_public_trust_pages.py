@@ -209,12 +209,19 @@ def test_homepage_compare_copy_is_professional():
     assert 'data-film' in r.text
     assert "/static/site/workflow/01-riu.jpg" in r.text
     assert 'id="cases"' in r.text
+    assert 'id="bind"' in r.text
+    assert "specialist" in r.text.lower()
+    assert "working capital" in r.text.lower()
     assert "Tiruppur" in r.text
     assert "Pune" in r.text
     assert "Hyderabad" in r.text
+    assert "/static/site/people/hero-together.jpg" in r.text
+    assert "/static/site/cases/tiruppur-together.jpg" in r.text
     assert 'href="/india-msme"' in r.text
     assert 'href="/run-locally"' in r.text
     assert 'href="/roles"' in r.text
+    low = r.text.lower()
+    assert "does not replace" in low or "not a replacement" in low
 
 
 def test_india_msme_page_is_citable():
@@ -228,6 +235,8 @@ def test_india_msme_page_is_citable():
     assert "FAQPage" in r.text
     assert 'rel="canonical"' in r.text
     assert "illustrated" in low or "composite" in low
+    assert "working capital" in low or "hire" in low
+    assert "example" in low
     assert "langsmith" not in low
     assert "llama-3" not in low
 
@@ -250,10 +259,11 @@ def test_roles_page_covers_replace_assist_multiply():
     r = client.get("/roles")
     assert r.status_code == 200
     low = r.text.lower()
-    assert "full take" in low or "end to end" in low
-    assert "partial" in low or "first pass" in low
-    assert "manyfold" in low or "multiplier" in low
+    assert "staff" in low
+    assert "first pass" in low or "draft" in low
+    assert "example" in low or "five" in low
     assert "licence" in low or "licensed" in low
+    assert "does not replace" in low or "not replace" in low
     assert "harness" in low
     assert "FAQPage" in r.text
     assert "ollama" in low

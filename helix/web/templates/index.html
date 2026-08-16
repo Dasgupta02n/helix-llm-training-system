@@ -1,6 +1,6 @@
 {% extends "public_base.html" %}
-{% block title %}C7X{% endblock %}
-{% block meta_description %}A model that holds the role, not a prompt that describes it. C7X builds gold training data for one role, assimilates it into an open model, and returns weights you deploy inside your own environment.{% endblock %}
+{% block title %}Specialist workers for the person you already trust{% endblock %}
+{% block meta_description %}C7X does not replace a person with AI. It gives one trusted person dedicated specialist LLM workers — so an Indian MSME can grow like a five-person bench, without five salaries sitting in working capital.{% endblock %}
 {% block canonical %}https://c7xai.in/{% endblock %}
 {% block main_class %}public-home{% endblock %}
 {% block content %}
@@ -12,7 +12,7 @@
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Web",
   "url": "https://c7xai.in/",
-  "description": "Gold training-data studio and C7X-IO fine-tune: a worker for one role, deployed inside your perimeter.",
+  "description": "C7X gives one trusted person dedicated specialist LLM workers for a single desk. Gold training data, pinned weights, run on hardware you already own.",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free during public beta for approved accounts" },
   "publisher": { "@type": "Organization", "name": "c7x AI", "url": "https://c7xai.in/about" }
 }
@@ -22,12 +22,12 @@
   "@context": "https://schema.org",
   "@type": "FAQPage",
   "mainEntity": [
-    {"@type": "Question", "name": "Is C7X a chatbot?", "acceptedAnswer": {"@type": "Answer", "text": "No. Riu is a setup guide. C7X is not another chat box — it produces a gold library and a pinned worker you own."}},
-    {"@type": "Question", "name": "How does C7X compare with current industry solutions?", "acceptedAnswer": {"@type": "Answer", "text": "Hosted chat answers once. Prompt and eval consoles debug live agents. Labeling factories annotate at enterprise scale. Train-from-upload tools assume a dataset already exists. C7X starts earlier: it interviews the role, builds a gold library, and writes the role into weights you run locally."}},
+    {"@type": "Question", "name": "Does C7X replace people with AI?", "acceptedAnswer": {"@type": "Answer", "text": "No. C7X staffs the person you already trust with dedicated specialist workers. The human keeps exceptions, cash, licences, and relationships. The specialist brain takes the hundred repeats."}},
+    {"@type": "Question", "name": "How does C7X compare with current industry solutions?", "acceptedAnswer": {"@type": "Answer", "text": "Hosted chat is a generalist who forgets you every session and charges more as you grow. A labeling factory is a floor you cannot fund. Train-from-upload assumes a dataset you do not have. C7X interviews the person who knows the desk, builds gold, and leaves specialist weights on a PC you already own."}},
     {"@type": "Question", "name": "What is GEO?", "acceptedAnswer": {"@type": "Answer", "text": "Generative Engine Optimization: making your domain the source AI systems cite. A C7X worker answers from trained judgment, not generic web text."}},
-    {"@type": "Question", "name": "Who is Riu?", "acceptedAnswer": {"@type": "Answer", "text": "Riu is C7X’s setup interview. She is the only way a plan gets created."}},
-    {"@type": "Question", "name": "Can an Indian MSME run a custom-trained LLM on its own desk?", "acceptedAnswer": {"@type": "Answer", "text": "Yes. C7X-IO returns a QLoRA adapter you download. Load it beside an Apache-2.0 or MIT instruct base and serve it with Ollama, Open Interpreter, LM Studio, llama.cpp, or the included PEFT script. Inference stays on hardware you control."}},
-    {"@type": "Question", "name": "Which roles can a custom trained LLM hold?", "acceptedAnswer": {"@type": "Answer", "text": "Bounded high-volume desks — returns classification, invoice coding, L1 support, lab FAQs — can run end to end. Exception-heavy work stays a first pass with a person on the boundary. Licensed sign-off is never fully replaced."}}
+    {"@type": "Question", "name": "Who is Riu?", "acceptedAnswer": {"@type": "Answer", "text": "Riu is C7X’s setup interview. She is the only way a plan gets created. The person who knows the job specifies the specialist brain."}},
+    {"@type": "Question", "name": "Can an Indian MSME grow without hiring a full bench?", "acceptedAnswer": {"@type": "Answer", "text": "That is the bind C7X is built for. Volume cannot pay for five salaries; without a bench, volume cannot rise. On a typical high-volume desk, one trusted person plus a specialist worker is the example of a five-person bench — without five CTC sitting in working capital. The worker runs locally with Ollama, Open Interpreter, or a similar harness."}},
+    {"@type": "Question", "name": "Which roles can a custom trained LLM staff?", "acceptedAnswer": {"@type": "Answer", "text": "High-volume written desks — returns classification, invoice coding, L1 support, lab FAQs — can be staffed end to end, with the person auditing a sample. Exception work stays a first pass. Licensed sign-off is never the model’s."}}
   ]
 }
 </script>
@@ -36,35 +36,63 @@
   <div class="h180-cursor" data-cursor></div>
 
   <section class="h180-hero">
-    <div class="h180-wave" aria-hidden="true">
-      <div style="animation:hxDrift 12s ease-in-out infinite alternate">
-        <svg viewBox="0 0 900 260" aria-hidden="true">
-          <polyline points="0,130 75,218 150,130 225,42 300,130 375,218 450,130 525,42 600,130 675,218 750,130 825,42 900,130" fill="none" stroke="#C9A227" stroke-width="1.4" stroke-linejoin="round"/>
-          <polyline points="0,130 75,42 150,130 225,218 300,130 375,42 450,130 525,218 600,130 675,42 750,130 825,218 900,130" fill="none" stroke="#F0E5C8" stroke-width="1.4" stroke-linejoin="round" opacity=".4"/>
-        </svg>
+    <div class="h180-hero-split">
+      <div>
+        <div class="hx-kicker">
+          <span class="dot"></span>
+          <span>Not a replacement</span>
+          <span class="hx-rule"></span>
+          <span style="color:rgba(43,34,26,.5)">Specialist brains for the person you trust</span>
+        </div>
+        <h1>
+          <span class="line">One person.</span>
+          <span class="line">Several</span>
+          <span class="line gold">specialist</span>
+          <span class="line">workers.</span>
+        </h1>
+        <div class="h180-lede">
+          <p>Volume cannot pay for a bench. Without a bench, volume cannot rise. C7X gives the person you already trust dedicated specialist workers — one desk, one brain, running on a PC in the same room. On a typical high-volume desk, that is the example of one person doing the work of five, without five salaries sitting in working capital.</p>
+          <p class="soft">The human keeps exceptions, cash, licences, and the buyer. The specialist brain takes the hundred repeats. Hosted chat gets more expensive as you succeed. These workers do not.</p>
+        </div>
+        <div class="h180-actions">
+          <a class="btn-gold btn-gold-lg" href="/app">Talk to Riu</a>
+          <a class="btn-ghost-gold" href="#bind">The bind</a>
+          <a class="btn-ghost-gold" href="#cases">India MSME cases</a>
+        </div>
       </div>
+      <figure class="h180-hero-photo">
+        <img src="/static/site/people/hero-together.jpg" width="1600" height="900" alt="Two colleagues in a small Indian manufacturing office talking across a wooden desk over coffee and a notebook.">
+        <figcaption>The customer is the person. The model is staff.</figcaption>
+      </figure>
     </div>
-    <div class="hx-kicker">
-      <span class="dot"></span>
-      <span>Custom LLM workers</span>
-      <span class="hx-rule"></span>
-      <span style="color:rgba(240,229,200,.55)">Trained on your data, run inside your perimeter</span>
+  </section>
+
+  <section class="h180-section" id="bind">
+    <div class="h180-head wide">
+      <h2>The chicken-and-egg an MSME actually lives in</h2>
+      <span class="meta">Working capital · capability</span>
     </div>
-    <h1>
-      <span class="line">A model that</span>
-      <span class="line">holds the</span>
-      <span class="line gold">role,</span>
-      <span class="line dim">not a prompt</span>
-      <span class="line dim">that describes it</span>
-    </h1>
-    <div class="h180-lede">
-      <p>A frontier model can describe a job. It cannot hold one, because nothing about your work is written into it. C7X builds the training data for a single role, assimilates it into an open model, and returns weights you deploy inside your own environment.</p>
-      <p class="soft">The result is a worker that takes repetitive and skill-based decisions end to end, reaches for a person at boundaries you defined, and logs every call it makes. No records leave your network at inference. No vendor can change its behaviour underneath you.</p>
+    <p class="hint" style="max-width:72ch;margin:18px 0 0">You cannot hire until the books allow it. You cannot grow the books until someone is there to take the extra orders, invoices, and calls. Working capital is already in fabric, receivables, GST, or an OEM’s payment cycle. That is not a software problem. It is why a general chatbot and a five-person hire both fail the same firm.</p>
+    <div class="h180-people">
+      <img src="/static/site/people/owner-books.jpg" width="1600" height="900" alt="An MSME owner at a small office table with a cash book and invoices, looking up as a colleague brings tea.">
+      <img src="/static/site/people/hands.jpg" width="1600" height="900" alt="Two pairs of hands passing a packing list and a knit garment across a wooden work table.">
     </div>
-    <div class="h180-actions">
-      <a class="btn-gold btn-gold-lg" href="/app">Talk to Riu</a>
-      <a class="btn-ghost-gold" href="#why">Why it holds</a>
-      <a class="btn-ghost-gold" href="#cases">India MSME cases</a>
+    <div class="h180-bind">
+      <article class="h180-job">
+        <div class="h180-label">Cannot hire yet</div>
+        <h3>Five CTC you cannot float</h3>
+        <p>A returns bench, an accounts clerk, a phone person — each is salary, PF, training, and three months before they are useful. Then they can leave for the next factory.</p>
+      </article>
+      <article class="h180-job">
+        <div class="h180-label">Cannot grow yet</div>
+        <h3>The trusted person is the bottleneck</h3>
+        <p>The supervisor, the senior accountant, the receptionist already know the job. They also already walk the line, post the books, and take the cash. The repeats eat the day.</p>
+      </article>
+      <article class="h180-job">
+        <div class="h180-label">What C7X staffs</div>
+        <h3>One person, specialist workers</h3>
+        <p>Train a brain on how that person already decides. Sit it next to them. On a typical desk, treat “the output of five” as the example — then keep the human for the 20% that needs a signature.</p>
+      </article>
     </div>
   </section>
 
@@ -72,9 +100,10 @@
     <span id="failure" hidden></span>
     <div class="h180-watermark">WHY</div>
     <div class="h180-head">
-      <h2>What a general model cannot hold</h2>
+      <h2>Why a general model cannot staff that person</h2>
       <span class="meta">The gap</span>
     </div>
+    <p class="hint" style="max-width:72ch;margin:18px 0 0">A hosted general model can describe the job in a prompt. It cannot sit beside the supervisor as a junior who remembers last season’s clause, does not send buyer photos away, and does not raise the bill as the firm grows. That is the gap the eight points below name.</p>
     {% set fails = [
       ("01", "No weight updates", "Every conversation starts from the same fixed parameters. Whatever it is told about your work is discarded when the session ends, so the model never gets better at your job — only at sounding like it might.", "Correct decisions for the role are written into the weights during assimilation. The competence is in the artefact, so it persists across every session and every restart."),
       ("02", "A role is not a document", "Pasting the handbook into the context window makes the rules available for one exchange, not learned. Long contexts also degrade: material in the middle gets weighted less, and a role is exactly the kind of accumulated judgment that will not fit in the window at all.", "The role is trained in rather than retrieved. Context stays free for the case in front of it, and the behaviour holds whether the prompt reminds it or not."),
@@ -146,7 +175,7 @@
       <h2>How C7X compares with current industry solutions</h2>
       <span class="meta">By job category</span>
     </div>
-    <p class="hint" style="max-width:72ch;margin:18px 0 0">Teams looking for a custom LLM are usually handed one of four industry solutions: a hosted chat box, a prompt and eval console, a labeling factory, or a train button that assumes the dataset already exists. C7X starts one step earlier — it builds the gold library for one role, then writes that role into weights you run yourself.</p>
+    <p class="hint" style="max-width:72ch;margin:18px 0 0">If the job is “staff the person I already trust,” current industry solutions hand you the wrong tool: a hosted chat box that forgets the firm every session, a prompt console for something already in production, a labeling factory you cannot fund, or a train button that assumes a file you do not have. C7X interviews that person, builds gold from how they already decide, and leaves specialist weights on a machine you own — so growth is not another token bill and not four extra CTC.</p>
     <div class="h180-jobs">
       <article class="h180-job">
         <div class="h180-label">Hosted chat</div>
@@ -347,33 +376,33 @@
   <section class="h180-section" id="cases">
     <div class="h180-watermark">INDIA</div>
     <div class="h180-head wide">
-      <h2>How C7X makes an Indian MSME several times faster</h2>
-      <span class="meta">Three illustrated cases</span>
+      <h2>One trusted person, staffed like a five-person bench</h2>
+      <span class="meta">Three illustrated cases · example, not a guarantee</span>
     </div>
-    <p class="hint" style="max-width:72ch;margin:18px 0 0">Composite floors from Tiruppur knitwear, Pune auto-components, and a Hyderabad diagnostic lab — typical Indian MSME desks, not named customer logos. Each case is a single role, trained on decisions the shop already makes, then run on hardware that never leaves the building.</p>
+    <p class="hint" style="max-width:72ch;margin:18px 0 0">Composite desks from Tiruppur, Pune, and Hyderabad — typical Indian MSME floors, not named logos. On each desk the human stays. The specialist brain takes the repeats. “Five” is the example for a high-volume written job, not a promise on work that is already mostly exceptions.</p>
     <div class="h180-cases">
       <a class="h180-case" href="/india-msme#tiruppur">
-        <img src="/static/site/cases/tiruppur-knitwear.jpg" width="1600" height="1000" alt="Tiruppur knitwear export floor: operators at industrial sewing machines, packed white T-shirts marked for the USA, and a manager cabin with a laptop.">
+        <img src="/static/site/cases/tiruppur-together.jpg" width="1600" height="1067" alt="A Tiruppur knitwear supervisor and an operator looking together at a white T-shirt at the sewing machine.">
         <div class="pad">
           <div class="h180-label">Tiruppur · Tamil Nadu</div>
-          <h3>Knitwear returns desk</h3>
-          <p>Classify WhatsApp returns, pick refund or remake, and write the Tamil + English floor note — so the supervisor stops being the bottleneck on every damaged carton.</p>
+          <h3>The supervisor walks the line again</h3>
+          <p>The specialist brain drafts the return note. She reviews exceptions and stays with the operators — the work of a five-person WhatsApp bench, as an example, on one trusted person.</p>
         </div>
       </a>
       <a class="h180-case" href="/india-msme#pune">
-        <img src="/static/site/cases/pune-auto-ap.jpg" width="1600" height="1000" alt="Pune auto-component accounts office: two clerks coding GST invoices beside steel filing cabinets, with CNC machines visible through the shop-floor door.">
+        <img src="/static/site/cases/pune-together.jpg" width="1600" height="1067" alt="A senior accountant and a younger clerk sitting side by side, reading an invoice together.">
         <div class="pad">
           <div class="h180-label">Pune · Maharashtra</div>
-          <h3>GST invoice coding</h3>
-          <p>Read a vendor bill, propose HSN and GL, flag input-tax-credit risk. The senior accountant reviews exceptions instead of typing every line.</p>
+          <h3>The senior stops retyping bills</h3>
+          <p>The worker proposes HSN and ITC. He posts the exceptions. The same two people clear a day that used to need a Saturday — and a hire the working capital could not stand.</p>
         </div>
       </a>
       <a class="h180-case" href="/india-msme#hyderabad">
-        <img src="/static/site/cases/hyderabad-lab.jpg" width="1600" height="1000" alt="Hyderabad diagnostic lab reception: patients waiting on plastic chairs while the front desk answers a phone beside a bilingual MediCare Diagnostics board.">
+        <img src="/static/site/cases/hyderabad-together.jpg" width="1600" height="1067" alt="A clinic receptionist leaning in kindly to explain something to an elderly patient at the front desk.">
         <div class="pad">
           <div class="h180-label">Hyderabad · Telangana</div>
-          <h3>Lab front desk</h3>
-          <p>Fasting rules, report-ready times, and booking answers in Telugu and English — the receptionist keeps the queue moving instead of repeating the same script.</p>
+          <h3>The receptionist has time for the person in front of her</h3>
+          <p>Fasting and report-ready answers go to the specialist brain. She keeps the cash, the kindness, and the queue. The pathologist is not replaced. The front desk stops being a call centre.</p>
         </div>
       </a>
     </div>
@@ -388,14 +417,14 @@
 
   <section class="h180-seo" id="seo-geo">
     <p class="page-kicker">SEO + GEO</p>
-    <h2 style="text-transform:none;letter-spacing:-.02em;margin:.4rem 0 1rem">Not another chat box. Gold that search and generative engines can trust.</h2>
-    <p>C7X is a gold training-data studio for one role, not a chatbot, prompt debugger, or labeling factory. Generative engine optimization (GEO) needs a model that answers from your domain. The library you export is the dataset; C7X-IO writes it into weights you can serve with Ollama, Open Interpreter, or a similar local harness. <a href="/gold-training-data">How C7X compares with current industry solutions</a>. <a href="/india-msme">Custom LLM case studies for Indian MSMEs</a>. <a href="/roles">Which desks a custom-trained LLM can take</a>.</p>
+    <h2 style="text-transform:none;letter-spacing:-.02em;margin:.4rem 0 1rem">Not another chat box. Specialist workers a person — and a search engine — can trust.</h2>
+    <p>C7X is a gold training-data studio that staffs one trusted person with a specialist brain, not a chatbot, prompt debugger, or labeling factory. Generative engine optimization (GEO) needs a model that answers from your domain. The library you export is the dataset; C7X-IO writes it into weights you serve with Ollama, Open Interpreter, or a similar local harness. On a typical MSME desk, one person plus that worker is the example of a five-person bench, without five salaries in working capital. <a href="/gold-training-data">How C7X compares with current industry solutions</a>. <a href="/india-msme">Indian MSME case studies</a>. <a href="/roles">Roles a custom LLM can staff</a>.</p>
   </section>
 
   <section class="h180-cta" id="cta">
     <div class="hx-kicker"><span class="dot"></span><span>Enter through Riu</span></div>
-    <h2>Describe the role. Everything else follows from it.</h2>
-    <p class="hint" style="max-width:46ch;margin:0 0 28px">One domain, one role, one worker at a time. C7X works with a focused group of teams each cycle so every strand is reviewed properly before it becomes a model.</p>
+    <h2>Describe the person, and the desk they already hold.</h2>
+    <p class="hint" style="max-width:46ch;margin:0 0 28px">One domain, one role, one specialist worker at a time. The first month is that person training a junior. After that, they keep the judgment — and the bench they could not hire.</p>
     <div class="h180-actions">
       <a class="btn-gold btn-gold-lg" href="/app">Talk to Riu</a>
       <a class="btn-ghost-gold" href="/docs">Read the documentation</a>
