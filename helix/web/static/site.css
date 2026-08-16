@@ -75,19 +75,19 @@
   letter-spacing: 0;
   text-transform: none;
   font-weight: 600;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-body);
 }
 .site-body .brand-text span {
   font-size: 11px;
   color: var(--muted);
   font-weight: 400;
-  font-family: "IBM Plex Mono", monospace;
+  font-family: var(--font-mono);
 }
 .site-body .site-nav a:not(.btn) {
   color: var(--muted);
   font-weight: 500;
   font-size: 14px;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-body);
   padding: 6px 10px;
   border-radius: 0;
 }
@@ -100,14 +100,14 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   background: transparent;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-body);
   font-weight: 600;
 }
 
 .site-body .btn {
   justify-content: center;
   border-radius: 8px;
-  font-family: Inter, sans-serif;
+  font-family: var(--font-body);
   font-weight: 600;
   border-width: 0;
   letter-spacing: 0;

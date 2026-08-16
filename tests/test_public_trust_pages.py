@@ -58,6 +58,16 @@ def test_docs_not_404_and_not_only_openapi():
     assert "corpus" in r.text.lower() or "gold" in r.text.lower()
 
 
+def test_home_nav_is_professional():
+    r = client.get("/")
+    assert r.status_code == 200
+    assert ">Failure</a>" not in r.text
+    assert "Why general models fail" not in r.text
+    assert 'id="why"' in r.text
+    assert ">Why C7X</a>" in r.text
+    assert ">How it works</a>" in r.text
+
+
 def test_about_identity():
     r = client.get("/about")
     assert r.status_code == 200

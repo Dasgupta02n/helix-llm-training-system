@@ -261,7 +261,19 @@ async function loadJobs() {
                   ? "accent"
                   : "warn";
         const statusLabel =
-          j.status === "paused_spend_cap" ? "paused (spend cap)" : j.status;
+          j.status === "paused_spend_cap"
+            ? "paused at spend cap"
+            : j.status === "failed"
+              ? "did not finish"
+              : j.status === "completed"
+                ? "complete"
+                : j.status === "cancelled"
+                  ? "stopped"
+                  : j.status === "running"
+                    ? "in progress"
+                    : j.status === "pending"
+                      ? "queued"
+                      : j.status;
         const typeLabel = j.job_type === "synthesis" ? "Synthesis" : "Mining";
         const pct = Number(j.progress_pct) || 0;
         const updated = j.updated_at ? new Date(j.updated_at).toLocaleTimeString() : "—";

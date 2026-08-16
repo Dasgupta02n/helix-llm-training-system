@@ -23,7 +23,7 @@
   "@type": "FAQPage",
   "mainEntity": [
     {"@type": "Question", "name": "Is C7X a chatbot?", "acceptedAnswer": {"@type": "Answer", "text": "No. Riu is a setup guide. C7X is not another chat box — it produces a gold library and a pinned worker you own."}},
-    {"@type": "Question", "name": "How is C7X different from ChatGPT, LangSmith, or Scale?", "acceptedAnswer": {"@type": "Answer", "text": "Chat tools generate answers. Prompt and eval platforms debug live agents. Labeling factories annotate at enterprise scale. RAG retrieves documents for one call. C7X writes the role into weights."}},
+    {"@type": "Question", "name": "How is C7X different from a chat tool or a labeling factory?", "acceptedAnswer": {"@type": "Answer", "text": "Chat tools generate answers. Prompt and eval platforms debug live agents. Labeling factories annotate at enterprise scale. RAG retrieves documents for one call. C7X writes the role into weights."}},
     {"@type": "Question", "name": "What is GEO?", "acceptedAnswer": {"@type": "Answer", "text": "Generative Engine Optimization: making your domain the source AI systems cite. A C7X worker answers from trained judgment, not generic web text."}},
     {"@type": "Question", "name": "Who is Riu?", "acceptedAnswer": {"@type": "Answer", "text": "Riu is C7X’s setup interview. She is the only way a plan gets created."}}
   ]
@@ -61,16 +61,17 @@
     </div>
     <div class="h180-actions">
       <a class="btn-gold btn-gold-lg" href="/app">Talk to Riu</a>
-      <a class="btn-ghost-gold" href="#failure">Why general models fail</a>
-      <a class="btn-ghost-gold" href="#features">Capabilities</a>
+      <a class="btn-ghost-gold" href="#why">Why it holds</a>
+      <a class="btn-ghost-gold" href="#how">How it works</a>
     </div>
   </section>
 
-  <section class="h180-section" id="failure">
-    <div class="h180-watermark">FAIL</div>
+  <section class="h180-section" id="why">
+    <span id="failure" hidden></span>
+    <div class="h180-watermark">WHY</div>
     <div class="h180-head">
-      <h2>Eight reasons a frontier model cannot replace a role</h2>
-      <span class="meta">01 — 08</span>
+      <h2>What a general model cannot hold</h2>
+      <span class="meta">The gap</span>
     </div>
     {% set fails = [
       ("01", "No weight updates", "Every conversation starts from the same fixed parameters. Whatever it is told about your work is discarded when the session ends, so the model never gets better at your job — only at sounding like it might.", "Correct decisions for the role are written into the weights during assimilation. The competence is in the artefact, so it persists across every session and every restart."),
@@ -83,7 +84,7 @@
       ("08", "Cost scales with every token, forever", "Metered inference means the work gets more expensive precisely as it succeeds, and the pricing is set by someone else. Volume becomes a reason not to automate, which defeats the purpose.", "Training is a bounded piece of work and the weights are then yours. Running cost is your own infrastructure, so volume stops being a commercial decision.")
     ] %}
     {% for n, title, problem, change in fails %}
-    <div class="h180-fail">
+    <div class="h180-point">
       <div class="num">{{ n }}</div>
       <div class="col">
         <h3>{{ title }}</h3>
@@ -98,7 +99,8 @@
     <p class="hint" style="margin-top:28px;max-width:70ch">Read together, all eight describe one absence: a general model has no durable, inspectable representation of the role it is being asked to hold. Producing one is the entire purpose of the system below.</p>
   </section>
 
-  <section class="h180-section" id="strands">
+  <section class="h180-section" id="how">
+    <span id="strands" hidden></span>
     <div class="h180-head">
       <h2>Two strands, one artefact</h2>
       <span class="meta">Diagram 01</span>

@@ -152,7 +152,7 @@ async function refreshDashboard() {
             r.status === "completed"
               ? "Done"
               : r.status === "error"
-                ? "Failed"
+                ? "Needs attention"
                 : r.status;
           const badge =
             r.status === "completed" ? "ok" : r.status === "error" ? "err" : "warn";
@@ -490,7 +490,7 @@ async function runPipeline() {
     });
     const lines = (result.results || []).map((r) => {
       const title = FRIENDLY_AGENTS[r.agent]?.title || r.agent;
-      if (r.status === "error") return `• ${title}: failed — ${r.error || "error"}`;
+      if (r.status === "error") return `• ${title}: did not finish — ${r.error || "see the log"}`;
       return `• ${title}: done ($${(r.cost_usd || 0).toFixed(3)})`;
     });
     $("runStatus").textContent = `Full process finished (${(result.results || []).length} steps)`;

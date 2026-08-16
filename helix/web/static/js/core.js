@@ -352,7 +352,7 @@ async function refreshAll() {
     .map((fn) => fn());
   const results = await Promise.allSettled(tasks);
   const failed = results.find((r) => r.status === "rejected");
-  if (failed) toast(failed.reason?.message || "Some panels failed to refresh", "err");
+  if (failed) toast(failed.reason?.message || "Some panels could not refresh", "err");
   updatePipeEta();
   updateSynthEta();
   if (typeof hooks.startJobPolling === "function") hooks.startJobPolling();

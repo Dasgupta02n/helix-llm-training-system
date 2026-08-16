@@ -162,7 +162,7 @@ async function loadLibrary(opts = {}) {
                 : `<span class="badge ok" title="${escapeHtml(origin)}">${escapeHtml(badgeText)}</span>`
             }${
               rejected
-                ? ` <span class="badge err" title="${escapeHtml(rejReason || "Failed quality gates")}">Quality reject</span>`
+                ? ` <span class="badge err" title="${escapeHtml(rejReason || "Did not pass quality review")}">Held for review</span>`
                 : ""
             }</h4>
             <p><strong>Q:</strong> ${escapeHtml((g.input || "").slice(0, 120))}</p>
@@ -349,7 +349,7 @@ async function exportLibrary(kind, fmt) {
       `/api/t/${state.tenantSlug}/library/export?kind=${encodeURIComponent(kind)}&format=${encodeURIComponent(format)}`,
       { headers: { Authorization: `Bearer ${state.token}` } }
     );
-    if (!res.ok) throw new Error("Download failed");
+    if (!res.ok) throw new Error("Could not download the file");
     const blob = await res.blob();
     _saveBlob(blob, `c7x_${state.tenantSlug}_${kind}.${format === "json" ? "json" : "jsonl"}`);
     toast("Download started");
@@ -388,7 +388,7 @@ async function uploadGoldZip(fileInput, statusEl, { viaRiu = false, materials = 
     body: fd,
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.detail || data.error || "Upload failed");
+  if (!res.ok) throw new Error(data.detail || data.error || "Could not upload the file");
   if (statusEl) {
     statusEl.textContent = data.message || `Saved ${data.created || 0} rows.`;
     statusEl.className = "status-line ok";
@@ -647,7 +647,7 @@ if ($("doubleHelixZipBtn")) {
       URL.revokeObjectURL(url);
       toast("Gold zip downloaded — train it anywhere");
     } catch (e) {
-      toast(e.message || "Package failed", "err");
+      toast(e.message || "Could not build the package", "err");
     }
   };
 }
@@ -733,7 +733,7 @@ async function downloadTrainedZip(jobId) {
     } catch (_) {
       /* keep text */
     }
-    throw new Error(msg || "Download failed");
+    throw new Error(msg || "Could not download the trained zip");
   }
   const blob = await res.blob();
   const url = URL.createObjectURL(blob);
@@ -896,7 +896,7 @@ export function bindLibraryEvents() {
         URL.revokeObjectURL(url);
         toast("Gold zip downloaded — train it anywhere");
       } catch (e) {
-        toast(e.message || "Package failed", "err");
+        toast(e.message || "Could not build the package", "err");
       }
     };
   }
@@ -956,7 +956,7 @@ export function bindLibraryEvents() {
         await downloadTrainedZip(job.id);
         toast("Trained zip downloaded");
       } catch (e) {
-        toast(e.message || "Download failed", "err");
+        toast(e.message || "Could not download the trained zip", "err");
       }
     };
   }

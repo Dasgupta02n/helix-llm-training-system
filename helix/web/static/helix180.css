@@ -1,5 +1,5 @@
-/* Helix 180 — warm black, gold strand, Syne display.
-   Shared by the public site and the studio. */
+/* Assay — private-ledger gold on warm ink.
+   Display Syne, body Instrument Sans. Shared by the public site and studio. */
 
 @import url("https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@700;800&display=swap");
 
@@ -316,6 +316,7 @@ html { scroll-behavior: smooth; }
   z-index: 0;
 }
 
+.h180-point,
 .h180-fail {
   position: relative;
   display: grid;
@@ -324,6 +325,7 @@ html { scroll-behavior: smooth; }
   padding: 40px 0;
   border-bottom: 1px solid var(--hx-line-soft);
 }
+.h180-point .num,
 .h180-fail .num {
   position: absolute;
   left: -14px; top: 14px;
@@ -335,15 +337,20 @@ html { scroll-behavior: smooth; }
   user-select: none;
   z-index: 0;
 }
+.h180-point h3,
 .h180-fail h3 {
   margin: 0 0 12px;
   font: 700 clamp(20px, 1.9vw, 28px) / 1.14 var(--font-display);
   letter-spacing: -0.025em;
   text-transform: none;
 }
+.h180-point p,
 .h180-fail p { margin: 0; font: 400 15.5px / 1.55 var(--font-body); color: rgba(240, 229, 200, 0.62); }
+.h180-point .change,
 .h180-fail .change { border-left: 1px solid rgba(201, 162, 39, 0.3); padding: 56px 0 0 40px; }
+.h180-point .col,
 .h180-fail .col { position: relative; z-index: 1; padding-top: 56px; }
+.h180-point .change p,
 .h180-fail .change p { color: var(--hx-ink); }
 .h180-label {
   font: 500 10.5px var(--font-mono);
@@ -449,8 +456,8 @@ html { scroll-behavior: smooth; }
 @media (max-width: 800px) {
   .h180-wrap, .h180-hero, .h180-section, .h180-cta, .h180-seo { padding-left: 20px; padding-right: 20px; }
   .site-body .site-top { padding: 14px 20px; }
-  .h180-fail, .h180-cap { grid-template-columns: 1fr; }
-  .h180-fail .change { border-left: 0; padding: 16px 0 0; }
+  .h180-point, .h180-fail, .h180-cap { grid-template-columns: 1fr; }
+  .h180-point .change, .h180-fail .change { border-left: 0; padding: 16px 0 0; }
   .site-body .site-nav { display: none; }
   .site-body .site-nav.is-open {
     display: flex;
