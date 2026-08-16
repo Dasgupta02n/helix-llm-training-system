@@ -22,11 +22,9 @@
       });
       buttons.forEach(function (b, idx) {
         b.classList.toggle("is-on", idx === i);
-        b.setAttribute("aria-selected", idx === i ? "true" : "false");
       });
     }
-    function tick() { show(i + 1); }
-    function start() { timer = window.setInterval(tick, 4200); }
+    function start() { timer = window.setInterval(function () { show(i + 1); }, 4200); }
     function stop() { if (timer) window.clearInterval(timer); }
     buttons.forEach(function (b, idx) {
       b.addEventListener("click", function () {
@@ -38,16 +36,14 @@
     film.addEventListener("mouseenter", stop);
     film.addEventListener("mouseleave", start);
     show(0);
-    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      start();
-    }
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) start();
   });
 
   var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var reveals = document.querySelectorAll("[data-reveal], .vs-row, .flow-card, .staff-viz");
-  if (reduce) {
+  var reveals = document.querySelectorAll("[data-reveal]");
+  if (reduce || !("IntersectionObserver" in window)) {
     Array.prototype.forEach.call(reveals, function (el) { el.classList.add("is-in"); });
-  } else if ("IntersectionObserver" in window) {
+  } else {
     var io = new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         if (entry.isIntersecting) {
@@ -55,20 +51,7 @@
           io.unobserve(entry.target);
         }
       });
-    }, { threshold: 0.22, rootMargin: "0px 0px -8% 0px" });
+    }, { threshold: 0.18 });
     Array.prototype.forEach.call(reveals, function (el) { io.observe(el); });
-  } else {
-    Array.prototype.forEach.call(reveals, function (el) { el.classList.add("is-in"); });
-  }
-
-  var cursor = document.querySelector("[data-cursor]");
-  if (cursor && window.matchMedia("(pointer:fine)").matches) {
-    window.addEventListener("pointermove", function (e) {
-      cursor.style.opacity = "1";
-      cursor.style.transform = "translate3d(" + e.clientX + "px," + e.clientY + "px,0)";
-    });
-    window.addEventListener("pointerleave", function () {
-      cursor.style.opacity = "0";
-    });
   }
 })();
