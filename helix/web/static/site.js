@@ -43,6 +43,24 @@
     }
   });
 
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var reveals = document.querySelectorAll("[data-reveal], .vs-row, .flow-card, .staff-viz");
+  if (reduce) {
+    Array.prototype.forEach.call(reveals, function (el) { el.classList.add("is-in"); });
+  } else if ("IntersectionObserver" in window) {
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-in");
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.22, rootMargin: "0px 0px -8% 0px" });
+    Array.prototype.forEach.call(reveals, function (el) { io.observe(el); });
+  } else {
+    Array.prototype.forEach.call(reveals, function (el) { el.classList.add("is-in"); });
+  }
+
   var cursor = document.querySelector("[data-cursor]");
   if (cursor && window.matchMedia("(pointer:fine)").matches) {
     window.addEventListener("pointermove", function (e) {

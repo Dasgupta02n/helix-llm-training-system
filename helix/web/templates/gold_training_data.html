@@ -145,51 +145,26 @@
 
   <h2>How C7X compares with current industry solutions</h2>
   <p>
-    This table names <strong>jobs</strong> current industry solutions actually do, not company brands.
+    These are the <strong>jobs</strong> current industry solutions actually do, not company brands.
     If a tool starts after the dataset exists, it is solving a later step.
   </p>
-  <div class="table-wrap">
-    <table class="h180-table">
-      <thead>
-        <tr>
-          <th>Job people actually have</th>
-          <th>Typical tool for that job</th>
-          <th>What C7X does</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>Talk to a general model today</td>
-          <td>Hosted chat</td>
-          <td>Builds a worker for one role, then you run it</td>
-        </tr>
-        <tr>
-          <td>Debug prompts and traces</td>
-          <td>Eval / prompt console</td>
-          <td>Writes behaviour into gold, then into weights</td>
-        </tr>
-        <tr>
-          <td>Pay people to label a queue</td>
-          <td>Labeling factory</td>
-          <td>Interviews the expert, then mines and gates</td>
-        </tr>
-        <tr>
-          <td>Generate extra rows from a seed</td>
-          <td>Synthetic-only toolkit</td>
-          <td>Synthetics only after gold exists, stored separately</td>
-        </tr>
-        <tr>
-          <td>Fine-tune a file you already have</td>
-          <td>Train-from-upload UI</td>
-          <td>Collects the file first, then can train</td>
-        </tr>
-        <tr>
-          <td>Own the result</td>
-          <td>Rented capability</td>
-          <td>You download gold and, if you train, the adapter zip</td>
-        </tr>
-      </tbody>
-    </table>
+  <div class="flow-board">
+    {% set flows = [
+      ("Talk to a general model today", "Hosted chat", "Builds a worker for one role, then you run it"),
+      ("Debug prompts and traces", "Eval / prompt console", "Writes behaviour into gold, then into weights"),
+      ("Pay people to label a queue", "Labeling factory", "Interviews the expert, then mines and gates"),
+      ("Generate extra rows from a seed", "Synthetic-only toolkit", "Synthetics only after gold exists, stored separately"),
+      ("Fine-tune a file you already have", "Train-from-upload UI", "Collects the file first, then can train"),
+      ("Own the result", "Rented capability", "You download gold and, if you train, the adapter zip")
+    ] %}
+    {% for job, tool, ours in flows %}
+    <article class="flow-card" data-reveal>
+      <p class="flow-job">{{ job }}</p>
+      <div class="flow-tool"><span class="k">Typical tool</span>{{ tool }}</div>
+      <div class="flow-arrow" aria-hidden="true">→</div>
+      <div class="flow-c7x"><span class="k">What C7X does</span>{{ ours }}</div>
+    </article>
+    {% endfor %}
   </div>
 
   <h2>What stays yours</h2>

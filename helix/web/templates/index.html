@@ -73,6 +73,13 @@
       <span class="meta">Working capital · capability</span>
     </div>
     <p class="hint" style="max-width:72ch;margin:18px 0 0">You cannot hire until the books allow it. You cannot grow the books until someone is there to take the extra orders, invoices, and calls. Working capital is already in fabric, receivables, GST, or an OEM’s payment cycle. That is not a software problem. It is why a general chatbot and a five-person hire both fail the same firm.</p>
+    <div class="staff-viz" data-staff data-reveal>
+      <div class="staff-row">
+        <div class="staff-you">One<br>person</div>
+        <div class="staff-dots" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+      </div>
+      <p>Example on a typical high-volume desk: one trusted person, five specialist workers.</p>
+    </div>
     <div class="h180-people">
       <img src="/static/site/people/owner-books.jpg" width="1600" height="900" alt="An MSME owner at a small office table with a cash book and invoices, looking up as a colleague brings tea.">
       <img src="/static/site/people/hands.jpg" width="1600" height="900" alt="Two pairs of hands passing a packing list and a knit garment across a wooden work table.">
@@ -115,7 +122,7 @@
       ("08", "Cost scales with every token, forever", "Metered inference means the work gets more expensive precisely as it succeeds, and the pricing is set by someone else. Volume becomes a reason not to automate, which defeats the purpose.", "Training is a bounded piece of work and the weights are then yours. Running cost is your own infrastructure, so volume stops being a commercial decision.")
     ] %}
     {% for n, title, problem, change in fails %}
-    <div class="h180-point">
+    <div class="h180-point" data-reveal>
       <div class="num">{{ n }}</div>
       <div class="col">
         <h3>{{ title }}</h3>
@@ -198,21 +205,27 @@
         <p>Fine-tune UIs start after JSONL is ready. C7X collects, gates, and stores that file first — then can train.</p>
       </article>
     </div>
-    <table class="h180-table">
-      <thead>
-        <tr><th>Dimension</th><th>Hosted frontier model</th><th>C7X worker</th></tr>
-      </thead>
-      <tbody>
-        <tr><td>Where behaviour lives</td><td>In a prompt, reassembled on every call</td><td>In the weights, as a property of the model</td></tr>
-        <tr><td>On vendor update</td><td>Behaviour can change without notice</td><td>Nothing changes; the version is pinned</td></tr>
-        <tr><td>Where inference runs</td><td>Vendor infrastructure; records cross the boundary</td><td>Your hardware or private cloud; no external call</td></tr>
-        <tr><td>Uncertain cases</td><td>Answered with the same confidence as clear ones</td><td>Escalated at boundaries trained in during setup</td></tr>
-        <tr><td>Audit position</td><td>Transcripts against a model you cannot inspect</td><td>Reasoned decision log, fixed version, visible training set</td></tr>
-        <tr><td>Cost curve</td><td>Per token, indefinitely, at their price</td><td>Bounded training, then your own compute</td></tr>
-        <tr><td>What accumulates</td><td>Prompt files and transcripts</td><td>A gold library and successive model versions</td></tr>
-        <tr><td>If the supplier goes away</td><td>The capability leaves with them</td><td>The worker keeps running; you hold the weights</td></tr>
-      </tbody>
-    </table>
+    <div class="vs-board" role="list">
+      {% set compares = [
+        ("Where behaviour lives", "In a prompt, reassembled on every call", "In the weights, as a property of the model"),
+        ("On vendor update", "Behaviour can change without notice", "Nothing changes; the version is pinned"),
+        ("Where inference runs", "Vendor infrastructure; records cross the boundary", "Your hardware or private cloud; no external call"),
+        ("Uncertain cases", "Answered with the same confidence as clear ones", "Escalated at boundaries trained in during setup"),
+        ("Audit position", "Transcripts against a model you cannot inspect", "Reasoned decision log, fixed version, visible training set"),
+        ("Cost curve", "Per token, indefinitely, at their price", "Bounded training, then your own compute"),
+        ("What accumulates", "Prompt files and transcripts", "A gold library and successive model versions"),
+        ("If the supplier goes away", "The capability leaves with them", "The worker keeps running; you hold the weights")
+      ] %}
+      {% for dim, old, new in compares %}
+      <div class="vs-row" data-reveal role="listitem">
+        <p class="vs-dim">{{ dim }}</p>
+        <div class="vs-split">
+          <div class="vs-old"><span>Hosted frontier</span><p>{{ old }}</p></div>
+          <div class="vs-new"><span>C7X worker</span><p>{{ new }}</p></div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
     <p class="hint" style="margin-top:18px">The full job-by-job matrix, with cost bands and ownership facts, is on <a href="/gold-training-data">How C7X compares with current industry solutions</a>.</p>
   </section>
 

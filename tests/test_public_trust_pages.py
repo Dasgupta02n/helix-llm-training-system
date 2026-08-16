@@ -210,6 +210,8 @@ def test_homepage_compare_copy_is_professional():
     assert "/static/site/workflow/01-riu.jpg" in r.text
     assert 'id="cases"' in r.text
     assert 'id="bind"' in r.text
+    assert "vs-board" in r.text
+    assert "<table" not in r.text.lower()
     assert "specialist" in r.text.lower()
     assert "working capital" in r.text.lower()
     assert "Tiruppur" in r.text
