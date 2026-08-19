@@ -172,9 +172,9 @@
   padding: 16px 0;
   border-top: 1px solid rgba(244,239,230,.12);
 }
-.uc-vs-row strong { font: 500 20px "Cormorant Garamond", serif; }
-.uc-vs-old { color: rgba(244,239,230,.55); }
-.uc-vs-new em, .uc-vs-old em {
+.cine-root .uc-vs-row strong { font: 500 20px "Cormorant Garamond", serif; }
+.cine-root .uc-vs-old { color: rgba(244,239,230,.55); }
+.cine-root .uc-vs-new em, .cine-root .uc-vs-old em {
   display: block;
   font: 600 10px Outfit, sans-serif;
   letter-spacing: .14em;

@@ -34,7 +34,8 @@
 .landing-shell:has(.geo-root) .site-nav .btn { display: none; }
 .landing-shell:has(.geo-root) .uc-fixed-cta {
   background: #ff2d95;
-  color: #fff !important;
+  /* #fff on #ff2d95 is 3.46:1 — AA fail. Ink is 5.45:1. */
+  color: #111 !important;
   border: 0;
 }
 .landing-shell:has(.geo-root) .uc-fixed-cta:hover { background: #111; color: #fff200 !important; }
@@ -44,6 +45,9 @@
   background: #111;
   color: #fff;
   margin-top: 0;
+}
+.landing-shell:has(.geo-root) .site-footer .hint {
+  color: #fff;
 }
 
 .geo-root {
@@ -110,7 +114,7 @@
   text-decoration: none;
   clip-path: polygon(0 0, calc(100% - 14px) 0, 100% 14px, 100% 100%, 14px 100%, 0 calc(100% - 14px));
 }
-.geo-btn:hover { background: #ff2d95; color: #fff !important; }
+.geo-btn:hover { background: #ff2d95; color: #111 !important; }
 .geo-btn.ghost {
   background: transparent;
   color: #111 !important;
@@ -118,10 +122,10 @@
 }
 
 .geo-band { padding: 88px 6vw; position: relative; }
-.geo-band.pink { background: #ff2d95; color: #fff; }
+.geo-band.pink { background: #ff2d95; color: #111; }
 .geo-band.pink .geo-kicker,
 .geo-band.pink .geo-h2,
-.geo-band.pink .geo-lede { color: #fff; }
+.geo-band.pink .geo-lede { color: #111; }
 .geo-band.cyan { background: #00e5ff; color: #111; }
 .geo-band.lime { background: #b6ff3b; color: #111; }
 .geo-band.orange { background: #ff6a00; color: #111; }
@@ -148,7 +152,7 @@
 }
 .geo-card:hover { transform: translate(-4px, -4px); }
 .geo-card.alt { background: #fff200; color: #111; }
-.geo-card.hot { background: #ff2d95; color: #fff; }
+.geo-card.hot { background: #ff2d95; color: #111; }
 .geo-card h3 {
   margin: 8px 0 8px;
   font: 400 28px/1 "Archivo Black", sans-serif;
@@ -184,6 +188,7 @@
   text-transform: uppercase;
   margin-bottom: 4px;
   font-style: normal;
+  color: #111;
 }
 
 .geo-film {
@@ -204,7 +209,7 @@
 }
 .geo-film figure:nth-child(1) { background: #fff200; animation-delay: 0s; }
 .geo-film figure:nth-child(2) { background: #00e5ff; animation-delay: .4s; }
-.geo-film figure:nth-child(3) { background: #ff2d95; color: #fff; animation-delay: .8s; }
+.geo-film figure:nth-child(3) { background: #ff2d95; color: #111; animation-delay: .8s; }
 .geo-film figure:nth-child(4) { background: #b6ff3b; animation-delay: 1.2s; }
 @keyframes geoPulse {
   0%, 100% { transform: rotate(0deg) scale(1); }

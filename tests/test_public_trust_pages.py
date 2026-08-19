@@ -201,6 +201,24 @@ def test_docs_cover_riu_and_materials():
     assert "export" in body
 
 
+def test_geo_theme_meets_aa_contrast_pairs():
+    from pathlib import Path
+
+    geo = Path("helix/web/static/geo.css").read_text(encoding="utf-8")
+    cine = Path("helix/web/static/cine.css").read_text(encoding="utf-8")
+    uc = Path("helix/web/static/uc.css").read_text(encoding="utf-8")
+    assert ".geo-band.pink { background: #ff2d95; color: #111; }" in geo
+    assert ".geo-card.hot { background: #ff2d95; color: #111; }" in geo
+    assert "color: #111; animation-delay: .8s" in geo
+    assert ".uc-vs-old em, .uc-vs-new em" in geo
+    assert "color: #111;" in geo.split(".uc-vs-old em, .uc-vs-new em")[1][:280]
+    assert ".site-footer .hint" in geo
+    assert ".geo-band.pink .geo-lede { color: #fff; }" not in geo
+    assert ".cine-root .uc-vs-new em, .cine-root .uc-vs-old em" in cine
+    assert ".uc-vs-new em, .uc-vs-old em {\n  display: block;\n  font: 600 10px Outfit" not in cine
+    assert ".site-footer .hint { color: #fff; }" in uc
+
+
 def test_homepage_compare_copy_is_professional():
     r = client.get("/")
     assert r.status_code == 200

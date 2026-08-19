@@ -496,6 +496,7 @@ a { color: inherit; text-decoration: none; }
 .flow-arrow { display: none; }
 .h180-code { background: #05070c; color: #eef; padding: 16px; overflow-x: auto; font: 13px/1.5 ui-monospace, monospace; }
 .hint { color: var(--uc-muted-d); }
+.site-footer .hint { color: #fff; }
 .h180-label, .hx-kicker { font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--uc-muted-d); }
 
 [data-reveal] { opacity: 0; transform: translateY(20px); transition: opacity .7s ease, transform .7s ease; }
