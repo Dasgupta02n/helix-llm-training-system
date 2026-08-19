@@ -92,6 +92,90 @@
     Array.prototype.forEach.call(reveals, function (el) { io.observe(el); });
   }
 
+  var cine = document.querySelector("[data-cine]");
+  if (cine) {
+    var FRAME_COUNT = parseInt(cine.getAttribute("data-frame-count"), 10) || 43;
+    var canvas = document.getElementById("cineCanvas");
+    var spacer = document.getElementById("cineSpacer");
+    var ctx = canvas ? canvas.getContext("2d", { alpha: false }) : null;
+    var frames = new Array(FRAME_COUNT);
+    var last = -1;
+    function path(i) {
+      var n = String(i + 1);
+      while (n.length < 4) n = "0" + n;
+      return "/static/site/cinema/frames/frame_" + n + ".jpg";
+    }
+    function cover(img) {
+      var cw = window.innerWidth, ch = window.innerHeight;
+      var ir = img.width / img.height, cr = cw / ch;
+      var dw, dh, dx, dy;
+      if (cr > ir) { dw = cw; dh = cw / ir; dx = 0; dy = (ch - dh) / 2; }
+      else { dh = ch; dw = ch * ir; dy = 0; dx = (cw - dw) / 2; }
+      ctx.drawImage(img, dx, dy, dw, dh);
+    }
+    function draw(i) {
+      if (!ctx || !frames[i]) return;
+      last = i;
+      cover(frames[i]);
+    }
+    function resize() {
+      if (!canvas || !ctx) return;
+      var dpr = Math.min(window.devicePixelRatio || 1, 2);
+      canvas.width = Math.floor(window.innerWidth * dpr);
+      canvas.height = Math.floor(window.innerHeight * dpr);
+      canvas.style.width = window.innerWidth + "px";
+      canvas.style.height = window.innerHeight + "px";
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      draw(last < 0 ? 0 : last);
+    }
+    function preload() {
+      var i = 0;
+      function batch() {
+        var end = Math.min(i + 8, FRAME_COUNT);
+        for (; i < end; i++) {
+          (function (idx) {
+            var img = new Image();
+            img.onload = function () {
+              frames[idx] = img;
+              if (idx === 0) draw(0);
+            };
+            img.src = path(idx);
+          })(i);
+        }
+        if (i < FRAME_COUNT) window.requestAnimationFrame(batch);
+      }
+      batch();
+    }
+    function progress() {
+      var max = document.documentElement.scrollHeight - window.innerHeight;
+      if (max <= 0) return 0;
+      return Math.min(1, Math.max(0, window.scrollY / max));
+    }
+    function onScroll() {
+      var p = progress();
+      document.documentElement.style.setProperty("--scroll-p", String(p));
+      var idx = reduce ? FRAME_COUNT - 1 : Math.round(p * (FRAME_COUNT - 1));
+      if (idx !== last) draw(idx);
+      cine.querySelectorAll("[data-cine-range]").forEach(function (el) {
+        var parts = el.getAttribute("data-cine-range").split(",");
+        var a = parseFloat(parts[0]), b = parseFloat(parts[1]);
+        el.classList.toggle("is-on", p >= a && p <= b);
+      });
+    }
+    var ticking = false;
+    window.addEventListener("scroll", function () {
+      if (!ticking) {
+        window.requestAnimationFrame(function () { onScroll(); ticking = false; });
+        ticking = true;
+      }
+    }, { passive: true });
+    window.addEventListener("resize", resize);
+    if (spacer && !reduce) spacer.style.height = "420vh";
+    preload();
+    resize();
+    onScroll();
+  }
+
   var counts = document.querySelectorAll("[data-count]");
   if (counts.length) {
     function runCount(el) {
