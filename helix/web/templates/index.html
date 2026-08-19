@@ -1,12 +1,9 @@
 {% extends "public_base.html" %}
 {% block title %}One person. A whole bench of minds.{% endblock %}
-{% block meta_description %}C7X does not replace a person with AI. It gives one trusted person dedicated specialist LLM workers — so an Indian MSME can grow like a five-person bench, without five salaries sitting in working capital.{% endblock %}
+{% block meta_description %}C7X is a gold training-data studio. Interview one desk, gate gold rows, export a QLoRA adapter, serve it on a PC you own. It staffs the person you already trust — the example of five, not a replacement.{% endblock %}
 {% block canonical %}https://c7xai.in/{% endblock %}
 {% block main_class %}public-home{% endblock %}
 {% block extra_head %}
-<link rel="stylesheet" href="/static/geo.css?v={{ static_v }}" />
-{% endblock %}
-{% block content %}
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -15,7 +12,7 @@
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Web",
   "url": "https://c7xai.in/",
-  "description": "C7X gives one trusted person dedicated specialist LLM workers for a single desk. Gold training data, pinned weights, run on hardware you already own.",
+  "description": "Gold training-data studio: gated gold examples, optional QLoRA adapter, local serve. Not a chatbot.",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD", "description": "Free during public beta for approved accounts" },
   "publisher": { "@type": "Organization", "name": "c7x AI", "url": "https://c7xai.in/about" }
 }
@@ -32,28 +29,83 @@
   ]
 }
 </script>
-
-<div class="geo-root">
+{% endblock %}
+{% block content %}
+<div class="geo-root public-root">
   <canvas class="geo-stage" id="geoStage" aria-hidden="true"></canvas>
 
   <div class="geo-ui">
     <section class="geo-hero" id="bind">
-      <div class="geo-shape sq" style="top:18%;right:8%"></div>
-      <div class="geo-shape ci" style="bottom:8%;right:22%"></div>
-      <div class="geo-shape tr" style="top:28%;right:28%"></div>
-      <p class="geo-kicker">C7X · one operator</p>
-      <h1 class="geo-h1">One person. A whole bench of minds.</h1>
-      <p class="geo-lede">Volume cannot pay for a bench. Without a bench, volume cannot rise. C7X gives the person you already trust dedicated specialist workers — trained on how they already decide, run on a PC in the same room. On a typical desk, that is the example of five, not a promise.</p>
+      <div>
+        <div class="geo-shape sq" style="top:18%;right:8%"></div>
+        <div class="geo-shape ci" style="bottom:8%;right:22%"></div>
+        <div class="geo-shape tr" style="top:28%;right:28%"></div>
+        <p class="geo-kicker">C7X · gold training-data studio</p>
+        <h1 class="geo-h1">One person. A whole bench of minds.</h1>
+        <p class="geo-lede">Interview one desk. Gate gold rows. Export a QLoRA adapter. Serve it on a PC you own — Ollama, Open Interpreter, or llama.cpp. Not a chatbot. Not a replacement. On a typical desk, that is the example of five, not a promise. Working capital stays in the shop.</p>
+        <div class="geo-actions">
+          <a class="geo-btn" href="/app">Open studio</a>
+          <a class="geo-btn ghost" href="/sample-gold">Download sample gold</a>
+        </div>
+        <p class="geo-cta-note">Approved accounts · no checkout · usage = 2 × billed spend · about $0.75–$1 per gold row with sources</p>
+        <div class="proof-strip">
+          <span>Adapter zip</span>
+          <span>Gold ⟂ synthetics</span>
+          <span>Apache-2.0 / MIT bases</span>
+          <span>No hosted inference</span>
+          <span>Early beta</span>
+        </div>
+      </div>
+      <aside class="studio-win" data-studio aria-label="C7X artefact">
+        <div class="studio-win-bar"><span>returns-desk.zip</span><span>composite sample</span></div>
+        <div class="studio-tabs" role="tablist" aria-label="Artefact">
+          <button type="button" role="tab" aria-selected="true" aria-controls="panel-gold" id="tab-gold">Gold</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-riu" id="tab-riu">Riu</button>
+          <button type="button" role="tab" aria-selected="false" aria-controls="panel-zip" id="tab-zip">Zip</button>
+        </div>
+        <div class="studio-panel is-on" role="tabpanel" id="panel-gold" aria-labelledby="tab-gold">
+          <h3>Gold row · gate pass</h3>
+          <pre>{
+  "id": "sample-001",
+  "input": "Buyer photo: left sleeve hole after wash. PO 391.",
+  "output": "Defect: hole. Decision: remake. Do not invent a credit note."
+}</pre>
+        </div>
+        <div class="studio-panel" role="tabpanel" id="panel-riu" aria-labelledby="tab-riu">
+          <h3>Riu · setup interview</h3>
+          <p>Riu is the setup interview. The person who knows the job specifies the specialist brain: one perfect example, the edge cases, and the refusal — missing PO means ask one question, never invent a credit.</p>
+        </div>
+        <div class="studio-panel" role="tabpanel" id="panel-zip" aria-labelledby="tab-zip">
+          <h3>What you take home</h3>
+          <pre>returns-desk.zip
+  qlora/
+  tokenizer/
+  meta.json          base_model + license
+  gold.jsonl
+  load_adapter.py</pre>
+        </div>
+      </aside>
+    </section>
+
+    <section class="geo-band white" id="artefact">
+      <p class="geo-kicker">The artefact</p>
+      <h2 class="geo-h2">A gold row you can read. A zip you can run.</h2>
+      <p class="geo-lede">Export schema is <code>{"input", "output", "id"}</code>. Gold and synthetics are stored apart. If you train, C7X-IO returns a QLoRA adapter — not a merged 7B–30B dump — plus <code>load_adapter.py</code>. Catalog bases are Apache-2.0 or MIT instruct. Default is Qwen2.5 7B Instruct.</p>
+      <div class="schema-card">
+        <p><code>python load_adapter.py --prompt "Buyer sent a photo: left sleeve hole after wash. PO 391."</code></p>
+        <p><code>python load_adapter.py --merge-to ./merged</code></p>
+      </div>
       <div class="geo-actions">
-        <a class="geo-btn" href="/app">Talk to Riu</a>
-        <a class="geo-btn ghost" href="#cases">See the desks</a>
+        <a class="geo-btn" href="/samples/returns-desk.gold.jsonl">Raw JSONL</a>
+        <a class="geo-btn ghost" href="/gold-training-data">Gold training data</a>
+        <a class="geo-btn ghost" href="/docs">Docs</a>
       </div>
     </section>
 
     <section class="geo-band pink" id="why">
       <p class="geo-kicker">Why C7X</p>
       <h2 class="geo-h2">A general model cannot staff that person.</h2>
-      <p class="geo-lede">It forgets the clause. It sends records away. It charges more as you succeed. C7X writes the role into pinned weights. Working capital stays in the shop, not in five new CTC.</p>
+      <p class="geo-lede">It forgets the clause. It sends records away. It charges more as you succeed. C7X writes the role into pinned weights. Working capital stays in the shop, not in five new CTC. C7X does not replace the person. It staffs them.</p>
     </section>
 
     <section class="geo-band cyan" id="how">
@@ -96,21 +148,27 @@
           <p class="meta">Tiruppur</p>
           <h3>Returns desk</h3>
           <p>She walks the line again. The specialist drafts the note.</p>
+          <pre class="row-excerpt">"input": "sleeve hole after wash. PO 391."
+"output": "remake. do not invent a credit."</pre>
         </a>
         <a class="geo-card alt" href="/india-msme#pune">
           <p class="meta">Pune</p>
           <h3>GST coding</h3>
           <p>He posts exceptions. Working capital does not hire a Saturday.</p>
+          <pre class="row-excerpt">Propose HSN / ITC / GL.
+A person posts.</pre>
         </a>
         <a class="geo-card hot" href="/india-msme#hyderabad">
           <p class="meta">Hyderabad</p>
           <h3>Lab front desk</h3>
           <p>Time for the person in the chair. Not a replacement.</p>
+          <pre class="row-excerpt">Fasting · report-ready time.
+No diagnosis.</pre>
         </a>
       </div>
     </section>
 
-    <section class="geo-band white" data-film>
+    <section class="geo-band white" id="local" data-film>
       <p class="geo-kicker">The strand</p>
       <h2 class="geo-h2">From interview to the desk</h2>
       <div class="geo-film">
@@ -118,6 +176,33 @@
         <figure>02 Gold</figure>
         <figure>03 Train</figure>
         <figure>04 Local</figure>
+      </div>
+      <dl class="adapter-card">
+        <dt>Method</dt><dd>QLoRA adapter. Not a merged dump. Not a hosted endpoint.</dd>
+        <dt>Base</dt><dd>Apache-2.0 or MIT instruct. Default Qwen2.5 7B Instruct. 14B and 30B need more RAM.</dd>
+        <dt>Serve</dt><dd>Ollama, Open Interpreter, LM Studio, llama.cpp, or <code>load_adapter.py</code>.</dd>
+        <dt>Limit</dt><dd>If the shop PC is off, the worker is off. C7X does not host production inference.</dd>
+        <dt>Cost on the counter</dt><dd>Usage = 2 × billed spend. Gold with sources about $0.75–$1 per row. Default 7B train about $10–40.</dd>
+      </dl>
+      <div class="geo-actions">
+        <a class="geo-btn" href="/run-locally">Run locally</a>
+        <a class="geo-btn ghost" href="/roles">Roles</a>
+      </div>
+    </section>
+
+    <section class="geo-band pink" id="trust-strip">
+      <p class="geo-kicker">Trust</p>
+      <h2 class="geo-h2">Named operator. Honest beta.</h2>
+      <p class="geo-lede">Sabyasachi Dasgupta operates c7xai.in. No card data. No SOC 2 / ISO claim. Dataset and adapter limits are on the <a href="/dataset-card">dataset card</a>. Sample artefact is public and labelled a composite.</p>
+      <div class="proof-strip">
+        <span>HTTPS</span>
+        <span>No SOC 2</span>
+        <span>No cards</span>
+        <span>You own the zip</span>
+      </div>
+      <div class="geo-actions">
+        <a class="geo-btn" href="/trust">Trust center</a>
+        <a class="geo-btn ghost" href="/sample-gold">Sample gold</a>
       </div>
     </section>
 
@@ -136,8 +221,9 @@
         </details>
       </div>
       <div class="geo-actions">
-        <a class="geo-btn" href="/app">Talk to Riu</a>
-        <a class="geo-btn ghost" href="/docs" style="color:#fff200!important;box-shadow:inset 0 0 0 3px #fff200">Docs</a>
+        <a class="geo-btn" href="/app">Open studio</a>
+        <a class="geo-btn ghost" href="/sample-gold">Download sample gold</a>
+        <a class="geo-btn ghost" href="/docs">Docs</a>
       </div>
     </section>
   </div>

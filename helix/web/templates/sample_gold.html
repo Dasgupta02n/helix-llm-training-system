@@ -1,0 +1,61 @@
+{% extends "public_base.html" %}
+{% block title %}Sample gold JSONL{% endblock %}
+{% block canonical %}https://c7xai.in/sample-gold{% endblock %}
+{% block meta_description %}Public composite gold file for a knitwear returns desk. Operator-authored. Same export shape C7X uses: input, output, id. Not a live customer dataset.{% endblock %}
+{% block extra_head %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "DataDownload",
+  "name": "C7X sample gold — knitwear returns desk",
+  "description": "Illustrated composite gold JSONL. Not customer data.",
+  "encodingFormat": "application/jsonl",
+  "contentUrl": "https://c7xai.in/samples/returns-desk.gold.jsonl",
+  "license": "https://c7xai.in/terms"
+}
+</script>
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  "itemListElement": [
+    {"@type": "ListItem", "position": 1, "name": "Home", "item": "https://c7xai.in/"},
+    {"@type": "ListItem", "position": 2, "name": "Sample gold", "item": "https://c7xai.in/sample-gold"}
+  ]
+}
+</script>
+{% endblock %}
+{% block content %}
+<article class="legal-doc">
+  <p class="page-kicker">Sample artefact</p>
+  <h1>returns-desk.gold.jsonl</h1>
+  <p class="lead">
+    Ten gold rows for a Tiruppur-style returns desk. Operator-authored illustrated composite —
+    <strong>not a live customer file</strong>. Schema matches a C7X export: <code>input</code>, <code>output</code>, <code>id</code>.
+  </p>
+  <p>
+    <a class="btn btn-primary" href="/samples/returns-desk.gold.jsonl">Download JSONL</a>
+    <a class="btn btn-ghost" href="/gold-training-data">Gold training data</a>
+    <a class="btn btn-ghost" href="/dataset-card">Dataset card</a>
+  </p>
+  <h2>What a row is</h2>
+  <p>A gated example of how one person already decides. Synthetics, if you make them later, live in a separate file and join training only if you say so.</p>
+  <h2>The ten rows</h2>
+  <table class="gold-table">
+    <thead><tr><th>id</th><th>input</th><th>output</th></tr></thead>
+    <tbody>
+      <tr><td>sample-001</td><td>Sleeve hole after wash. PO 391.</td><td>Remake. Do not invent a credit note.</td></tr>
+      <tr><td>sample-002</td><td>Repeat shade claim, no swatch.</td><td>Reject pending lab dip. Ask for barcode.</td></tr>
+      <tr><td>sample-003</td><td>Crushed carton, no PO.</td><td>Ask the PO. Refusal to credit.</td></tr>
+      <tr><td>sample-004</td><td>M labelled as L, 12 pieces.</td><td>Relabel or replace. Stop packing.</td></tr>
+      <tr><td>sample-005</td><td>Late ship, no damage, 8% asked.</td><td>Not a floor defect. Hand to merchandising.</td></tr>
+      <tr><td>sample-006</td><td>Needle mark, repeat machine.</td><td>Remake 3. Flag machine 4.</td></tr>
+      <tr><td>sample-007</td><td>Selfie, “not happy”, no PO.</td><td>Ask PO and defect. Hard refusal.</td></tr>
+      <tr><td>sample-008</td><td>Oil stain, style already closed.</td><td>Refund 2. No recut. Supervisor signs.</td></tr>
+      <tr><td>sample-009</td><td>Dark photo of a possible hole.</td><td>Ask a daylight photo. Do not classify yet.</td></tr>
+      <tr><td>sample-010</td><td>Open stitch, first bulk.</td><td>Remake 6. QA to the line.</td></tr>
+    </tbody>
+  </table>
+  <p class="hint">This table is a reading aid. The downloadable file is JSONL, one object per line.</p>
+</article>
+{% endblock %}

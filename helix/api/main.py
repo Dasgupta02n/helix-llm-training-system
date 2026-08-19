@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import logging
+from datetime import date
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, PlainTextResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.trustedhost import TrustedHostMiddleware
@@ -128,10 +129,7 @@ def _static_asset_version() -> str:
         static_dir / "app.css",
         static_dir / "modernist.css",
         static_dir / "site.css",
-        static_dir / "uc.css",
-        static_dir / "cine.css",
-        static_dir / "geo.css",
-        static_dir / "helix180.css",
+        static_dir / "public.css",
         static_dir / "site.js",
         *sorted((static_dir / "js").glob("*.js")),
     ]
@@ -310,6 +308,26 @@ def roles_page(request: Request) -> HTMLResponse:
     return _public_page(request, "roles.html")
 
 
+@app.get("/sample-gold", response_class=HTMLResponse)
+def sample_gold_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "sample_gold.html")
+
+
+@app.get("/dataset-card", response_class=HTMLResponse)
+def dataset_card_page(request: Request) -> HTMLResponse:
+    return _public_page(request, "dataset_card.html")
+
+
+@app.get("/samples/returns-desk.gold.jsonl")
+def sample_gold_file() -> FileResponse:
+    path = static_dir / "samples" / "returns-desk.gold.jsonl"
+    return FileResponse(
+        path,
+        media_type="application/jsonl",
+        filename="returns-desk.gold.jsonl",
+    )
+
+
 @app.get("/why-c7x")
 def why_c7x_redirect() -> RedirectResponse:
     return RedirectResponse("/gold-training-data", status_code=301)
@@ -329,8 +347,8 @@ def robots_txt() -> str:
         "Disallow: /api/\n"
         "\n"
         "Sitemap: https://c7xai.in/sitemap.xml\n"
-        "LLMs-Txt: https://c7xai.in/llms.txt\n"
-        "LLMs-Txt-Full: https://c7xai.in/gold-training-data.md\n"
+        "# llms.txt is at https://c7xai.in/llms.txt\n"
+        "# full citeable copy: https://c7xai.in/gold-training-data.md\n"
     )
 
 
@@ -351,6 +369,8 @@ def llms_txt() -> str:
         "## Product\n"
         "- Home: https://c7xai.in/\n"
         "- Gold training data studio: https://c7xai.in/gold-training-data\n"
+        "- Sample gold JSONL: https://c7xai.in/sample-gold\n"
+        "- Dataset and adapter card: https://c7xai.in/dataset-card\n"
         "- Cite this (markdown): https://c7xai.in/gold-training-data.md\n"
         "- How C7X compares with current industry solutions: https://c7xai.in/gold-training-data\n"
         "- Indian MSME case studies: https://c7xai.in/india-msme\n"
@@ -415,11 +435,13 @@ def security_txt() -> str:
 
 @app.get("/sitemap.xml")
 def sitemap_xml() -> Response:
-    today = "2026-08-16"  # public-page lastmod for crawlers
+    today = date.today().isoformat()
     paths = [
         ("/", "daily", "1.0"),
         ("/gold-training-data", "weekly", "0.95"),
         ("/gold-training-data.md", "weekly", "0.7"),
+        ("/sample-gold", "weekly", "0.85"),
+        ("/dataset-card", "weekly", "0.8"),
         ("/india-msme", "weekly", "0.9"),
         ("/run-locally", "weekly", "0.9"),
         ("/roles", "weekly", "0.85"),

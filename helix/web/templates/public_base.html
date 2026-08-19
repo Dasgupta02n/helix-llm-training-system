@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>{% block title %}C7X{% endblock %} — Training Data Studio</title>
-  <meta name="description" content="{% block meta_description %}C7X is a no-code gold training-data studio for product and ops teams: plan in plain English, mine evidence, quality-gate gold examples, synthesize variants, and export fine-tune-ready datasets.{% endblock %}" />
+  <meta name="description" content="{% block meta_description %}C7X is a gold training-data studio: interview one desk, gate gold rows, export a QLoRA adapter, and serve it on a PC you own.{% endblock %}" />
   <meta name="robots" content="index,follow,max-image-preview:large" />
   <meta name="author" content="Sabyasachi Dasgupta, c7x AI" />
   <meta name="publisher" content="c7x AI" />
-  <meta name="theme-color" content="#0b0d12" />
+  <meta name="theme-color" content="#fff200" />
   <link rel="canonical" href="{% block canonical %}https://c7xai.in/{% endblock %}" />
   <link rel="icon" href="/static/favicon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="/static/favicon.svg" />
@@ -18,13 +18,14 @@
   <meta property="og:title" content="{{ self.title() }} — Training Data Studio" />
   <meta property="og:description" content="{{ self.meta_description() }}" />
   <meta property="og:url" content="{{ self.canonical() }}" />
-  <meta property="og:image" content="https://c7xai.in/static/site/hero.jpg" />
+  <meta property="og:image" content="https://c7xai.in/static/site/og-artefact.jpg" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="{{ self.title() }} — Training Data Studio" />
   <meta name="twitter:description" content="{{ self.meta_description() }}" />
-  <meta name="twitter:image" content="https://c7xai.in/static/site/hero.jpg" />
-  <link rel="stylesheet" href="/static/site.css?v={{ static_v }}" />
-  <link rel="stylesheet" href="/static/cine.css?v={{ static_v }}" />
+  <meta name="twitter:image" content="https://c7xai.in/static/site/og-artefact.jpg" />
+  <link rel="preload" href="/static/fonts/archivo-black-400.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="preload" href="/static/fonts/space-grotesk-500.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="/static/public.css?v={{ static_v }}" />
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -57,45 +58,34 @@
   {% block extra_head %}{% endblock %}
 </head>
 <body class="site-body">
+  <a class="skip-link" href="#main">Skip to content</a>
   <div class="landing-shell">
-    <div class="uc-ticker" aria-hidden="true">
-      <div class="uc-ticker-track">
-        <span>News: one trusted person, specialist workers</span>
-        <span>Tiruppur knitwear returns</span>
-        <span>Pune GST coding</span>
-        <span>Hyderabad lab desk</span>
-        <span>Run locally · Ollama · Open Interpreter</span>
-        <span>News: one trusted person, specialist workers</span>
-        <span>Tiruppur knitwear returns</span>
-        <span>Pune GST coding</span>
-        <span>Hyderabad lab desk</span>
-        <span>Run locally · Ollama · Open Interpreter</span>
-      </div>
-    </div>
     <header class="site-top">
       <a class="brand" href="/" aria-label="C7X home">
         <svg class="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <circle cx="12" cy="12" r="9" stroke="#fff" stroke-width="1.4"/>
-          <path d="M7 12h10" stroke="#3b6cff" stroke-width="1.4"/>
+          <circle cx="12" cy="12" r="9" stroke="#fff200" stroke-width="1.4"/>
+          <path d="M7 12h10" stroke="#fff200" stroke-width="1.4"/>
         </svg>
         <div class="brand-text">
           <strong>C7X</strong>
-          <span>One operator</span>
+          <span>Gold training-data studio</span>
         </div>
       </a>
       <nav class="site-nav" id="siteNav" aria-label="Primary">
-        <a href="/#why">Why C7X</a>
-        <a href="/#how">How it works</a>
+        <a href="/gold-training-data">Gold</a>
+        <a href="/run-locally">Local</a>
+        <a href="/roles">Roles</a>
         <a href="/india-msme">Cases</a>
-        <a href="/pricing">Pricing</a>
         <a href="/docs">Docs</a>
-        <a class="btn btn-primary btn-sm" href="/app">Talk to Riu</a>
+        <a href="/pricing">Pricing</a>
+        <a href="/trust">Trust</a>
+        <a class="btn btn-primary btn-sm" href="/app">Open studio</a>
       </nav>
-      <a class="uc-fixed-cta" href="/app">Talk to Riu</a>
+      <button class="motion-toggle" type="button" data-motion-toggle aria-pressed="false">Pause motion</button>
       <button class="site-nav-toggle" type="button" aria-expanded="false" aria-controls="siteNav" data-nav-toggle>Menu</button>
     </header>
 
-    <main class="{% block main_class %}public-page{% endblock %}">
+    <main id="main" class="{% block main_class %}public-page{% endblock %}" tabindex="-1">
       {% block content %}{% endblock %}
     </main>
 
@@ -112,6 +102,8 @@
           <a href="/#why">Why C7X</a>
           <a href="/#how">How it works</a>
           <a href="/gold-training-data">Gold training data</a>
+          <a href="/sample-gold">Sample gold</a>
+          <a href="/dataset-card">Dataset card</a>
           <a href="/india-msme">India MSME cases</a>
           <a href="/run-locally">Run locally</a>
           <a href="/roles">Roles</a>
@@ -134,6 +126,7 @@
           <a href="/privacy">Privacy</a>
           <a href="/terms">Terms</a>
           <a href="/llms.txt">llms.txt</a>
+          <a href="/humans.txt">humans.txt</a>
           <a href="mailto:dasgupta.02n@gmail.com">dasgupta.02n@gmail.com</a>
         </div>
       </div>
@@ -141,6 +134,7 @@
         <span>HTTPS at the public edge</span>
         <span>Named operator on every page</span>
         <span>No card data collected</span>
+        <span>No SOC 2 claim</span>
         <span>Workspace data stays in your account</span>
       </div>
       <div class="site-footer-bottom">

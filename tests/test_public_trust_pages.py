@@ -24,6 +24,8 @@ PUBLIC_HTML = [
     "/india-msme",
     "/run-locally",
     "/roles",
+    "/sample-gold",
+    "/dataset-card",
 ]
 
 
@@ -93,6 +95,8 @@ def test_robots_and_sitemap():
     assert "https://c7xai.in/india-msme" in sm.text
     assert "https://c7xai.in/run-locally" in sm.text
     assert "https://c7xai.in/roles" in sm.text
+    assert "https://c7xai.in/sample-gold" in sm.text
+    assert "https://c7xai.in/dataset-card" in sm.text
 
 
 def test_crawler_files_exist():
@@ -204,19 +208,16 @@ def test_docs_cover_riu_and_materials():
 def test_geo_theme_meets_aa_contrast_pairs():
     from pathlib import Path
 
-    geo = Path("helix/web/static/geo.css").read_text(encoding="utf-8")
-    cine = Path("helix/web/static/cine.css").read_text(encoding="utf-8")
-    uc = Path("helix/web/static/uc.css").read_text(encoding="utf-8")
-    assert ".geo-band.pink { background: #ff2d95; color: #111; }" in geo
-    assert ".geo-card.hot { background: #ff2d95; color: #111; }" in geo
-    assert "color: #111; animation-delay: .8s" in geo
-    assert ".uc-vs-old em, .uc-vs-new em" in geo
-    assert "color: #111;" in geo.split(".uc-vs-old em, .uc-vs-new em")[1][:280]
-    assert ".site-footer .hint" in geo
-    assert ".geo-band.pink .geo-lede { color: #fff; }" not in geo
-    assert ".cine-root .uc-vs-new em, .cine-root .uc-vs-old em" in cine
-    assert ".uc-vs-new em, .uc-vs-old em {\n  display: block;\n  font: 600 10px Outfit" not in cine
-    assert ".site-footer .hint { color: #fff; }" in uc
+    css = Path("helix/web/static/public.css").read_text(encoding="utf-8")
+    assert "--pink: #ff2d95;" in css
+    assert "--ink: #111111;" in css
+    assert ".geo-band.pink { background: var(--pink); color: var(--ink); }" in css
+    assert ".geo-card.hot { background: var(--pink); color: var(--ink); }" in css
+    assert ".uc-vs-old em, .uc-vs-new em" in css
+    assert "color: var(--ink);" in css.split(".uc-vs-old em, .uc-vs-new em")[1][:400]
+    assert ".site-footer .hint { color: var(--white); }" in css
+    assert ".geo-band.pink .geo-lede { color: #fff; }" not in css
+    assert "color: #fff;" not in css.split(".geo-band.pink")[1][:280]
 
 
 def test_homepage_compare_copy_is_professional():
@@ -287,6 +288,65 @@ def test_roles_page_covers_replace_assist_multiply():
     assert "FAQPage" in r.text
     assert "ollama" in low
     assert "open interpreter" in low
+
+
+def test_public_site_is_ml_artefact_first():
+    from pathlib import Path
+
+    r = client.get("/")
+    assert r.status_code == 200
+    low = r.text.lower()
+    assert "gold training-data" in low
+    assert "qlora" in low
+    assert "open studio" in low
+    assert "/samples/returns-desk.gold.jsonl" in r.text
+    assert "qlora/" in low
+    assert "load_adapter.py" in r.text
+    assert "apache" in low
+    assert "2 ×" in r.text or "2 ×" in r.text.replace("&times;", "×")
+    assert "uc-ticker" not in r.text
+    assert "cine.css" not in r.text
+    header = r.text.split("<main", 1)[0]
+    assert "Talk to Riu" not in header
+    css = Path("helix/web/static/public.css").read_text(encoding="utf-8")
+    assert "#fff" not in css.split(".geo-band.pink")[1].split("}", 1)[0]
+
+
+def test_sample_gold_and_dataset_card():
+    page = client.get("/sample-gold")
+    assert page.status_code == 200
+    assert "sample-001" in page.text
+    assert "input" in page.text
+    raw = client.get("/samples/returns-desk.gold.jsonl")
+    assert raw.status_code == 200
+    lines = [ln for ln in raw.text.splitlines() if ln.strip()]
+    assert len(lines) >= 8
+    import json
+
+    for ln in lines:
+        row = json.loads(ln)
+        assert row.get("input")
+        assert row.get("output")
+    card = client.get("/dataset-card")
+    assert card.status_code == 200
+    body = card.text.lower()
+    for heading in (
+        "purpose",
+        "training data",
+        "base",
+        "method",
+        "metrics",
+        "limits",
+        "human oversight",
+        "deployment",
+    ):
+        assert heading in body
+    assert "not claimed" in body
+    llms = client.get("/llms.txt")
+    assert "sample-gold" in llms.text
+    assert "dataset-card" in llms.text
+    robots = client.get("/robots.txt")
+    assert "LLMs-Txt:" not in robots.text
 
 
 def test_app_login_has_legal_links():

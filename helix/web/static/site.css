@@ -1,2 +1,2 @@
-/* Public site entry. Visual system lives in uc.css (United Carriers language). */
-@import url("/static/uc.css");
+/* Public site entry. Visual system lives in public.css. */
+@import url("/static/public.css");
