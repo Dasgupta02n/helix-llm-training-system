@@ -306,6 +306,8 @@ def test_public_site_is_ml_artefact_first():
     assert "2 ×" in r.text or "2 ×" in r.text.replace("&times;", "×")
     assert "uc-ticker" not in r.text
     assert "cine.css" not in r.text
+    assert 'aria-label="C7X home"' not in r.text
+    assert "<h3>Gold row" not in r.text
     header = r.text.split("<main", 1)[0]
     assert "Talk to Riu" not in header
     css = Path("helix/web/static/public.css").read_text(encoding="utf-8")

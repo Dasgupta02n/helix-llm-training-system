@@ -397,7 +397,7 @@ a { color: inherit; }
 }
 .studio-panel { padding: 16px 18px 22px; display: none; }
 .studio-panel.is-on { display: block; }
-.studio-panel h3 {
+.studio-panel h3, .studio-panel .studio-title {
   margin: 0 0 10px;
   font: 400 22px/1 var(--font-d);
   text-transform: uppercase;
