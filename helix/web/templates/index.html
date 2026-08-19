@@ -3,6 +3,9 @@
 {% block meta_description %}C7X does not replace a person with AI. It gives one trusted person dedicated specialist LLM workers — so an Indian MSME can grow like a five-person bench, without five salaries sitting in working capital.{% endblock %}
 {% block canonical %}https://c7xai.in/{% endblock %}
 {% block main_class %}public-home{% endblock %}
+{% block extra_head %}
+<link rel="stylesheet" href="/static/geo.css?v={{ static_v }}" />
+{% endblock %}
 {% block content %}
 <script type="application/ld+json">
 {
@@ -30,145 +33,113 @@
 }
 </script>
 
-<div class="cine-root" data-cine data-frame-count="43">
-  <canvas class="cine-canvas" id="cineCanvas" aria-hidden="true"></canvas>
-  <div class="cine-scrim" aria-hidden="true"></div>
-  <div class="cine-spacer" id="cineSpacer"></div>
+<div class="geo-root">
+  <canvas class="geo-stage" id="geoStage" aria-hidden="true"></canvas>
 
-  <div class="cine-ui">
-    <section class="cine-panel is-on" data-cine-range="0,0.22" id="bind">
-      <div>
-        <p class="cine-kicker">C7X · one operator</p>
-        <h1 class="cine-h1">One person. A whole bench of minds.</h1>
-        <p class="cine-lede">Volume cannot pay for a bench. Without a bench, volume cannot rise. C7X gives the person you already trust dedicated specialist workers — trained on how they already decide, run on a PC in the same room. On a typical desk, that is the example of five, not a promise.</p>
-        <div class="cine-actions">
-          <a class="cine-btn" href="/app">Talk to Riu</a>
-          <a class="cine-btn ghost" href="#cases">See the desks</a>
-        </div>
+  <div class="geo-ui">
+    <section class="geo-hero" id="bind">
+      <div class="geo-shape sq" style="top:18%;right:8%"></div>
+      <div class="geo-shape ci" style="bottom:8%;right:22%"></div>
+      <div class="geo-shape tr" style="top:28%;right:28%"></div>
+      <p class="geo-kicker">C7X · one operator</p>
+      <h1 class="geo-h1">One person. A whole bench of minds.</h1>
+      <p class="geo-lede">Volume cannot pay for a bench. Without a bench, volume cannot rise. C7X gives the person you already trust dedicated specialist workers — trained on how they already decide, run on a PC in the same room. On a typical desk, that is the example of five, not a promise.</p>
+      <div class="geo-actions">
+        <a class="geo-btn" href="/app">Talk to Riu</a>
+        <a class="geo-btn ghost" href="#cases">See the desks</a>
       </div>
     </section>
 
-    <section class="cine-panel" data-cine-range="0.22,0.42" id="why">
-      <div class="cine-glass">
-        <p class="cine-kicker">Why C7X</p>
-        <h2 class="cine-h2">A general model cannot staff that person.</h2>
-        <p class="cine-lede">It forgets the clause. It sends the buyer photo away. It charges more as you succeed. C7X writes the role into pinned weights. Working capital stays in the shop, not in five new CTC.</p>
+    <section class="geo-band pink" id="why">
+      <p class="geo-kicker">Why C7X</p>
+      <h2 class="geo-h2">A general model cannot staff that person.</h2>
+      <p class="geo-lede">It forgets the clause. It sends records away. It charges more as you succeed. C7X writes the role into pinned weights. Working capital stays in the shop, not in five new CTC.</p>
+    </section>
+
+    <section class="geo-band cyan" id="how">
+      <p class="geo-kicker">How it works</p>
+      <h2 class="geo-h2">Interview. Gold. Weights. Home.</h2>
+      <div class="geo-grid">
+        <article class="geo-card" id="riu">
+          <p class="meta">01</p>
+          <h3>Riu</h3>
+          <p>Riu is the setup interview. The person who knows the job specifies the specialist brain.</p>
+        </article>
+        <article class="geo-card alt">
+          <p class="meta">02</p>
+          <h3>Gold</h3>
+          <p>Decisions, gated. A gold training-data library you own — not a chat box.</p>
+        </article>
+        <article class="geo-card hot">
+          <p class="meta">03</p>
+          <h3>Local</h3>
+          <p>C7X-IO returns a QLoRA adapter. Serve it with Ollama or Open Interpreter.</p>
+        </article>
       </div>
     </section>
 
-    <section class="cine-panel" data-cine-range="0.42,0.62" id="how">
-      <div>
-        <p class="cine-kicker">How it works</p>
-        <h2 class="cine-h2">Interview. Gold. Weights. Home.</h2>
-        <div class="cine-grid3" style="margin-top:28px">
-          <article class="cine-card" id="riu">
-            <p class="meta">01</p>
-            <h3>Riu</h3>
-            <p>Riu is the setup interview. The person who knows the job specifies the specialist brain.</p>
-          </article>
-          <article class="cine-card">
-            <p class="meta">02</p>
-            <h3>Gold</h3>
-            <p>Decisions, gated. A gold training-data library you own — not a chat box.</p>
-          </article>
-          <article class="cine-card">
-            <p class="meta">03</p>
-            <h3>Local</h3>
-            <p>C7X-IO returns a QLoRA adapter. Serve it with Ollama or Open Interpreter.</p>
-          </article>
-        </div>
+    <section class="geo-band lime" id="compare">
+      <p class="geo-kicker">Industry solutions</p>
+      <h2 class="geo-h2">How C7X compares with current industry solutions</h2>
+      <div class="uc-vs">
+        <div class="uc-vs-row"><strong>Behaviour</strong><div class="uc-vs-old"><em>Hosted</em>In a prompt, forgotten each session</div><div class="uc-vs-new"><em>C7X</em>In the weights, as a property of the model</div></div>
+        <div class="uc-vs-row"><strong>Inference</strong><div class="uc-vs-old"><em>Hosted</em>Records leave the building</div><div class="uc-vs-new"><em>C7X</em>Your hardware. No outbound call</div></div>
+        <div class="uc-vs-row"><strong>Cost</strong><div class="uc-vs-old"><em>Hosted</em>Per token, forever</div><div class="uc-vs-new"><em>C7X</em>Bounded train, then electricity</div></div>
       </div>
     </section>
 
-    <section class="cine-panel tight" data-cine-range="0.58,0.78" id="compare">
-      <div>
-        <p class="cine-kicker">Industry solutions</p>
-        <h2 class="cine-h2">How C7X compares with current industry solutions</h2>
-        <div class="uc-vs">
-          <div class="uc-vs-row"><strong>Behaviour</strong><div class="uc-vs-old"><em>Hosted</em>In a prompt, forgotten each session</div><div class="uc-vs-new"><em>C7X</em>In the weights, as a property of the model</div></div>
-          <div class="uc-vs-row"><strong>Inference</strong><div class="uc-vs-old"><em>Hosted</em>Records leave the building</div><div class="uc-vs-new"><em>C7X</em>Your hardware. No outbound call</div></div>
-          <div class="uc-vs-row"><strong>Cost</strong><div class="uc-vs-old"><em>Hosted</em>Per token, forever</div><div class="uc-vs-new"><em>C7X</em>Bounded train, then electricity</div></div>
-        </div>
+    <section class="geo-band orange" id="cases">
+      <p class="geo-kicker">India · illustrated cases</p>
+      <h2 class="geo-h2">Three desks. One person each.</h2>
+      <div class="geo-grid">
+        <a class="geo-card" href="/india-msme#tiruppur">
+          <p class="meta">Tiruppur</p>
+          <h3>Returns desk</h3>
+          <p>She walks the line again. The specialist drafts the note.</p>
+        </a>
+        <a class="geo-card alt" href="/india-msme#pune">
+          <p class="meta">Pune</p>
+          <h3>GST coding</h3>
+          <p>He posts exceptions. Working capital does not hire a Saturday.</p>
+        </a>
+        <a class="geo-card hot" href="/india-msme#hyderabad">
+          <p class="meta">Hyderabad</p>
+          <h3>Lab front desk</h3>
+          <p>Time for the person in the chair. Not a replacement.</p>
+        </a>
       </div>
     </section>
 
-    <section class="cine-panel" data-cine-range="0.72,0.9" id="cases">
-      <div style="width:100%">
-        <p class="cine-kicker">India · illustrated</p>
-        <h2 class="cine-h2">Three desks. One person each.</h2>
-        <div class="cine-grid3" style="margin-top:24px">
-          <a class="cine-card" href="/india-msme#tiruppur">
-            <img src="/static/site/cases/tiruppur-together.jpg" width="1600" height="1067" alt="Tiruppur supervisor and operator at a sewing machine.">
-            <p class="meta">Tiruppur</p>
-            <h3>Returns desk</h3>
-            <p>She walks the line again. The specialist drafts the note.</p>
-          </a>
-          <a class="cine-card" href="/india-msme#pune">
-            <img src="/static/site/cases/pune-together.jpg" width="1600" height="1067" alt="Pune accountant and clerk.">
-            <p class="meta">Pune</p>
-            <h3>GST coding</h3>
-            <p>He posts exceptions. Working capital does not hire a Saturday.</p>
-          </a>
-          <a class="cine-card" href="/india-msme#hyderabad">
-            <img src="/static/site/cases/hyderabad-together.jpg" width="1600" height="1067" alt="Hyderabad receptionist with a patient.">
-            <p class="meta">Hyderabad</p>
-            <h3>Lab front desk</h3>
-            <p>Time for the person in the chair. Not a replacement.</p>
-          </a>
-        </div>
+    <section class="geo-band white" data-film>
+      <p class="geo-kicker">The strand</p>
+      <h2 class="geo-h2">From interview to the desk</h2>
+      <div class="geo-film">
+        <figure>01 Riu</figure>
+        <figure>02 Gold</figure>
+        <figure>03 Train</figure>
+        <figure>04 Local</figure>
       </div>
     </section>
 
-    <section class="cine-panel tight" data-cine-range="0.86,1">
-      <div>
-        <p class="cine-kicker">The strand</p>
-        <h2 class="cine-h2">From interview to the desk</h2>
-        <div class="uc-film" data-film>
-          <div class="uc-film-stage">
-            <figure class="is-on" data-slide>
-              <img src="/static/site/workflow/01-riu.jpg" width="1920" height="1080" alt="Riu interview.">
-              <figcaption>01 Riu</figcaption>
-            </figure>
-            <figure data-slide>
-              <img src="/static/site/workflow/02-library.jpg" width="1920" height="1080" alt="Gold library.">
-              <figcaption>02 Library</figcaption>
-            </figure>
-            <figure data-slide>
-              <img src="/static/site/workflow/03-train.jpg" width="1920" height="1080" alt="Train.">
-              <figcaption>03 Train</figcaption>
-            </figure>
-            <figure data-slide>
-              <img src="/static/site/workflow/04-ollama.jpg" width="1920" height="1080" alt="Local run.">
-              <figcaption>04 Local</figcaption>
-            </figure>
-          </div>
-          <div class="uc-film-nav">
-            <button type="button" data-film-go class="is-on">01</button>
-            <button type="button" data-film-go>02</button>
-            <button type="button" data-film-go>03</button>
-            <button type="button" data-film-go>04</button>
-          </div>
-        </div>
+    <section class="geo-band black" id="seo-geo">
+      <p class="geo-kicker">SEO + GEO</p>
+      <h2 class="geo-h2">Not another chat box.</h2>
+      <p class="geo-lede">Gold training data. Generative engines cite a model that answers from your domain. C7X does not replace the person. <a href="/gold-training-data" style="color:#fff200;text-decoration:underline">How C7X compares with current industry solutions</a>. <a href="/run-locally" style="color:#00e5ff;text-decoration:underline">Run locally</a>. <a href="/roles" style="color:#ff2d95;text-decoration:underline">Roles</a>.</p>
+      <div class="uc-faq" style="margin-top:32px">
+        <details open>
+          <summary>Does C7X replace people?</summary>
+          <p>No. It staffs the person you already trust. Labeling factories and hosted chat start from a different job.</p>
+        </details>
+        <details>
+          <summary>Who is Riu?</summary>
+          <p>Riu is the setup interview. She is the only way a plan gets created.</p>
+        </details>
       </div>
-    </section>
-
-    <section class="cine-panel tight" id="seo-geo">
-      <div class="cine-glass">
-        <p class="cine-kicker">SEO + GEO</p>
-        <h2 class="cine-h2">Not another chat box.</h2>
-        <p class="cine-lede">Gold training data. Generative engines cite a model that answers from your domain. C7X does not replace the person. <a href="/gold-training-data">How C7X compares with current industry solutions</a>. <a href="/run-locally">Run locally</a>. <a href="/roles">Roles</a>.</p>
-      </div>
-    </section>
-
-    <section class="cine-cta" id="cta">
-      <p class="cine-kicker">Enter</p>
-      <h2 class="cine-h2">Describe the person, and the desk they already hold.</h2>
-      <div class="cine-actions">
-        <a class="cine-btn" href="/app">Talk to Riu</a>
-        <a class="cine-btn ghost" href="/docs">Docs</a>
+      <div class="geo-actions">
+        <a class="geo-btn" href="/app">Talk to Riu</a>
+        <a class="geo-btn ghost" href="/docs" style="color:#fff200!important;box-shadow:inset 0 0 0 3px #fff200">Docs</a>
       </div>
     </section>
   </div>
 </div>
-<img src="/static/site/people/hero-together.jpg" width="1" height="1" alt="" hidden>
 {% endblock %}

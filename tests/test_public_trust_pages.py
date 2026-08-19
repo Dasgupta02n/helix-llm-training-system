@@ -207,7 +207,6 @@ def test_homepage_compare_copy_is_professional():
     assert "without naming other products" not in r.text.lower()
     assert "How C7X compares with current industry solutions" in r.text
     assert 'data-film' in r.text
-    assert "/static/site/workflow/01-riu.jpg" in r.text
     assert 'id="cases"' in r.text
     assert 'id="bind"' in r.text
     assert "uc-vs" in r.text
@@ -217,8 +216,8 @@ def test_homepage_compare_copy_is_professional():
     assert "Tiruppur" in r.text
     assert "Pune" in r.text
     assert "Hyderabad" in r.text
-    assert "/static/site/people/hero-together.jpg" in r.text
-    assert "/static/site/cases/tiruppur-together.jpg" in r.text
+    assert "geo-root" in r.text
+    assert "hero-together.jpg" not in r.text
     assert 'href="/india-msme"' in r.text
     assert 'href="/run-locally"' in r.text
     assert 'href="/roles"' in r.text

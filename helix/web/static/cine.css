@@ -164,8 +164,8 @@
   color: #e8b86d;
 }
 
-.uc-vs { width: 100%; max-width: 900px; }
-.uc-vs-row {
+.cine-root .uc-vs { width: 100%; max-width: 900px; }
+.cine-root .uc-vs-row {
   display: grid;
   grid-template-columns: .8fr 1fr 1fr;
   gap: 14px;
@@ -184,7 +184,7 @@
   color: #e8b86d;
 }
 
-.uc-film { width: 100%; max-width: 920px; }
+.cine-root .uc-film { width: 100%; max-width: 920px; }
 .uc-film-stage {
   position: relative;
   aspect-ratio: 16 / 9;

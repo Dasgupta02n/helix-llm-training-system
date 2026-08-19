@@ -92,6 +92,76 @@
     Array.prototype.forEach.call(reveals, function (el) { io.observe(el); });
   }
 
+  var geo = document.getElementById("geoStage");
+  if (geo && !reduce) {
+    var gctx = geo.getContext("2d");
+    var bits = [];
+    var colors = ["#ff2d95", "#00e5ff", "#b6ff3b", "#ff6a00", "#111", "#fff200"];
+    function resizeGeo() {
+      var dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      geo.width = Math.floor(window.innerWidth * dpr);
+      geo.height = Math.floor(window.innerHeight * dpr);
+      geo.style.width = window.innerWidth + "px";
+      geo.style.height = window.innerHeight + "px";
+      gctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    function seed() {
+      bits = [];
+      var i, w = window.innerWidth, h = window.innerHeight;
+      for (i = 0; i < 28; i++) {
+        bits.push({
+          t: i % 3,
+          x: Math.random() * w,
+          y: Math.random() * h,
+          s: 18 + Math.random() * 70,
+          r: Math.random() * Math.PI,
+          v: 0.002 + Math.random() * 0.008,
+          c: colors[i % colors.length],
+          vx: -0.25 + Math.random() * 0.5,
+          vy: -0.2 + Math.random() * 0.4
+        });
+      }
+    }
+    function drawGeo() {
+      var w = window.innerWidth, h = window.innerHeight, i, b;
+      gctx.clearRect(0, 0, w, h);
+      for (i = 0; i < bits.length; i++) {
+        b = bits[i];
+        b.r += b.v;
+        b.x += b.vx;
+        b.y += b.vy;
+        if (b.x < -80) b.x = w + 80;
+        if (b.x > w + 80) b.x = -80;
+        if (b.y < -80) b.y = h + 80;
+        if (b.y > h + 80) b.y = -80;
+        gctx.save();
+        gctx.translate(b.x, b.y);
+        gctx.rotate(b.r);
+        gctx.fillStyle = b.c;
+        if (b.t === 0) {
+          gctx.fillRect(-b.s / 2, -b.s / 2, b.s, b.s);
+        } else if (b.t === 1) {
+          gctx.beginPath();
+          gctx.arc(0, 0, b.s / 2, 0, Math.PI * 2);
+          gctx.fill();
+        } else {
+          gctx.beginPath();
+          gctx.moveTo(0, -b.s / 2);
+          gctx.lineTo(b.s / 2, b.s / 2);
+          gctx.lineTo(-b.s / 2, b.s / 2);
+          gctx.closePath();
+          gctx.fill();
+        }
+        gctx.restore();
+      }
+      window.requestAnimationFrame(drawGeo);
+    }
+    resizeGeo();
+    seed();
+    drawGeo();
+    window.addEventListener("resize", function () { resizeGeo(); seed(); });
+  }
+
   var cine = document.querySelector("[data-cine]");
   if (cine) {
     var FRAME_COUNT = parseInt(cine.getAttribute("data-frame-count"), 10) || 43;

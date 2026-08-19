@@ -130,6 +130,7 @@ def _static_asset_version() -> str:
         static_dir / "site.css",
         static_dir / "uc.css",
         static_dir / "cine.css",
+        static_dir / "geo.css",
         static_dir / "helix180.css",
         static_dir / "site.js",
         *sorted((static_dir / "js").glob("*.js")),
